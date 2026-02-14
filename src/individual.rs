@@ -1,5 +1,6 @@
 use crate::node::{Node, Op};
 
+#[derive(Clone)]
 pub struct Individual {
     pub nodes: Vec<Node>,
     pub fitness: f64,

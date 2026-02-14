@@ -1,7 +1,9 @@
+#[derive(Clone)]
 pub enum Op {
     Add, Sub, Mul, Div, Sin, Cos, Exp
 }
 
+#[derive(Clone)]
 pub enum Node {
     Operator(Op),
     Variable(usize),
