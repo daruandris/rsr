@@ -1,8 +1,10 @@
+use rand::RngExt;
 use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256PlusPlus;
 use rayon::prelude::*;
 
 use crate::individual::{Individual};
+use crate::operators::*;
 
 pub struct Island {
     pub individuals: Vec<Individual>,
@@ -33,8 +35,20 @@ impl Island {
         let mut next_gen = Vec::with_capacity(pop_size);
         next_gen.push(self.best_individual.clone());
         while next_gen.len() < pop_size {
-            // TODO: operátorok meghívása
-            next_gen.push(self.best_individual.clone());
+            let p: f64 = self.rng.random();
+            if p < 0.85 {
+                let parent1 = tournament_selection(&self.individuals, 3, &mut self.rng);
+                let parent2 = tournament_selection(&self.individuals, 3, &mut self.rng);
+
+                let child = crossover(parent1, parent2, &mut self.rng);
+                next_gen.push(child);
+            }
+            else{
+                let child = tournament_selection(&self.individuals, 3, &mut self.rng).clone();
+                
+                // TODO: mutation
+                next_gen.push(child);
+            }
         }
 
         for ind in next_gen.iter_mut() {
