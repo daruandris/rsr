@@ -57,4 +57,22 @@ impl Individual {
         stack.pop().unwrap_or(f64::NAN)
     }
 
+    pub fn get_subtree_bounds(&self, root_idx: usize) -> (usize, usize) {
+        let mut needed = 1;
+        let mut current_idx = root_idx;
+        loop {
+            needed += self.nodes[current_idx].arity() - 1;
+            if needed == 0{
+                return (current_idx, root_idx);
+            }
+
+            if current_idx == 0 {
+                break ;
+            }
+            current_idx -= 1;
+        }
+
+        (0, root_idx)
+    }
+
 }
