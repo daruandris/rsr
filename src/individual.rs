@@ -25,7 +25,7 @@ impl Individual {
                 Node::Variable(v) => stack.push(features[*v]),
                 Node::Operator(op) => match op {
                     Op::Add | Op::Sub | Op::Mul | Op::Div => {
-                        if let (Some(a), Some(b)) = (stack.pop(), stack.pop()){
+                        if let (Some(b), Some(a)) = (stack.pop(), stack.pop()){
                             let result = match op {
                                 Op::Add => a + b,
                                 Op::Sub => a - b,

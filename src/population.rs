@@ -136,6 +136,7 @@ impl Island {
         }
 
         if self.stagnation_counter >= config.stagnation_threshold {
+            println!("NUKING!");
             self.individuals.clear();
             self.individuals.push(self.best_individual.clone());
             
