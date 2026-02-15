@@ -61,7 +61,7 @@ impl Individual {
         let mut needed = 1;
         let mut current_idx = root_idx;
         loop {
-            needed += self.nodes[current_idx].arity() - 1;
+            needed = needed + self.nodes[current_idx].arity() - 1;
             if needed == 0{
                 return (current_idx, root_idx);
             }

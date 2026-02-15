@@ -13,11 +13,11 @@ pub struct Island {
 }
 
 impl Island {
-    pub fn new(size: usize, seed: u64) -> Self {
+    pub fn new(size: usize, seed: u64, num_features: usize) -> Self {
         let mut rng = Xoshiro256PlusPlus::seed_from_u64(seed);
         let mut individuals = Vec::with_capacity(size);
         for _ in 0..size {
-            let ast = generate_random_ast(5, &mut rng, 3);
+            let ast = generate_random_ast(5, &mut rng, num_features);
             individuals.push(Individual::new(ast));
         }
 
@@ -92,10 +92,10 @@ pub struct Engine {
 }
 
 impl Engine {
-    pub fn new(num_islands: usize, island_size: usize) -> Self {
+    pub fn new(num_islands: usize, island_size: usize, num_features: usize) -> Self {
         let mut islands = Vec::with_capacity(num_islands);
         for i in 0..num_islands{
-            islands.push(Island::new(island_size, 42 + i as u64));
+            islands.push(Island::new(island_size, 42 + i as u64, num_features));
         }
         Self { islands }
     }
