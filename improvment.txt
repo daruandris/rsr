@@ -1,0 +1,19 @@
+A. BFGS / L-BFGS Konstans Optimalizáció
+
+Te jelenleg "kézzel" tologatod a konstansokat egy gradiens ereszkedéssel, ami lassú és gyakran lokális minimumban ragad. A tudományos motorok a híres L-BFGS (Broyden–Fletcher–Goldfarb–Shanno) algoritmust (vagy Nelder-Meadet) használják, ami másodrendű deriváltakat (Hesse-mátrix közelítést) is figyel. Ezért tud a PySR másodpercek alatt rátalálni a tökéletes 3.1415-re, amíg a sima GP csak "szenved" a racionális törtekkel.
+
+
+B. SIMD Vektorizáció (Batched Evaluation)
+
+A kódod egy for ciklussal, soronként értékeli ki az adatokat: let pred = self.evaluate(row);. A legjobb C++ motorok (mint az Operon) az egész data_x adathalmazt egyszerre küldik át a fán. Nem egyetlen f64 számot adnak össze a + operátornál, hanem egy 256 bites AVX regisztert használva egyszerre 4 vagy 8 adatsort számolnak ki egyetlen processzor-órajelen belül. Ez 5-10-szeres sebességnövekedést ad a nyers kiértékelésnél.
+
+
+C. Age-Fitness Pareto (Túlélés kor alapján)
+
+Amikor a motorod stagnál, te a "NUKING" stratégiát használod: megtartod a legjobbat, és mindenki mást legyilkolsz. Ez egy működő módszer, de az új trend az ALPS (Age-Layered Population Structure).
+A motor minden egyednél nyilvántartja az "életkorát" (hány generáció óta létezik). A Pareto-front nemcsak a Hossz és a Hiba alapján választ, hanem védi a fiatal, még pontatlanabb egyedeket az ősi, már lokális minimumba ragadt, szuperpontos fákkal szemben. Így sosincs szükség drasztikus törlésre (Nuking).
+
+
+D. Súlyozott Komplexitás
+
+A te motorodban az egyenlet hossza egyszerűen a csomópontok száma (nodes.len()). Az ipari motorokban operátoronként eltérő súlyok vannak: az összeadás (+) olcsó (pl. súlya 1), de egy sin() vagy exp() drága (súlya 2 vagy 3). Emiatt a Pareto-front előnyben részesíti a polinomokat a bonyolult trigonometriai ágyazásokkal szemben.

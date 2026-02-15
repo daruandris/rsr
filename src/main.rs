@@ -14,18 +14,24 @@ fn main() {
     println!("=== Szimbolikus Regressziós Motor ===");
     println!("Cél: y=2.5⋅exp(-0.5⋅X0​)⋅cos(3.0⋅X1​)");
     
-    let num_samples = 200;
+    let num_samples = 300;
     let mut data_x = Vec::with_capacity(num_samples);
     let mut data_y = Vec::with_capacity(num_samples);
     
     let mut rng = rand::rng();
     
-    let num_features = 1;
+    let num_features = 3;
 
     for _ in 0..num_samples {
-        let x0: f64 = rng.random_range(-3.14..3.14);
-        data_x.push(vec![x0]);
-        data_y.push(2.0 * (3.0 * x0.cos()).sin());
+        let v0 = rng.random_range(0.0..15.0); // Kezdősebesség (pl. m/s)
+        let t = rng.random_range(0.1..10.0);  // Idő (másodperc, csak pozitív!)
+        let a = rng.random_range(-9.81..9.81); // Gyorsulás (lehet negatív is, pl. fékezés)
+        
+        data_x.push(vec![v0, t, a]);
+        
+        // s = v0*t + 0.5 * a * t^2
+        let distance = v0 * t + 0.5 * a * t * t;
+        data_y.push(distance);
     }
 
     let config = EvolutionConfig {
