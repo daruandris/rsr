@@ -2,6 +2,7 @@ use rand::RngExt;
 use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256PlusPlus;
 use rayon::prelude::*;
+use std::collections::HashMap;
 
 use crate::individual::{Individual};
 use crate::operators::*;
@@ -30,6 +31,7 @@ pub struct Island {
     pub best_individual: Individual,
     pub rng: Xoshiro256PlusPlus,
     pub stagnation_counter: usize,
+    pub local_hof: HashMap<usize, (f64, Individual)>,
 }
 
 impl Island {
@@ -48,6 +50,7 @@ impl Island {
             best_individual,
             rng,
             stagnation_counter: 0,
+            local_hof: HashMap::new(),
         }
     }
 
@@ -92,6 +95,18 @@ impl Island {
             }
 
             let mse = ind.calculate_mse(data_x, data_y);
+
+            if mse.is_finite() {
+                let complexity = ind.nodes.len();
+                let is_new_best = match self.local_hof.get(&complexity) {
+                    Some(&(best_mse, _)) => mse < best_mse,
+                    None => true,
+                };
+                if is_new_best {
+                    self.local_hof.insert(complexity, (mse, ind.clone()));
+                }
+            }
+
             let complexity_penalty = (ind.nodes.len() as f64) * config.parsimony_penalty;
 
             if mse.is_finite() {
@@ -141,6 +156,7 @@ impl Island {
 pub struct Engine {
     pub islands: Vec<Island>,
     pub config: EvolutionConfig,
+    pub global_hof: HashMap<usize, (f64, Individual)>,
 }
 
 impl Engine {
@@ -149,7 +165,7 @@ impl Engine {
         for i in 0..config.num_islands{
             islands.push(Island::new(config.island_size, 42 + i as u64, num_features));
         }
-        Self { islands, config }
+        Self { islands, config, global_hof: HashMap::new() }
     }
 
     pub fn run_evolution(&mut self, data_x: &[Vec<f64>], data_y: &[f64]){
@@ -158,6 +174,18 @@ impl Engine {
             self.islands.par_iter_mut().for_each(|island| {
                 island.step_generation(data_x, data_y, &config);
             });
+
+            for island in &self.islands{
+                for (&complexity, &(mse, ref ind)) in &island.local_hof {
+                    let is_global_best = match self.global_hof.get(&complexity){
+                        Some(&(best_mse,_)) => mse < best_mse,
+                        None => true,
+                    };
+                    if is_global_best {
+                        self.global_hof.insert(complexity, (mse, ind.clone()));
+                    }
+                }
+            }
 
             let global_best = self.get_global_best();
             let pure_mse = global_best.calculate_mse(data_x, data_y);
@@ -195,5 +223,24 @@ impl Engine {
             .min_by(|a,b| a.best_individual.fitness.partial_cmp(&b.best_individual.fitness).unwrap())
             .map(|island| &island.best_individual)
             .unwrap()
+    }
+
+    pub fn get_pareto_front(&self) -> Vec<(usize, f64, Individual)> {
+        let mut front: Vec<(usize, f64, Individual)> = self.global_hof.iter()
+            .map(|(&c, &(mse, ref ind))| (c, mse, ind.clone()))
+            .collect();
+        front.sort_by_key(|k| k.0);
+
+        let mut pareto = Vec::new();
+        let mut best_mse = f64::MAX;
+
+        for (comp, mse, ind) in front {
+            if mse < best_mse {
+                best_mse = mse;
+                pareto.push((comp, mse, ind));
+            }
+        }
+
+        pareto
     }
 }

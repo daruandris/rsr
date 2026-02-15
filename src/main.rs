@@ -46,10 +46,13 @@ fn main() {
     println!("Evolúció indítása ({} generáció)...", config.max_generations);
     engine.run_evolution(&data_x, &data_y);
 
-    let best = engine.get_global_best();
     println!("\n=== Evolúció Befejeződött ===");
-    println!("Legjobb fitness (MSE + büntetés): {:.6}", best.fitness);
-    println!("Kifejezés hossza: {} csomópont (AST)", best.nodes.len());
+    let pareto_front = engine.get_pareto_front();
     
-    println!("\nTalált Képlet: {}", best);
+    println!("\n--- PARETO FRONT (A Legjobb Egyenletek Hossz Szerint) ---");
+    println!("{:<6} | {:<20} | {}", "Hossz", "Tiszta MSE Hiba", "Egyenlet");
+    println!("------------------------------------------------------------");
+    for (complexity, mse, ind) in pareto_front {
+        println!("{:<6} | {:<20.8} | {}", complexity, mse, ind);
+    }
 }
