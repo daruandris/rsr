@@ -1,5 +1,6 @@
+// src/main.rs
 use std::f64::consts::PI;
-use population::Engine;
+use population::{Engine, EvolutionConfig};
 
 pub mod node;
 pub mod individual;
@@ -8,7 +9,7 @@ pub mod operators;
 
 fn main() {
     println!("=== Szimbolikus Regressziós Motor ===");
-    println!("Szintetikus adatok generálása: y = X0 * X0 + 3.0 * sin(X1)...");
+    println!("Cél: y = (X0 * X0) + 3.0 * sin(X1)...");
     
     let num_samples = 200;
     let num_features = 2;
@@ -18,30 +19,32 @@ fn main() {
     for i in 0..num_samples {
         let x0 = (i as f64 / num_samples as f64) * 4.0 - 2.0;
         let x1 = (i as f64 / num_samples as f64) * 2.0 * PI;
-        
         data_x.push(vec![x0, x1]);
-        // Az elvárt y érték
         data_y.push(x0 * x0 + 3.0 * x1.sin());
     }
 
-    // A SOTA stratégia szerint beállítjuk a sziget-modellt: [cite: 43]
-    let num_islands = 4; // Logikai magok száma (pl. 4 mag = 4 sziget) [cite: 44]
-    let island_size = 50; // 50 egyed per sziget [cite: 46]
+    // A stratégiai paraméterek SOTA alapokon 
+    let config = EvolutionConfig {
+        num_islands: 4,               // Logikai magok száma
+        island_size: 200,             // Növelve 50-ről 200-ra a jobb diverzitásért
+        max_generations: 500,         
+        crossover_rate: 0.85,         // 85% keresztezés, 15% mutáció
+        tournament_size: 5,           // Nagyobb nyomás a pontosabb egyedekért
+        migration_interval: 20,       // Minden 20. generációban sziget-migráció
+        parsimony_penalty: 0.001,     // Büntetés a hosszú kifejezésekért
+    };
     
-    println!("Motor inicializálása: {} sziget, egyenként {} egyeddel...", num_islands, island_size);
-    let mut engine = Engine::new(num_islands, island_size, num_features);
+    println!("Motor inicializálása: {} sziget, egyenként {} egyeddel...", config.num_islands, config.island_size);
+    let mut engine = Engine::new(config, num_features);
 
-    let max_generations = 500;
-    println!("Evolúció indítása ({} generáció)...", max_generations);
-    
-    // START! Itt a Rayon szétosztja a munkát a CPU magokon
-    engine.run_evolution(max_generations, &data_x, &data_y);
+    println!("Evolúció indítása ({} generáció)...", config.max_generations);
+    engine.run_evolution(&data_x, &data_y);
 
     let best = engine.get_global_best();
     println!("\n=== Evolúció Befejeződött ===");
-    println!("Legjobb fitness (MSE + büntetés): {}", best.fitness);
+    println!("Legjobb fitness (MSE + büntetés): {:.6}", best.fitness);
     println!("Kifejezés hossza: {} csomópont (AST)", best.nodes.len());
     
-    // Kiírjuk a lapos postfix tömböt, hogy lássuk a struktúrát
-    println!("Postfix struktúra: {:?}", best.nodes);
+    // Az új Display trait használata a gyönyörű kiíráshoz
+    println!("\nTalált Képlet: {}", best);
 }
