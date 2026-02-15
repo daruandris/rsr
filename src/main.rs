@@ -2,10 +2,13 @@ use std::f64::consts::PI;
 use population::{Engine, EvolutionConfig};
 use rand::RngExt;
 
+use simplify::simplify_symengine;
+
 pub mod node;
 pub mod individual;
 pub mod population;
 pub mod operators;
+pub mod simplify;
 
 fn main() {
     println!("=== Szimbolikus Regressziós Motor ===");
@@ -60,6 +63,8 @@ fn main() {
     println!("{:<6} | {:<20} | {}", "Hossz", "Tiszta MSE Hiba", "Egyenlet");
     println!("------------------------------------------------------------");
     for (complexity, mse, ind) in pareto_front {
-        println!("{:<6} | {:<20.8} | {}", complexity, mse, ind);
+        let raw_eq = ind.to_string();
+        let clean_eq = simplify_symengine(&raw_eq);
+        println!("{:<6} | {:<20.8} | {}", complexity, mse, clean_eq);
     }
 }
