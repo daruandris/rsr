@@ -77,6 +77,70 @@ impl Individual {
         (0, root_idx)
     }
 
+    pub fn get_constants(&self) -> Vec<f64> {
+        self.nodes.iter().filter_map(|node| {
+            if let Node::Constant(c) = node {Some(*c)} else { None }
+        }).collect()
+    }
+
+    pub fn set_constants(&mut self, new_constants: &[f64]) {
+        let mut const_idx = 0;
+        for node in self.nodes.iter_mut() {
+            if let Node::Constant(c) = node {
+                if const_idx < new_constants.len() {
+                    *c = new_constants[const_idx];
+                    const_idx += 1;
+                }
+            }
+        }
+    }
+
+    pub fn calculate_mse(&self, data_x: &[Vec<f64>], data_y: &[f64]) -> f64 {
+        let mut sum_error = 0.0;
+        for (i, row) in data_x.iter().enumerate() {
+            let pred = self.evaluate(row);
+            let diff = pred - data_y[i];
+            sum_error += diff * diff;
+        }
+        sum_error / (data_x.len() as f64)
+    }
+
+    pub fn optimize_constants(
+        &mut self, 
+        data_x: &[Vec<f64>], 
+        data_y: &[f64],
+        iterations: usize,
+        lr: f64,
+        epsilon: f64)
+        {
+        let mut consts = self.get_constants();
+        if consts.is_empty() { return; }
+
+        for _ in 0..iterations {
+            let current_mse = self.calculate_mse(data_x, data_y);
+            let mut gradients = vec![0.0; consts.len()];
+            for i in 0..consts.len() {
+                let original_val = consts[i];
+                consts[i] = original_val + epsilon;
+                self.set_constants(&consts);
+                let plus_mse = self.calculate_mse(data_x, data_y);
+                gradients[i] = (plus_mse - current_mse) / epsilon;
+                
+                consts[i] = original_val;
+            }
+            let mut improved = false;
+            for i in 0..consts.len() {
+                let grad = gradients[i].clamp(-10.0, 10.0);
+                consts[i] -= lr * grad;
+                
+                if grad.abs() > 1e-6 { improved = true; }
+            }
+
+            self.set_constants(&consts);
+            if !improved { break; }
+        }
+    }
+
 }
 
 impl fmt::Display for Individual {

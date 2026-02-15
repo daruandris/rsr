@@ -14,13 +14,22 @@ pub struct EvolutionConfig {
     pub crossover_rate: f64,
     pub tournament_size: usize,
     pub migration_interval: usize,
-    pub parsimony_penalty: f64
+    pub parsimony_penalty: f64,
+
+    pub opt_prob: f64,
+    pub opt_iterations: usize,
+    pub opt_lr: f64,
+    pub opt_epsilon: f64,
+
+    pub stagnation_threshold: usize,
+    pub target_mse: f64,
 }
 
 pub struct Island {
     pub individuals: Vec<Individual>,
     pub best_individual: Individual,
     pub rng: Xoshiro256PlusPlus,
+    pub stagnation_counter: usize,
 }
 
 impl Island {
@@ -37,7 +46,8 @@ impl Island {
         Self {
             individuals,
             best_individual,
-            rng
+            rng,
+            stagnation_counter: 0,
         }
     }
 
@@ -68,16 +78,20 @@ impl Island {
             }
         }
 
-        for ind in next_gen.iter_mut() {
-            let mut sum_error = 0.0;
-            let n = data_x.len() as f64;
+        let mut improved_this_gen = false;
 
-            for (i, row) in data_x.iter().enumerate(){
-                let pred = ind.evaluate(row);
-                let diff = pred - data_y[i];
-                sum_error += diff * diff;
+        for ind in next_gen.iter_mut() {
+            if self.rng.random::<f64>() < config.opt_prob {
+                ind.optimize_constants(
+                    data_x, 
+                    data_y, 
+                    config.opt_iterations,
+                    config.opt_lr,
+                    config.opt_epsilon
+                );
             }
-            let mse = sum_error / n;
+
+            let mse = ind.calculate_mse(data_x, data_y);
             let complexity_penalty = (ind.nodes.len() as f64) * config.parsimony_penalty;
 
             if mse.is_finite() {
@@ -89,11 +103,38 @@ impl Island {
 
             if ind.fitness < self.best_individual.fitness {
                 self.best_individual = ind.clone();
+                improved_this_gen = true;
             }
             
         }
 
         self.individuals = next_gen;
+
+        if improved_this_gen {
+            self.stagnation_counter = 0;
+        } else {
+            self.stagnation_counter += 1;
+        }
+
+        if self.stagnation_counter >= config.stagnation_threshold {
+            self.individuals.clear();
+            self.individuals.push(self.best_individual.clone());
+            
+            for _ in 1..pop_size {
+                let ast = generate_random_ast(5, &mut self.rng, num_features);
+                let mut new_ind = Individual::new(ast);
+                
+                let mse = new_ind.calculate_mse(data_x, data_y);
+                let penalty = (new_ind.nodes.len() as f64) * config.parsimony_penalty;
+                if mse.is_finite() {
+                    new_ind.fitness = mse + penalty;
+                }
+                
+                self.individuals.push(new_ind);
+            }
+            
+            self.stagnation_counter = 0;
+        }
     }
 }
 
@@ -118,10 +159,19 @@ impl Engine {
                 island.step_generation(data_x, data_y, &config);
             });
 
+            let global_best = self.get_global_best();
+            let pure_mse = global_best.calculate_mse(data_x, data_y);
+
+            if pure_mse <= config.target_mse {
+                println!("\n>>> CÉL ELÉRVE a(z) {}. generációban! <<<", generation);
+                println!("Tiszta MSE: {:.8}", pure_mse);
+                println!("Egyenlet: {}", global_best);
+                break;
+            }
+
             if generation > 0 && generation % config.migration_interval == 0 {
                 self.migrate_individuals();
-                let global_best = self.get_global_best();
-                println!("Generáció: {}, Legjobb MSE: {}\n Egyenlet: {}", generation, global_best.fitness, global_best);
+                println!("Generáció: {}, Legjobb MSE: {}\n Egyenlet: {}", generation, pure_mse, self.get_global_best());
             }
         }
     }

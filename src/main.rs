@@ -1,4 +1,3 @@
-// src/main.rs
 use std::f64::consts::PI;
 use population::{Engine, EvolutionConfig};
 
@@ -23,15 +22,22 @@ fn main() {
         data_y.push(x0 * x0 + 3.0 * x1.sin());
     }
 
-    // A stratégiai paraméterek SOTA alapokon 
     let config = EvolutionConfig {
-        num_islands: 4,               // Logikai magok száma
-        island_size: 200,             // Növelve 50-ről 200-ra a jobb diverzitásért
-        max_generations: 500,         
-        crossover_rate: 0.85,         // 85% keresztezés, 15% mutáció
-        tournament_size: 5,           // Nagyobb nyomás a pontosabb egyedekért
-        migration_interval: 20,       // Minden 20. generációban sziget-migráció
-        parsimony_penalty: 0.001,     // Büntetés a hosszú kifejezésekért
+        num_islands: 4,
+        island_size: 500,
+        max_generations: 2000,         
+        crossover_rate: 0.85,
+        tournament_size: 3,
+        migration_interval: 25,
+        parsimony_penalty: 0.005,
+
+        opt_prob: 0.05,
+        opt_iterations: 3,
+        opt_lr: 0.5,
+        opt_epsilon: 1e-5,
+        
+        stagnation_threshold: 50,
+        target_mse: 1e-6,
     };
     
     println!("Motor inicializálása: {} sziget, egyenként {} egyeddel...", config.num_islands, config.island_size);
@@ -45,6 +51,5 @@ fn main() {
     println!("Legjobb fitness (MSE + büntetés): {:.6}", best.fitness);
     println!("Kifejezés hossza: {} csomópont (AST)", best.nodes.len());
     
-    // Az új Display trait használata a gyönyörű kiíráshoz
     println!("\nTalált Képlet: {}", best);
 }
