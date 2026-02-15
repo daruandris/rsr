@@ -40,7 +40,9 @@ impl Island {
         let mut individuals = Vec::with_capacity(size);
         for _ in 0..size {
             let ast = generate_random_ast(5, &mut rng, num_features);
-            individuals.push(Individual::new(ast));
+            let mut ind = Individual::new(ast);
+            ind.simplify();
+            individuals.push(ind);
         }
 
         let best_individual = individuals[0].clone();
@@ -65,7 +67,8 @@ impl Island {
                 let parent1 = tournament_selection(&self.individuals, config.tournament_size, &mut self.rng);
                 let parent2 = tournament_selection(&self.individuals, config.tournament_size, &mut self.rng);
 
-                let child = crossover(parent1, parent2, &mut self.rng);
+                let mut child = crossover(parent1, parent2, &mut self.rng);
+                child.simplify();
                 next_gen.push(child);
             }
             else{
@@ -77,6 +80,7 @@ impl Island {
                     1 => constant_perturbation(&mut child, &mut self.rng),
                     _ => subtree_mutation(&mut child, &mut self.rng, num_features),
                 }
+                child.simplify();
                 next_gen.push(child);
             }
         }
@@ -138,6 +142,7 @@ impl Island {
             for _ in 1..pop_size {
                 let ast = generate_random_ast(5, &mut self.rng, num_features);
                 let mut new_ind = Individual::new(ast);
+                new_ind.simplify();
                 
                 let mse = new_ind.calculate_mse(data_x, data_y);
                 let penalty = (new_ind.nodes.len() as f64) * config.parsimony_penalty;
