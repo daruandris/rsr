@@ -1,4 +1,4 @@
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum Op {
     Add, Sub, Mul, Div, Sin, Cos, Exp
 }

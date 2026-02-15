@@ -14,11 +14,11 @@ pub struct Island {
 
 impl Island {
     pub fn new(size: usize, seed: u64) -> Self {
-        let rng = Xoshiro256PlusPlus::seed_from_u64(seed);
+        let mut rng = Xoshiro256PlusPlus::seed_from_u64(seed);
         let mut individuals = Vec::with_capacity(size);
         for _ in 0..size {
-            // TODO: ast generálás
-            individuals.push(Individual::new(vec![]));
+            let ast = generate_random_ast(5, &mut rng, 3);
+            individuals.push(Individual::new(ast));
         }
 
         let best_individual = individuals[0].clone();
@@ -31,6 +31,7 @@ impl Island {
     }
 
     pub fn step_generation(&mut self, data_x: &[Vec<f64>], data_y: &[f64]) {
+        let num_features = if data_x.is_empty() {1} else {data_x[0].len()};
         let pop_size = self.individuals.capacity();
         let mut next_gen = Vec::with_capacity(pop_size);
         next_gen.push(self.best_individual.clone());
@@ -44,17 +45,42 @@ impl Island {
                 next_gen.push(child);
             }
             else{
-                let child = tournament_selection(&self.individuals, 3, &mut self.rng).clone();
+                let mut child = tournament_selection(&self.individuals, 3, &mut self.rng).clone();
+                let mut_type = self.rng.random_range(0..3);
                 
-                // TODO: mutation
+                match mut_type{
+                    0 => point_mutation(&mut child, &mut self.rng, num_features),
+                    1 => constant_perturbation(&mut child, &mut self.rng),
+                    _ => subtree_mutation(&mut child, &mut self.rng, num_features),
+                }
                 next_gen.push(child);
             }
         }
 
         for ind in next_gen.iter_mut() {
+            let mut sum_error = 0.0;
+            let n = data_x.len() as f64;
+
+            for (i, row) in data_x.iter().enumerate(){
+                let pred = ind.evaluate(row);
+                let diff = pred - data_y[i];
+                sum_error += diff * diff;
+            }
+            let mse = sum_error / n;
+            let lambda = 0.001;
+            let complexity_penalty = (ind.nodes.len() as f64) * lambda;
+
+            if mse.is_finite() {
+                ind.fitness = mse + complexity_penalty;
+            }
+            else{
+                ind.fitness = f64::MAX;
+            }
+
             if ind.fitness < self.best_individual.fitness {
                 self.best_individual = ind.clone();
             }
+            
         }
 
         self.individuals = next_gen;

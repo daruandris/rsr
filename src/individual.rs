@@ -14,7 +14,7 @@ impl Individual {
         }
     }
 
-    pub fn evaulate(&self, features: &[f64]) -> f64 {
+    pub fn evaluate(&self, features: &[f64]) -> f64 {
         let mut stack = Vec::with_capacity(32);
 
         for node in &self.nodes{
