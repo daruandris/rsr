@@ -11,7 +11,7 @@ pub enum Node {
 }
 
 impl Node {
-    pub fn arity(&self) -> usize{
+    pub fn arity(&self) -> usize {
         match self {
             Node::Constant(_) | Node::Variable(_) => 0,
             Node::Operator(op) => match op {

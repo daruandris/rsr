@@ -1,14 +1,7 @@
-use std::f64::consts::PI;
-use population::{Engine, EvolutionConfig};
+use rsr::EvolutionConfig; // Itt használd a Cargo.toml-ben megadott nevet!
+use rsr::Engine;
+use rsr::ffi::symengine::simplify_symengine;
 use rand::RngExt;
-
-use simplify::simplify_symengine;
-
-pub mod node;
-pub mod individual;
-pub mod population;
-pub mod operators;
-pub mod simplify;
 
 fn main() {
     println!("=== Szimbolikus Regressziós Motor ===");
@@ -23,13 +16,12 @@ fn main() {
     let num_features = 3;
 
     for _ in 0..num_samples {
-        let v0 = rng.random_range(0.0..15.0); // Kezdősebesség (pl. m/s)
-        let t = rng.random_range(0.1..10.0);  // Idő (másodperc, csak pozitív!)
-        let a = rng.random_range(-9.81..9.81); // Gyorsulás (lehet negatív is, pl. fékezés)
+        let v0 = rng.random_range(0.0..15.0);
+        let t = rng.random_range(0.1..10.0);
+        let a = rng.random_range(-9.81..9.81);
         
         data_x.push(vec![v0, t, a]);
         
-        // s = v0*t + 0.5 * a * t^2
         let distance = v0 * t + 0.5 * a * t * t;
         data_y.push(distance);
     }
@@ -41,7 +33,7 @@ fn main() {
         crossover_rate: 0.85,
         tournament_size: 3,
         migration_interval: 25,
-        parsimony_penalty: 0.005,
+        parsimony_penalty: 0.01,
 
         opt_prob: 0.05,
         opt_iterations: 3,

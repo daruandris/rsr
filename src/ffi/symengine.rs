@@ -1,6 +1,5 @@
 use std::{ffi::{CStr, CString}, os::raw::c_char};
 
-
 unsafe extern "C" {
     fn simplify_symengine_cpp(input: *const c_char, output: *mut c_char, max_len: usize);
 }
@@ -12,7 +11,8 @@ pub fn simplify_symengine(eq: &str) -> String {
         simplify_symengine_cpp(
             c_input.as_ptr(), 
             buffer.as_mut_ptr() as *mut c_char, 
-            buffer.len());
+            buffer.len()
+        );
         
         CStr::from_ptr(buffer.as_ptr() as *const c_char)
             .to_string_lossy()

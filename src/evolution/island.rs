@@ -1,30 +1,14 @@
 use rand::RngExt;
 use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256PlusPlus;
-use rayon::prelude::*;
 use std::collections::HashMap;
 
-use crate::individual::{Individual};
-use crate::operators::*;
-
-#[derive(Clone, Copy, Debug)]
-pub struct EvolutionConfig {
-    pub num_islands: usize,
-    pub island_size: usize,
-    pub max_generations: usize,
-    pub crossover_rate: f64,
-    pub tournament_size: usize,
-    pub migration_interval: usize,
-    pub parsimony_penalty: f64,
-
-    pub opt_prob: f64,
-    pub opt_iterations: usize,
-    pub opt_lr: f64,
-    pub opt_epsilon: f64,
-
-    pub stagnation_threshold: usize,
-    pub target_mse: f64,
-}
+use crate::evolution::config::EvolutionConfig;
+use crate::evolution::individual::Individual;
+use crate::operators::crossover::crossover;
+use crate::operators::generator::generate_random_ast;
+use crate::operators::mutation::{constant_perturbation, point_mutation, subtree_mutation};
+use crate::operators::selection::tournament_selection;
 
 pub struct Island {
     pub individuals: Vec<Individual>,
@@ -57,10 +41,20 @@ impl Island {
     }
 
     pub fn step_generation(&mut self, data_x: &[Vec<f64>], data_y: &[f64], config: &EvolutionConfig) {
-        let num_features = if data_x.is_empty() {1} else {data_x[0].len()};
+        let num_features = if data_x.is_empty() { 1 } else { data_x[0].len() };
+        
+        let mut next_gen = self.create_next_generation(config, num_features);
+        let improved_this_gen = self.evaluate_and_optimize(&mut next_gen, data_x, data_y, config);
+        
+        self.individuals = next_gen;
+        self.handle_stagnation(improved_this_gen, config, num_features, data_x, data_y);
+    }
+
+    fn create_next_generation(&mut self, config: &EvolutionConfig, num_features: usize) -> Vec<Individual> {
         let pop_size = self.individuals.capacity();
         let mut next_gen = Vec::with_capacity(pop_size);
         next_gen.push(self.best_individual.clone());
+
         while next_gen.len() < pop_size {
             let p: f64 = self.rng.random();
             if p < config.crossover_rate {
@@ -70,12 +64,11 @@ impl Island {
                 let mut child = crossover(parent1, parent2, &mut self.rng);
                 child.simplify();
                 next_gen.push(child);
-            }
-            else{
+            } else {
                 let mut child = tournament_selection(&self.individuals, config.tournament_size, &mut self.rng).clone();
                 let mut_type = self.rng.random_range(0..3);
                 
-                match mut_type{
+                match mut_type {
                     0 => point_mutation(&mut child, &mut self.rng, num_features),
                     1 => constant_perturbation(&mut child, &mut self.rng),
                     _ => subtree_mutation(&mut child, &mut self.rng, num_features),
@@ -84,7 +77,10 @@ impl Island {
                 next_gen.push(child);
             }
         }
+        next_gen
+    }
 
+    fn evaluate_and_optimize(&mut self, next_gen: &mut Vec<Individual>, data_x: &[Vec<f64>], data_y: &[f64], config: &EvolutionConfig) -> bool {
         let mut improved_this_gen = false;
 
         for ind in next_gen.iter_mut() {
@@ -115,8 +111,7 @@ impl Island {
 
             if mse.is_finite() {
                 ind.fitness = mse + complexity_penalty;
-            }
-            else{
+            } else {
                 ind.fitness = f64::MAX;
             }
 
@@ -124,12 +119,12 @@ impl Island {
                 self.best_individual = ind.clone();
                 improved_this_gen = true;
             }
-            
         }
+        improved_this_gen
+    }
 
-        self.individuals = next_gen;
-
-        if improved_this_gen {
+    fn handle_stagnation(&mut self, improved: bool, config: &EvolutionConfig, num_features: usize, data_x: &[Vec<f64>], data_y: &[f64]) {
+        if improved {
             self.stagnation_counter = 0;
         } else {
             self.stagnation_counter += 1;
@@ -137,6 +132,7 @@ impl Island {
 
         if self.stagnation_counter >= config.stagnation_threshold {
             println!("NUKING!");
+            let pop_size = self.individuals.capacity();
             self.individuals.clear();
             self.individuals.push(self.best_individual.clone());
             
@@ -156,97 +152,5 @@ impl Island {
             
             self.stagnation_counter = 0;
         }
-    }
-}
-
-pub struct Engine {
-    pub islands: Vec<Island>,
-    pub config: EvolutionConfig,
-    pub global_hof: HashMap<usize, (f64, Individual)>,
-}
-
-impl Engine {
-    pub fn new(config: EvolutionConfig, num_features: usize) -> Self {
-        let mut islands = Vec::with_capacity(config.num_islands);
-        for i in 0..config.num_islands{
-            islands.push(Island::new(config.island_size, 42 + i as u64, num_features));
-        }
-        Self { islands, config, global_hof: HashMap::new() }
-    }
-
-    pub fn run_evolution(&mut self, data_x: &[Vec<f64>], data_y: &[f64]){
-        let config = self.config.clone();
-        for generation in 0..config.max_generations{
-            self.islands.par_iter_mut().for_each(|island| {
-                island.step_generation(data_x, data_y, &config);
-            });
-
-            for island in &self.islands{
-                for (&complexity, &(mse, ref ind)) in &island.local_hof {
-                    let is_global_best = match self.global_hof.get(&complexity){
-                        Some(&(best_mse,_)) => mse < best_mse,
-                        None => true,
-                    };
-                    if is_global_best {
-                        self.global_hof.insert(complexity, (mse, ind.clone()));
-                    }
-                }
-            }
-
-            let global_best = self.get_global_best();
-            let pure_mse = global_best.calculate_mse(data_x, data_y);
-
-            if pure_mse <= config.target_mse {
-                println!("\n>>> CÉL ELÉRVE a(z) {}. generációban! <<<", generation);
-                println!("Tiszta MSE: {:.8}", pure_mse);
-                println!("Egyenlet: {}", global_best);
-                break;
-            }
-
-            if generation > 0 && generation % config.migration_interval == 0 {
-                self.migrate_individuals();
-                println!("Generáció: {}, Legjobb MSE: {}\n Egyenlet: {}", generation, pure_mse, self.get_global_best());
-            }
-        }
-    }
-
-    fn migrate_individuals(&mut self) {
-        let num_islands = self.islands.len();
-        if num_islands < 2 { return; }
-        let mut migrants: Vec<Individual> = self.islands.iter()
-            .map(|island| island.best_individual.clone())
-            .collect();
-        migrants.rotate_right(1);
-
-        for (island, migrant) in self.islands.iter_mut().zip(migrants.into_iter()){
-            let last_idx = island.individuals.len() -1;
-            island.individuals[last_idx] = migrant;
-        }
-    }
-
-    pub fn get_global_best(&self) -> &Individual {
-        self.islands.iter()
-            .min_by(|a,b| a.best_individual.fitness.partial_cmp(&b.best_individual.fitness).unwrap())
-            .map(|island| &island.best_individual)
-            .unwrap()
-    }
-
-    pub fn get_pareto_front(&self) -> Vec<(usize, f64, Individual)> {
-        let mut front: Vec<(usize, f64, Individual)> = self.global_hof.iter()
-            .map(|(&c, &(mse, ref ind))| (c, mse, ind.clone()))
-            .collect();
-        front.sort_by_key(|k| k.0);
-
-        let mut pareto = Vec::new();
-        let mut best_mse = f64::MAX;
-
-        for (comp, mse, ind) in front {
-            if mse < best_mse {
-                best_mse = mse;
-                pareto.push((comp, mse, ind));
-            }
-        }
-
-        pareto
     }
 }
