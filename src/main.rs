@@ -19,7 +19,7 @@ fn main() {
     for _ in 0..num_samples {
         let x = rng.random_range(-5.0..15.0);   // X0: x érték
         let mu = rng.random_range(0.0..10.0);   // X1: várható érték
-        let sigma = rng.random_range(0.5..3.0); // X2: szórás (nem lehet 0!)
+        let sigma = rng.random_range(0.1..3.0); // X2: szórás (nem lehet 0!)
         
         data_x.push(vec![x, mu, sigma]);
         
@@ -35,20 +35,18 @@ fn main() {
 
     let config = EvolutionConfig {
         num_islands: 8,
-        island_size: 500,
-        max_generations: 10000,         
+        island_size: 800,
+        max_generations: 2000,         
         crossover_rate: 0.85,
         tournament_size: 3,
         migration_interval: 25,
         parsimony_penalty: 0.00001,
 
         opt_prob: 0.1,
-        opt_iterations: 5,
-        opt_lr: 0.001,
-        opt_epsilon: 1e-5,
+        opt_iterations: 15,
         
-        stagnation_threshold: 50,
-        target_mse: 1e-5,
+        stagnation_threshold: 100,
+        target_mse: 1e-6,
         min_improvement: 1e-5,
     };
     

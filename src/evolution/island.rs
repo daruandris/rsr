@@ -89,8 +89,6 @@ impl Island {
                 ind.optimize_constants(
                     dataset,
                     config.opt_iterations,
-                    config.opt_lr,
-                    config.opt_epsilon
                 );
             }
 

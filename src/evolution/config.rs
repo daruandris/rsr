@@ -10,8 +10,6 @@ pub struct EvolutionConfig {
 
     pub opt_prob: f64,
     pub opt_iterations: usize,
-    pub opt_lr: f64,
-    pub opt_epsilon: f64,
 
     pub stagnation_threshold: usize,
     pub target_mse: f64,

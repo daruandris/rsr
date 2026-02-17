@@ -8,7 +8,7 @@ impl Op {
         match self {
             Op::Add | Op::Sub => 1,
             Op::Mul | Op::Div => 2,
-            Op::Cos | Op::Sin => 3,
+            Op::Cos | Op::Sin => 4,
             Op::Exp => 4
         }
     }

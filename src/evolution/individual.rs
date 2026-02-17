@@ -4,7 +4,7 @@ use crate::ast::heuristic::simplify_ast;
 use crate::ast::node::Node;
 use crate::metrics::dataset::SimdDataset;
 use crate::metrics::mse::calculate_mse;
-use crate::optimization::gradient::optimize_individual_constants;
+use crate::optimization::nelder_mead::optimize_individual_constants;
 use std::fmt;
 
 #[derive(Clone)]
@@ -44,8 +44,8 @@ impl Individual {
         }
     }
 
-    pub fn optimize_constants(&mut self, dataset: &SimdDataset, iterations: usize, lr: f64, epsilon: f64) {
-        optimize_individual_constants(self, dataset, iterations, lr, epsilon);
+    pub fn optimize_constants(&mut self, dataset: &SimdDataset, iterations: usize) {
+        optimize_individual_constants(self, dataset, iterations);
     }
 
     pub fn simplify(&mut self) {
