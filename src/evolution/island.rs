@@ -43,12 +43,14 @@ impl Island {
 
     pub fn step_generation(&mut self, dataset: &SimdDataset, config: &EvolutionConfig) {
         let num_features = dataset.num_features;
-        
+        let old_best_fitness = self.best_individual.fitness;
         let mut next_gen = self.create_next_generation(config, num_features);
-        let improved_this_gen = self.evaluate_and_optimize(&mut next_gen, dataset, config);
-        
+        self.evaluate_and_optimize(&mut next_gen, dataset, config);
         self.individuals = next_gen;
-        self.handle_stagnation(improved_this_gen, config, dataset);
+
+        let improvement = old_best_fitness - self.best_individual.fitness;
+        let is_significant_improvement = improvement > config.min_improvement;
+        self.handle_stagnation(is_significant_improvement, config, dataset);
     }
 
     fn create_next_generation(&mut self, config: &EvolutionConfig, num_features: usize) -> Vec<Individual> {
@@ -81,10 +83,8 @@ impl Island {
         next_gen
     }
 
-    fn evaluate_and_optimize(&mut self, next_gen: &mut Vec<Individual>, dataset: &SimdDataset, config: &EvolutionConfig) -> bool {
-        let mut improved_this_gen = false;
-
-        for ind in next_gen.iter_mut() {
+    fn evaluate_and_optimize(&mut self, next_gen: &mut Vec<Individual>, dataset: &SimdDataset, config: &EvolutionConfig) {
+       for ind in next_gen.iter_mut() {
             if self.rng.random::<f64>() < config.opt_prob {
                 ind.optimize_constants(
                     dataset,
@@ -117,10 +117,8 @@ impl Island {
 
             if ind.fitness < self.best_individual.fitness {
                 self.best_individual = ind.clone();
-                improved_this_gen = true;
             }
         }
-        improved_this_gen
     }
 
     fn handle_stagnation(&mut self, improved: bool, config: &EvolutionConfig, dataset: &SimdDataset) {

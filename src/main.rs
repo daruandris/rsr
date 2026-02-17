@@ -49,6 +49,7 @@ fn main() {
         
         stagnation_threshold: 50,
         target_mse: 1e-5,
+        min_improvement: 1e-5,
     };
     
     println!("Motor inicializálása: {} sziget, egyenként {} egyeddel...", config.num_islands, config.island_size);

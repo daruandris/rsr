@@ -15,4 +15,5 @@ pub struct EvolutionConfig {
 
     pub stagnation_threshold: usize,
     pub target_mse: f64,
+    pub min_improvement: f64,
 }
