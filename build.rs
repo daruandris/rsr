@@ -1,7 +1,7 @@
 fn main() {
     cc::Build::new()
         .cpp(true)
-        .file("src/simplify.cpp")
+        .file("src/cpp/simplify.cpp")
         .include("vendor/include")
         .flag("/EHsc")
         .compile("simplify_native");
