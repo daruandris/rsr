@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use crate::evolution::config::EvolutionConfig;
 use crate::evolution::individual::Individual;
 use crate::evolution::island::Island;
+use crate::metrics::dataset::SimdDataset;
 
 pub struct Engine {
     pub islands: Vec<Island>,
@@ -20,11 +21,11 @@ impl Engine {
         Self { islands, config, global_hof: HashMap::new() }
     }
 
-    pub fn run_evolution(&mut self, data_x: &[Vec<f64>], data_y: &[f64]) {
+    pub fn run_evolution(&mut self, dataset: &SimdDataset) {
         let config = self.config.clone();
         for generation in 0..config.max_generations {
             self.islands.par_iter_mut().for_each(|island| {
-                island.step_generation(data_x, data_y, &config);
+                island.step_generation(dataset, &config);
             });
 
             for island in &self.islands {
@@ -40,7 +41,7 @@ impl Engine {
             }
 
             let global_best = self.get_global_best();
-            let pure_mse = global_best.calculate_mse(data_x, data_y);
+            let pure_mse = global_best.calculate_mse(dataset);
 
             if pure_mse <= config.target_mse {
                 println!("\n>>> CÉL ELÉRVE a(z) {}. generációban! <<<", generation);

@@ -1,14 +1,67 @@
-A. BFGS / L-BFGS Konstans Optimalizáció
+Fázis 1: A motor felpörgetése (Sebesség és Evolúciós logika)
 
-Te jelenleg "kézzel" tologatod a konstansokat egy gradiens ereszkedéssel, ami lassú és gyakran lokális minimumban ragad. A tudományos motorok a híres L-BFGS (Broyden–Fletcher–Goldfarb–Shanno) algoritmust (vagy Nelder-Meadet) használják, ami másodrendű deriváltakat (Hesse-mátrix közelítést) is figyel. Ezért tud a PySR másodpercek alatt rátalálni a tökéletes 3.1415-re, amíg a sima GP csak "szenved" a racionális törtekkel.
+Ebben a fázisban még nem foglalkozunk a típusokkal és a dinamikus paraméterekkel, csak a meglévő logika "szteroidozásával".
 
+1. Függőleges SIMD Kiértékelés (Vertical Vectorization)
 
-B. SIMD Vektorizáció (Batched Evaluation)
+    A koncepció: A jelenlegi evaluate egyetlen adatsoron fut végig. A SIMD-hez az adathalmazt át kell forgatnod (Transpose): ne sorok legyenek ([v0, t, a]), hanem oszlopok (v0_array, t_array, a_array).
 
-A kódod egy for ciklussal, soronként értékeli ki az adatokat: let pred = self.evaluate(row);. A legjobb C++ motorok (mint az Operon) az egész data_x adathalmazt egyszerre küldik át a fán. Nem egyetlen f64 számot adnak össze a + operátornál, hanem egy 256 bites AVX regisztert használva egyszerre 4 vagy 8 adatsort számolnak ki egyetlen processzor-órajelen belül. Ez 5-10-szeres sebességnövekedést ad a nyers kiértékelésnél.
+    A megvalósítás: A fa kiértékelésekor a stack-be nem egyetlen f64 számot teszel be, hanem egy rögzített méretű SIMD tömböt (pl. [f64; 8] vagy a std::simd::f64x8 típust). Ha jön egy Node::Add, akkor egyszerre 8 adatsoron hajtod végre az összeadást egyetlen CPU órajel alatt.
 
+2. Nelder-Mead (Simplex) Integrálása a Konstansokhoz
 
-C. Age-Fitness Pareto (Túlélés kor alapján)
+    A koncepció: A zajos gradiens-süllyedés kukázása. A Nelder-Mead nem kér deriváltat, csak "letapogatja" a hiba-felületet egy n-dimenziós tetraéderrel.
 
-Amikor a motorod stagnál, te a "NUKING" stratégiát használod: megtartod a legjobbat, és mindenki mást legyilkolsz. Ez egy működő módszer, de az új trend az ALPS (Age-Layered Population Structure).
-A motor minden egyednél nyilvántartja az "életkorát" (hány generáció óta létezik). A Pareto-front nemcsak a Hossz és a Hiba alapján választ, hanem védi a fiatal, még pontatlanabb egyedeket az ősi, már lokális minimumba ragadt, szuperpontos fákkal szemben. Így sosincs szükség drasztikus törlésre (Nuking).
+    A megvalósítás: Érdemes behúzni egy könnyű külső crate-et (pl. argmin), vagy megírni egy saját, egyszerűsített Nelder-Mead rutint, amit az Individual::optimize_constants hív meg. Mivel a SIMD miatt a kiértékelésed villámgyors lesz, a Nelder-Mead büntetlenül ki tudja értékelni az egyedet akár 50-szer is egyetlen generáción belül.
+
+3. Age-Fitness Pareto (AFPO) Bevezetése a Nuke helyett
+
+    A koncepció: A sziget generációs cikluson belüli stagnálás-kezelésének cseréje.
+
+    A megvalósítás: * Adj egy age: usize mezőt az Individual struktúrához.
+
+        Minden újonnan generált (mutált/keresztezett) egyed kora 0. Minden generációváltáskor a túlélők kora nő 1-gyel.
+
+        A szelekciós operátorod (Tournament) mostantól ne csak a Fitnesst nézze, hanem a Pareto-dominanciát: Egy 'A' egyed akkor jobb 'B'-nél, ha fiatalabb VAGY jobb a fitnesze. Ez természetes diverzitást biztosít a szigeteken belül.
+
+Fázis 2: Az Önszabályozó Meta-Motor (Dinamikus Stratégia)
+
+Itt építjük meg az intelligens, ön-kalibráló rendszert, ami alkalmazkodik az adatokhoz.
+
+1. A Kettős API (Konstruktorok)
+
+    A megvalósítás: Két publikus függvényt definiálsz az Engine implementációjában.
+
+        Engine::new_manual(config: EvolutionConfig) -> A keményvonalas felhasználóknak.
+
+        Engine::new_dynamic(data_x, data_y, max_generations) -> Ez a függvény elemzi a bemenetet (pl. kiszámolja a data_y varianciáját), és ebből generál egy kezdő EvolutionConfig-ot (pl. belövi az optimális parsimony_penalty-t).
+
+2. A Meta-Korszakok (Epochs) Logikája
+
+    A koncepció: Az 1000 generációs ellenőrzőpontok.
+
+    A megvalósítás: A fő evolúciós ciklusba beteszel egy ellenőrzést (pl. if generation % 1000 == 0).
+
+        Mérés: Megnézi, mennyit csökkent a global_best MSE-je az elmúlt 1000 generáció alatt.
+
+        Beavatkozás: Ha alig csökkent (lassú konvergencia), a rendszer módosítja a saját config-ját. Például megemeli a mutációs rátát, csökkenti a keresztezést, vagy finomít a Nelder-Mead paraméterein.
+
+        Szelekciós Robbanás: Megtartja az aktuális Pareto-frontot (legjobb egyedek), de az összes többit lecseréli frissen generált, age=0 egyedekre. Az elit egyedek kora is visszaállítható 0-ra, hogy újra "esélyt kapjanak" a versenyben.
+
+Fázis 3: Típusos Szimbolikus Regresszió (STGP)
+
+Ha az alapmotor már stabilan és gyorsan fut, jöhet az architektúra legmélyebb átalakítása.
+
+1. Típus-Címkék és Szignatúrák
+
+    A koncepció: Minden adat és művelet tudja magáról, hogy kicsoda.
+
+    A megvalósítás: Bevezetsz egy DataType enumot (pl. Scalar, Vector, Boolean). Minden Node::Operator-hoz kell egy definíció, hogy milyen bemeneteket vár, és mit ad vissza (pl. a DotProduct két Vector-t vár és Scalar-t ad vissza).
+
+2. Szigorú Evolúciós Operátorok
+
+    A koncepció: A fa generálása és keresztezése nem ronthatja el a típushelyességet.
+
+    A megvalósítás: * A generate_random_ast függvény átalakítása úgy, hogy egy target_type paramétert kapjon, és csak valid fát tudjon építeni (felülről lefelé haladva).
+
+        A crossover átalakítása: ha kiválasztunk egy vágási pontot az A fában, a B fában csak azonos visszatérési típusú csomópontot választhatunk a cseréhez.

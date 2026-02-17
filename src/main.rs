@@ -1,5 +1,6 @@
 use rsr::EvolutionConfig; // Itt használd a Cargo.toml-ben megadott nevet!
 use rsr::Engine;
+use rsr::SimdDataset;
 use rsr::ffi::symengine::simplify_symengine;
 use rand::RngExt;
 
@@ -30,6 +31,8 @@ fn main() {
         data_y.push(pdf);
     }
 
+    let dataset = SimdDataset::new(&data_x, &data_y, num_features);
+
     let config = EvolutionConfig {
         num_islands: 8,
         island_size: 500,
@@ -52,7 +55,7 @@ fn main() {
     let mut engine = Engine::new(config, num_features);
 
     println!("Evolúció indítása ({} generáció)...", config.max_generations);
-    engine.run_evolution(&data_x, &data_y);
+    engine.run_evolution(&dataset);
 
     println!("\n=== Evolúció Befejeződött ===");
     let pareto_front = engine.get_pareto_front();

@@ -7,3 +7,4 @@ pub mod optimization;
 
 pub use evolution::config::EvolutionConfig;
 pub use evolution::engine::Engine;
+pub use metrics::dataset::SimdDataset;

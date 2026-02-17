@@ -1,9 +1,8 @@
-use crate::evolution::individual::Individual;
+use crate::{evolution::individual::Individual, metrics::dataset::SimdDataset};
 
 pub fn optimize_individual_constants(
     ind: &mut Individual, 
-    data_x: &[Vec<f64>], 
-    data_y: &[f64],
+    dataset: &SimdDataset,
     iterations: usize,
     lr: f64,
     epsilon: f64
@@ -12,14 +11,14 @@ pub fn optimize_individual_constants(
     if consts.is_empty() { return; }
 
     for _ in 0..iterations {
-        let current_mse = ind.calculate_mse(data_x, data_y);
+        let current_mse = ind.calculate_mse(dataset);
         let mut gradients = vec![0.0; consts.len()];
         
         for i in 0..consts.len() {
             let original_val = consts[i];
             consts[i] = original_val + epsilon;
             ind.set_constants(&consts);
-            let plus_mse = ind.calculate_mse(data_x, data_y);
+            let plus_mse = ind.calculate_mse(dataset);
             gradients[i] = (plus_mse - current_mse) / epsilon;
             
             consts[i] = original_val;

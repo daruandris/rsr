@@ -8,6 +8,7 @@ rand = "0.10.0"
 rand_distr = "0.6.0"
 rand_xoshiro = "0.8.0"
 rayon = "1.11.0"
+wide = "1.1.1"
 
 [build-dependencies]
 cc = "1.2.56"
