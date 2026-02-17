@@ -3,6 +3,17 @@ pub enum Op {
     Add, Sub, Mul, Div, Sin, Cos, Exp
 }
 
+impl Op {
+    pub fn weight(&self) -> usize {
+        match self {
+            Op::Add | Op::Sub => 1,
+            Op::Mul | Op::Div => 2,
+            Op::Cos | Op::Sin => 3,
+            Op::Exp => 4
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Node {
     Operator(Op),
@@ -19,5 +30,13 @@ impl Node {
                 Op::Add | Op::Sub | Op::Mul | Op::Div => 2,
             },
         }
+    }
+
+    pub fn weight(&self) -> usize {
+        match self {
+            Node::Constant(_) | Node::Variable(_) => 1,
+            Node::Operator(op) => op.weight(),
+        }
+        
     }
 }

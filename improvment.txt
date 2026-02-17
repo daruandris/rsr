@@ -12,8 +12,3 @@ C. Age-Fitness Pareto (Túlélés kor alapján)
 
 Amikor a motorod stagnál, te a "NUKING" stratégiát használod: megtartod a legjobbat, és mindenki mást legyilkolsz. Ez egy működő módszer, de az új trend az ALPS (Age-Layered Population Structure).
 A motor minden egyednél nyilvántartja az "életkorát" (hány generáció óta létezik). A Pareto-front nemcsak a Hossz és a Hiba alapján választ, hanem védi a fiatal, még pontatlanabb egyedeket az ősi, már lokális minimumba ragadt, szuperpontos fákkal szemben. Így sosincs szükség drasztikus törlésre (Nuking).
-
-
-D. Súlyozott Komplexitás
-
-A te motorodban az egyenlet hossza egyszerűen a csomópontok száma (nodes.len()). Az ipari motorokban operátoronként eltérő súlyok vannak: az összeadás (+) olcsó (pl. súlya 1), de egy sin() vagy exp() drága (súlya 2 vagy 3). Emiatt a Pareto-front előnyben részesíti a polinomokat a bonyolult trigonometriai ágyazásokkal szemben.

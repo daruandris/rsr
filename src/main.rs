@@ -7,41 +7,45 @@ fn main() {
     println!("=== Szimbolikus Regressziós Motor ===");
     println!("Cél: y=2.5⋅exp(-0.5⋅X0​)⋅cos(3.0⋅X1​)");
     
-    let num_samples = 300;
+    let num_samples = 400;
     let mut data_x = Vec::with_capacity(num_samples);
     let mut data_y = Vec::with_capacity(num_samples);
     
     let mut rng = rand::rng();
     
     let num_features = 3;
-
+    let sqrt_2pi = (2.0 * std::f64::consts::PI).sqrt(); // ~2.506628
     for _ in 0..num_samples {
-        let v0 = rng.random_range(0.0..15.0);
-        let t = rng.random_range(0.1..10.0);
-        let a = rng.random_range(-9.81..9.81);
+        let x = rng.random_range(-5.0..15.0);   // X0: x érték
+        let mu = rng.random_range(0.0..10.0);   // X1: várható érték
+        let sigma = rng.random_range(0.5..3.0); // X2: szórás (nem lehet 0!)
         
-        data_x.push(vec![v0, t, a]);
+        data_x.push(vec![x, mu, sigma]);
         
-        let distance = v0 * t + 0.5 * a * t * t;
-        data_y.push(distance);
+        // Z-érték (standardizálás)
+        let z = (x - mu) / sigma;
+        
+        // Valószínűségi sűrűség
+        let pdf = (1.0 / (sigma * sqrt_2pi)) * (-0.5 * z * z).exp();
+        data_y.push(pdf);
     }
 
     let config = EvolutionConfig {
-        num_islands: 4,
+        num_islands: 8,
         island_size: 500,
         max_generations: 10000,         
         crossover_rate: 0.85,
         tournament_size: 3,
         migration_interval: 25,
-        parsimony_penalty: 0.01,
+        parsimony_penalty: 0.00001,
 
-        opt_prob: 0.05,
-        opt_iterations: 3,
-        opt_lr: 0.5,
+        opt_prob: 0.1,
+        opt_iterations: 5,
+        opt_lr: 0.001,
         opt_epsilon: 1e-5,
         
         stagnation_threshold: 50,
-        target_mse: 1e-6,
+        target_mse: 1e-5,
     };
     
     println!("Motor inicializálása: {} sziget, egyenként {} egyeddel...", config.num_islands, config.island_size);

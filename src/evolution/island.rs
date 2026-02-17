@@ -97,7 +97,7 @@ impl Island {
             let mse = ind.calculate_mse(data_x, data_y);
 
             if mse.is_finite() {
-                let complexity = ind.nodes.len();
+                let complexity = ind.complexity();
                 let is_new_best = match self.local_hof.get(&complexity) {
                     Some(&(best_mse, _)) => mse < best_mse,
                     None => true,
@@ -107,7 +107,7 @@ impl Island {
                 }
             }
 
-            let complexity_penalty = (ind.nodes.len() as f64) * config.parsimony_penalty;
+            let complexity_penalty = (ind.complexity() as f64) * config.parsimony_penalty;
 
             if mse.is_finite() {
                 ind.fitness = mse + complexity_penalty;
@@ -142,7 +142,7 @@ impl Island {
                 new_ind.simplify();
                 
                 let mse = new_ind.calculate_mse(data_x, data_y);
-                let penalty = (new_ind.nodes.len() as f64) * config.parsimony_penalty;
+                let penalty = (new_ind.complexity() as f64) * config.parsimony_penalty;
                 if mse.is_finite() {
                     new_ind.fitness = mse + penalty;
                 }

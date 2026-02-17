@@ -68,6 +68,10 @@ impl Individual {
         }
         (0, root_idx)
     }
+
+    pub fn complexity(&self) -> usize{
+        self.nodes.iter().map(|node| node.weight()).sum()
+    }
 }
 
 impl fmt::Display for Individual {
