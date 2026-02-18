@@ -1,0 +1,28 @@
+name: Update Benchmark Graph
+
+on:
+  push:
+    paths:
+      - 'benchmark_output.json'
+
+permissions:
+  contents: write
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Szimbolikus Regresszió Benchmark
+          tool: 'customSmallerIsBetter'
+          output-file-path: benchmark_output.json
+          
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          
+          alert-threshold: '200%'
+          comment-on-alert: true
+          fail-on-alert: false
