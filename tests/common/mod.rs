@@ -1,7 +1,9 @@
+#![allow(dead_code)]
+
 use rsr::{EvolutionConfig, SimdDataset};
 
 use std::fs::{OpenOptions, File};
-use std::io::{BufReader, Write};
+use std::io::{BufReader};
 use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
