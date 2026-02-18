@@ -6,19 +6,19 @@ use rand::RngExt;
 fn get_heavy_config() -> EvolutionConfig {
     EvolutionConfig {
         num_islands: 5,
-        island_size: 500,
-        max_generations: 10_000,
-        crossover_rate: 0.75,
-        tournament_size: 4,
-        migration_interval: 50,
-        parsimony_penalty: 0.001,
-        opt_prob: 0.05,
-        opt_iterations: 20,
-        stagnation_threshold: 100,
-        target_mse: 1e-7,
-        min_improvement: 1e-8,
-        random_injection_rate: 0.04,
-        min_random_injection: 2,
+        island_size: 1000,
+        max_generations: 5000,
+        crossover_rate: 0.70,
+        tournament_size: 5,
+        migration_interval: 40,
+        parsimony_penalty: 0.0005,
+        opt_prob: 0.02,
+        opt_iterations: 50,
+        stagnation_threshold: 150,
+        target_mse: 1e-9,
+        min_improvement: 1e-10,
+        random_injection_rate: 0.05,
+        min_random_injection: 5,
         verbose : false
     }
 }
@@ -59,7 +59,7 @@ fn benchmark_physics_damped_oscillator() {
     println!("Best: {}", best);
     println!("Mse: {}", mse);
 
-    common::append_benchmark_result("Physics", mse, duration.as_millis());
+    common::update_history("Physics", mse, duration.as_millis() as u64);
 
     assert!(mse < 0.01); 
 }
@@ -99,7 +99,7 @@ fn benchmark_biology_enzyme_kinetics() {
     println!("Best: {}", best);
     println!("Mse: {}", mse);
 
-    common::append_benchmark_result("Biology", mse, duration.as_millis());
+    common::update_history("Biology", mse, duration.as_millis() as u64);
 
     
     assert!(mse < 1e-4);
@@ -142,7 +142,7 @@ fn benchmark_stats_maxwell_boltzmann() {
     println!("Best: {}", best);
     println!("Mse: {}", mse);
 
-    common::append_benchmark_result("Statistics", mse, duration.as_millis());
+    common::update_history("Statistics", mse, duration.as_millis() as u64);
 
     
     assert!(mse < 1e-3);

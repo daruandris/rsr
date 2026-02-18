@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Szimbolikus Regresszió Teljesítmény</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #f4f4f9; padding: 20px; }
+        .chart-container { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+            margin-bottom: 20px;
+        }
+        h1 { text-align: center; color: #333; }
+        h2 { color: #555; }
+    </style>
+</head>
+<body>
+
+    <h1>Teljesítmény</h1>
+
+    <div class="chart-container">
+        <h2>Pontosság (MSE)</h2>
+        <canvas id="mseChart"></canvas>
+    </div>
+
+    <div class="chart-container">
+        <h2>Sebesség (Idő ms)</h2>
+        <canvas id="timeChart"></canvas>
+    </div>
+
+    <script>
+        // Adatok betöltése a JSON fájlból
+        fetch('benchmark_history.json')
+            .then(response => response.json())
+            .then(data => {
+                const labels = data.map((entry, index) => `Run ${index + 1}`);
+
+                // Adatok kinyerése
+                const bioMse = data.map(d => d.biology_mse || null);
+                const physMse = data.map(d => d.physics_mse || null);
+                const statMse = data.map(d => d.stats_mse || null);
+
+                const bioTime = data.map(d => d.biology_time_ms || null);
+                const physTime = data.map(d => d.physics_time_ms || null);
+                const statTime = data.map(d => d.stats_time_ms || null);
+
+                // 1. MSE Grafikon
+                new Chart(document.getElementById('mseChart'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: 'Biológia MSE', data: bioMse, borderColor: 'green', tension: 0.1 },
+                            { label: 'Fizika MSE', data: physMse, borderColor: 'blue', tension: 0.1 },
+                            { label: 'Statisztika MSE', data: statMse, borderColor: 'red', tension: 0.1 }
+                        ]
+                    },
+                    options: { scales: { y: { type: 'logarithmic', title: {display: true, text: 'MSE (Log Skála)'} } } }
+                });
+
+                // 2. Time Grafikon
+                new Chart(document.getElementById('timeChart'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: 'Biológia Idő', data: bioTime, borderColor: 'lightgreen', borderDash: [5, 5] },
+                            { label: 'Fizika Idő', data: physTime, borderColor: 'lightblue', borderDash: [5, 5] },
+                            { label: 'Statisztika Idő', data: statTime, borderColor: 'pink', borderDash: [5, 5] }
+                        ]
+                    }
+                });
+            })
+            .catch(err => console.error("Nem sikerült betölteni a JSON-t:", err));
+    </script>
+</body>
+</html>

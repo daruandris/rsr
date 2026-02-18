@@ -1,48 +1,74 @@
 #![allow(dead_code)]
-
-use rsr::{EvolutionConfig, SimdDataset};
-
 use std::fs::{OpenOptions, File};
-use std::io::{BufReader};
+use std::io::{Read};
 use serde::{Serialize, Deserialize};
+use std::time::{SystemTime, UNIX_EPOCH};
 
+// Ez a struktúra tárolja EGY futtatás teljes eredményét
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct BenchResult {
-    name: String,
-    unit: String,
-    value: f64,
+pub struct BenchmarkEntry {
+    pub timestamp: u64,
+    pub commit_hash: String,
+    
+    pub biology_mse: Option<f64>,
+    pub biology_time_ms: Option<u64>,
+    
+    pub physics_mse: Option<f64>,
+    pub physics_time_ms: Option<u64>,
+    
+    pub stats_mse: Option<f64>,
+    pub stats_time_ms: Option<u64>,
 }
 
-pub fn append_benchmark_result(name: &str, mse: f64, duration_ms: u128) {
-    let new_results = vec![
-        BenchResult {
-            name: format!("{} - MSE", name),
-            unit: "MSE".to_string(),
-            value: mse,
-        },
-        BenchResult {
-            name: format!("{} - Time", name),
-            unit: "ms".to_string(),
-            value: duration_ms as f64,
-        }
-    ];
+pub fn update_history(
+    category: &str,
+    mse: f64,
+    time_ms: u64
+) {
+    let file_path = "benchmark_history.json";
 
-    let file_path = "benchmark_output.json";
-    
-    let mut current_data: Vec<BenchResult> = if let Ok(file) = File::open(file_path) {
-        let reader = BufReader::new(file);
-        serde_json::from_reader(reader).unwrap_or_else(|_| Vec::new())
+    let mut history: Vec<BenchmarkEntry> = if let Ok(mut file) = File::open(file_path) {
+        let mut content = String::new();
+        file.read_to_string(&mut content).unwrap_or_default();
+        serde_json::from_str(&content).unwrap_or_else(|_| Vec::new())
     } else {
         Vec::new()
     };
 
-    current_data.extend(new_results);
-
-    let max_entries = 600; 
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
     
-    if current_data.len() > max_entries {
-        let to_remove = current_data.len() - max_entries;
-        current_data.drain(0..to_remove);
+    let needs_new_entry = if let Some(last) = history.last() {
+        (now - last.timestamp) > 60
+    } else {
+        true
+    };
+
+    if needs_new_entry {
+        history.push(BenchmarkEntry {
+            timestamp: now,
+            commit_hash: "unknown".to_string(),
+            biology_mse: None, biology_time_ms: None,
+            physics_mse: None, physics_time_ms: None,
+            stats_mse: None, stats_time_ms: None,
+        });
+    }
+
+    if let Some(entry) = history.last_mut() {
+        match category {
+            "Biology" => {
+                entry.biology_mse = Some(mse);
+                entry.biology_time_ms = Some(time_ms);
+            },
+            "Physics" => {
+                entry.physics_mse = Some(mse);
+                entry.physics_time_ms = Some(time_ms);
+            },
+            "Statistics" => {
+                entry.stats_mse = Some(mse);
+                entry.stats_time_ms = Some(time_ms);
+            },
+            _ => {}
+        }
     }
 
     let file = OpenOptions::new()
@@ -51,77 +77,5 @@ pub fn append_benchmark_result(name: &str, mse: f64, duration_ms: u128) {
         .truncate(true)
         .open(file_path)
         .unwrap();
-        
-    serde_json::to_writer_pretty(file, &current_data).unwrap();
-}
-
-pub fn get_basic_config() -> EvolutionConfig {
-    EvolutionConfig {
-        num_islands: 2,
-        island_size: 100,
-        max_generations: 100,
-        crossover_rate: 0.85,
-        tournament_size: 3,
-        migration_interval: 10,
-        parsimony_penalty: 0.01,
-        
-        opt_prob: 0.1,
-        opt_iterations: 5,
-        
-        stagnation_threshold: 10,
-        min_improvement: 1e-5,
-        target_mse: 1e-7,
-
-        random_injection_rate: 0.05,
-        min_random_injection: 1,
-        verbose : false,
-    }
-}
-
-pub fn create_linear_data() -> (SimdDataset, usize) {
-    // Cél: y = 2 * X0 + 5
-    let mut x = Vec::new();
-    let mut y = Vec::new();
-    for i in 0..50 {
-        let val = i as f64;
-        x.push(vec![val]);
-        y.push(2.0 * val + 5.0);
-    }
-    (SimdDataset::new(&x, &y, 1), 1)
-}
-
-pub fn create_quadratic_data() -> (SimdDataset, usize) {
-    // Cél: y = X0^2 - 10
-    let mut x = Vec::new();
-    let mut y = Vec::new();
-    for i in 0..50 {
-        let val = (i as f64) / 5.0;
-        x.push(vec![val]);
-        y.push(val * val - 10.0);
-    }
-    (SimdDataset::new(&x, &y, 1), 1)
-}
-
-// Cél: y = 2.5 * sin(3.0 * X0)
-pub fn create_sine_wave_data() -> (SimdDataset, usize) {
-    let mut x = Vec::new();
-    let mut y = Vec::new();
-    for i in 0..50 {
-        let val = (i as f64) * 0.15; 
-        x.push(vec![val]);
-        y.push(2.5 * (3.0 * val).sin());
-    }
-    (SimdDataset::new(&x, &y, 1), 1)
-}
-
-// Cél: y = exp(0.5 * X0)
-pub fn create_exponential_data() -> (SimdDataset, usize) {
-    let mut x = Vec::new();
-    let mut y = Vec::new();
-    for i in 0..50 {
-        let val = (i as f64) * 0.1;
-        x.push(vec![val]);
-        y.push((0.5 * val).exp());
-    }
-    (SimdDataset::new(&x, &y, 1), 1)
+    serde_json::to_writer_pretty(file, &history).unwrap();
 }
