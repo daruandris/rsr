@@ -20,12 +20,13 @@ pub fn format_ast(nodes: &[Node]) -> String {
                         stack.push(format!("({} {} {})", a, sym, b));
                     }
                 },
-                Op::Sin | Op::Cos | Op::Exp => {
+                Op::Sin | Op::Cos | Op::Exp | Op::Sqr => {
                     if let Some(a) = stack.pop() {
                         let sym = match op {
                             Op::Sin => "sin",
                             Op::Cos => "cos",
                             Op::Exp => "exp",
+                            Op::Sqr => "sqr",
                             _ => unreachable!(),
                         };
                         stack.push(format!("{}({})", sym, a));

@@ -32,7 +32,7 @@ fn apply_operator(op: Op, stack: &mut Vec<f64>) {
                 stack.push(result);
             }
         },
-        Op::Sin | Op::Cos | Op::Exp => {
+        Op::Sin | Op::Cos | Op::Exp | Op::Sqr => {
             if let Some(a) = stack.pop() {
                 let result = match op {
                     Op::Sin => a.sin(),
@@ -41,6 +41,7 @@ fn apply_operator(op: Op, stack: &mut Vec<f64>) {
                         let val = a.exp();
                         if val.is_finite() { val } else { f64::MAX }
                     },
+                    Op::Sqr => a * a,
                     _ => unreachable!(),
                 };
                 stack.push(result);
@@ -88,14 +89,15 @@ fn apply_operator_simd(op: Op, stack: &mut Vec<f64x4>) {
                 stack.push(result);
             }
         },
-        Op::Sin | Op::Cos | Op::Exp => {
+        Op::Sin | Op::Cos | Op::Exp | Op::Sqr => {
             if let Some(a) = stack.pop() {
                 let result = match op {
                     Op::Sin => a.sin(),
                     Op::Cos => a.cos(),
-                    Op::Exp => a.exp(), 
+                    Op::Exp => a.exp(),
                     // (Az exp infinity check-et itt most a sebesség miatt elhagyjuk, 
                     // de a MSE számításnál a f64::NAN / INF úgyis f64::MAX büntetést kap)
+                    Op::Sqr => a * a,
                     _ => unreachable!(),
                 };
                 stack.push(result);

@@ -11,7 +11,7 @@ pub fn random_node_of_arity(arity: usize, rng: &mut impl RngExt, num_features: u
             }
         },
         1 => {
-            let ops = [Op::Sin, Op::Cos, Op::Exp];
+            let ops = [Op::Sin, Op::Cos, Op::Exp, Op::Sqr];
             Node::Operator(ops[rng.random_range(0..ops.len())])
         },
         2 => {
