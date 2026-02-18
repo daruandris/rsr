@@ -28,7 +28,7 @@ fn main() {
         
         // Valószínűségi sűrűség
         let pdf = (1.0 / (sigma * sqrt_2pi)) * (-0.5 * z * z).exp();
-        data_y.push(pdf * 100.0);
+        data_y.push(pdf * 10.0);
     }
 
     let dataset = SimdDataset::new(&data_x, &data_y, num_features);
@@ -46,8 +46,8 @@ fn main() {
         opt_iterations: 15,
         
         stagnation_threshold: 100,
-        target_mse: 1e-9,
-        min_improvement: 1e-8,
+        target_mse: 1e-6,
+        min_improvement: 1e-6,
 
         random_injection_rate: 0.04,
         min_random_injection: 2,

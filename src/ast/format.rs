@@ -20,7 +20,7 @@ pub fn format_ast(nodes: &[Node]) -> String {
                         stack.push(format!("({} {} {})", a, sym, b));
                     }
                 },
-                Op::Sin | Op::Cos | Op::Exp | Op::Sqr => {
+                Op::Sin | Op::Cos | Op::Exp => {
                     if let Some(a) = stack.pop() {
                         let sym = match op {
                             Op::Sin => "sin",
@@ -30,6 +30,11 @@ pub fn format_ast(nodes: &[Node]) -> String {
                             _ => unreachable!(),
                         };
                         stack.push(format!("{}({})", sym, a));
+                    }
+                },
+                Op::Sqr => {
+                    if let Some(a) = stack.pop() {
+                        stack.push(format!("({})^2", a));
                     }
                 }
             }

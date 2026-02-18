@@ -70,6 +70,12 @@ pub fn simplify_ast(original_nodes: &[Node]) -> Vec<Node> {
                                 stack.push(SubTree { nodes: vec![Node::Constant(1.0)], is_const: true, val: 1.0 });
                                 continue;
                             }
+                            if let Op::Mul = op {
+                                let mut new_nodes = a.nodes;
+                                new_nodes.push(Node::Operator(Op::Sqr)); 
+                                stack.push(SubTree { nodes: new_nodes, is_const: false, val: 0.0 });
+                                continue;
+                            }
                         }
                         
                         // szorzás 0-val
