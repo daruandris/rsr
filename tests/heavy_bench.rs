@@ -48,10 +48,18 @@ fn benchmark_physics_damped_oscillator() {
 
     let start = std::time::Instant::now();
     engine.run_evolution(&dataset);
+
+    let duration = start.elapsed();
+    let best = engine.get_global_best();
+    let mse = best.calculate_mse(&dataset);
     
-    println!("Physics solved in: {:?}", start.elapsed());
-    println!("Best: {}", engine.get_global_best());
-    assert!(engine.get_global_best().calculate_mse(&dataset) < 0.01); 
+    println!("Physics solved in: {:?}", duration);
+    println!("Best: {}", best);
+    println!("Mse: {}", mse);
+
+    super::common::append_benchmark_result("Physics", mse, duration.as_millis());
+
+    assert!(mse < 0.01); 
 }
 
 // 2. BIOLÓGIA / KÉMIA: Michaelis-Menten Kinetika
@@ -81,10 +89,18 @@ fn benchmark_biology_enzyme_kinetics() {
     let start = std::time::Instant::now();
     engine.run_evolution(&dataset);
 
-    println!("Biology solved in: {:?}", start.elapsed());
-    println!("Best: {}", engine.get_global_best());
+    let duration = start.elapsed();
+    let best = engine.get_global_best();
+    let mse = best.calculate_mse(&dataset);
     
-    assert!(engine.get_global_best().calculate_mse(&dataset) < 1e-4);
+    println!("Biology solved in: {:?}", duration);
+    println!("Best: {}", best);
+    println!("Mse: {}", mse);
+
+    super::common::append_benchmark_result("Biology", mse, duration.as_millis());
+
+    
+    assert!(mse < 1e-4);
 }
 
 // 3. STATISZTIKA: Maxwell-Boltzmann Eloszlás (Sebesség)
@@ -118,8 +134,16 @@ fn benchmark_stats_maxwell_boltzmann() {
     let start = std::time::Instant::now();
     engine.run_evolution(&dataset);
 
-    println!("Statistics solved in: {:?}", start.elapsed());
-    println!("Best: {}", engine.get_global_best());
+    let duration = start.elapsed();
+    let best = engine.get_global_best();
+    let mse = best.calculate_mse(&dataset);
     
-    assert!(engine.get_global_best().calculate_mse(&dataset) < 1e-3);
+    println!("PhStatisticsysics solved in: {:?}", duration);
+    println!("Best: {}", best);
+    println!("Mse: {}", mse);
+
+    super::common::append_benchmark_result("Statistics", mse, duration.as_millis());
+
+    
+    assert!(mse < 1e-3);
 }

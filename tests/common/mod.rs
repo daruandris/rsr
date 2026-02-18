@@ -1,5 +1,58 @@
 use rsr::{EvolutionConfig, SimdDataset};
 
+use std::fs::{OpenOptions, File};
+use std::io::Write;
+use serde::Serialize;
+
+#[derive(Serialize)]
+struct BenchResult {
+    name: String,
+    unit: String,
+    value: f64,
+}
+
+pub fn append_benchmark_result(name: &str, mse: f64, duration_ms: u128) {
+    let new_results = vec![
+        BenchResult {
+            name: format!("{} - MSE", name),
+            unit: "MSE".to_string(),
+            value: mse,
+        },
+        BenchResult {
+            name: format!("{} - Time", name),
+            unit: "ms".to_string(),
+            value: duration_ms as f64,
+        }
+    ];
+
+    let file_path = "benchmark_output.json";
+    
+    let mut current_data: Vec<BenchResult> = if let Ok(file) = File::open(file_path) {
+        let reader = BufReader::new(file);
+        serde_json::from_reader(reader).unwrap_or_else(|_| Vec::new())
+    } else {
+        Vec::new()
+    };
+
+    current_data.extend(new_results);
+
+    let max_entries = 600; 
+    
+    if current_data.len() > max_entries {
+        let to_remove = current_data.len() - max_entries;
+        current_data.drain(0..to_remove);
+    }
+
+    let file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(file_path)
+        .unwrap();
+        
+    serde_json::to_writer_pretty(file, &current_data).unwrap();
+}
+
 pub fn get_basic_config() -> EvolutionConfig {
     EvolutionConfig {
         num_islands: 2,
