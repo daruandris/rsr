@@ -1,4 +1,4 @@
-Write-Host "Benchmarkok futtatása (ez eltarthat pár percig)..."
+Write-Host "Running benchmarks..."
 
 cargo test --release -- --ignored --nocapture --test-threads=1
 

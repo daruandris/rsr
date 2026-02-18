@@ -18,7 +18,7 @@ fn test_linear_convergence() {
     println!("Linear Solved in: {:.2?}", duration);
     println!("Best Linear Equation: {}", best);
     println!("MSE: {}", mse);
-    assert!(mse < 1e-5, "A motornak meg kellett volna találnia a lineáris függvényt!");
+    assert!(mse < 1e-5, "Too much mse with linear equation!");
 }
 
 #[test]
@@ -39,7 +39,7 @@ fn test_quadratic_convergence() {
     println!("Quadratic Solved in: {:.2?}", duration);
     println!("Best Quadratic Equation: {}", best);
     println!("MSE: {}", mse);
-    assert!(mse < 1e-4, "A motornak meg kellett volna találnia a másodfokú függvényt!");
+    assert!(mse < 1e-4, "Too much mse with quadratic equation!");
 }
 
 #[test]
@@ -61,7 +61,7 @@ fn test_sine_convergence() {
     println!("Best Equation: {}", best);
     println!("MSE: {:.8}", mse);
 
-    assert!(mse < 1e-4, "Hiba: Túl nagy MSE a szinusznál!");
+    assert!(mse < 1e-4, "Too much mse with sine equation!");
 }
 
 #[test]
@@ -83,5 +83,5 @@ fn test_exp_convergence() {
     println!("Best Equation: {}", best);
     println!("MSE: {:.8}", mse);
 
-    assert!(mse < 1e-4, "Hiba: Túl nagy MSE az exponenciálisnál!");
+    assert!(mse < 1e-4, "Too much mse with exp equation!");
 }

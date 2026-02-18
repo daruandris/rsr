@@ -128,11 +128,9 @@ impl Island {
         let pop_size = self.individuals.capacity();
         let mut next_gen = Vec::with_capacity(pop_size);
 
-        // A) Elitizmus: A legjobb egyed átkerül (korát megtartva vagy növelve)
         let elite = self.best_individual.clone();
         next_gen.push(elite);
 
-        // B) "Friss Vér" (Random Injection): AFPO alapköve
         let num_randoms = (pop_size as f64 * config.random_injection_rate)
             .max(config.min_random_injection as f64) as usize; 
         
@@ -144,7 +142,6 @@ impl Island {
             next_gen.push(ind);
         }
 
-        // C) Utódok generálása (Szelekció + Keresztezés/Mutáció)
         while next_gen.len() < pop_size {
             let p: f64 = self.rng.random();
             

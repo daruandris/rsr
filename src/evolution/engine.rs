@@ -45,9 +45,9 @@ impl Engine {
 
             if pure_mse <= config.target_mse {
                 if config.verbose {
-                    println!("\n>>> CÉL ELÉRVE a(z) {}. generációban! <<<", generation);
-                    println!("Tiszta MSE: {:.8}", pure_mse);
-                    println!("Egyenlet: {}", global_best);
+                    println!("\n>>> Targert reached in {}. genereation! <<<", generation);
+                    println!("Pure MSE: {:.8}", pure_mse);
+                    println!("Expression: {}", global_best);
                 }
                 break;
             }
@@ -55,7 +55,7 @@ impl Engine {
             if generation > 0 && generation % config.migration_interval == 0 {
                 self.migrate_individuals();
                 if self.config.verbose {
-                    println!("Generáció: {}, Legjobb MSE: {}\n Egyenlet: {}", generation, pure_mse, self.get_global_best());
+                    println!("Generation: {}, Best MSE: {}\n Expression: {}", generation, pure_mse, self.get_global_best());
                 }
             }
         }

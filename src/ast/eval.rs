@@ -77,10 +77,7 @@ fn apply_operator_simd(op: Op, stack: &mut Vec<f64x4>) {
                         let ones = f64x4::splat(1.0);
                         let b_abs = b.abs();
                         
-                        // cmt_lt = Compare Less Than. Létrehoz egy bináris maszkot.
-                        let is_zero_mask = b_abs.simd_lt(epsilon);
-                        
-                        // Ha a maszk IGAZ, 'ones'-t ad vissza, ha HAMIS, 'b'-t.
+                        let is_zero_mask = b_abs.simd_lt(epsilon);                    
                         let safe_b = is_zero_mask.blend(ones, b);
                         a / safe_b
                     },

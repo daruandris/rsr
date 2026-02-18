@@ -11,7 +11,7 @@ fn get_heavy_config() -> EvolutionConfig {
         crossover_rate: 0.75,
         tournament_size: 4,
         migration_interval: 50,
-        parsimony_penalty: 1e-7,
+        parsimony_penalty: 0.001,
         opt_prob: 0.05,
         opt_iterations: 20,
         stagnation_threshold: 100,
@@ -64,7 +64,7 @@ fn benchmark_physics_damped_oscillator() {
     assert!(mse < 0.01); 
 }
 
-// 2. BIOLÓGIA / KÉMIA: Michaelis-Menten Kinetika
+// 2. BIOLÓGIA: Michaelis-Menten Kinetika
 // Képlet: v = (Vmax * [S]) / (Km + [S])
 #[test]
 #[ignore]
@@ -105,7 +105,7 @@ fn benchmark_biology_enzyme_kinetics() {
     assert!(mse < 1e-4);
 }
 
-// 3. STATISZTIKA: Maxwell-Boltzmann Eloszlás (Sebesség)
+// 3. STATISZTIKA: Maxwell-Boltzmann Eloszlás
 // Képlet: f(v) ~ v^2 * exp(-v^2 / a)
 #[test]
 #[ignore]
@@ -123,8 +123,6 @@ fn benchmark_stats_maxwell_boltzmann() {
         
         // y = v^2 * exp(-0.5 * v^2)
         let y = (v * v) * (-0.5 * v * v).exp();
-        
-        // Felszorozzuk, hogy emberibb léptékű legyen a hiba
         y_data.push(y * 10.0); 
     }
 
