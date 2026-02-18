@@ -5,21 +5,21 @@ use rand::RngExt;
 
 fn get_heavy_config() -> EvolutionConfig {
     EvolutionConfig {
-        num_islands: 8,
+        num_islands: 5,
         island_size: 1000,
-        max_generations: 5000,
+        max_generations: 1000,
         crossover_rate: 0.70,
         tournament_size: 5,
         migration_interval: 40,
         parsimony_penalty: 0.0005,
-        opt_prob: 0.02,
+        opt_prob: 0.05,
         opt_iterations: 50,
         final_opt_iterations: 2000,
         stagnation_threshold: 200,
         target_mse: 1e-6,
         min_improvement: 1e-6,
-        random_injection_rate: 0.05,
-        min_random_injection: 5,
+        random_injection_rate: 0.1,
+        min_random_injection: 10,
         verbose : false
     }
 }

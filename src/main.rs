@@ -1,4 +1,4 @@
-use rsr::EvolutionConfig; // Itt használd a Cargo.toml-ben megadott nevet!
+use rsr::EvolutionConfig;
 use rsr::Engine;
 use rsr::SimdDataset;
 use rsr::ffi::symengine::simplify_symengine;

@@ -7,8 +7,8 @@ impl Op {
     pub fn weight(&self) -> usize {
         match self {
             Op::Add | Op::Sub => 1,
-            Op::Mul | Op::Div | Op::Sqr => 2,
-            Op::Cos | Op::Sin | Op::Exp => 4,
+            Op::Mul | Op::Div => 2,
+            Op::Cos | Op::Sin | Op::Exp | Op::Sqr => 3,
         }
     }   
 }
