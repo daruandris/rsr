@@ -1,7 +1,8 @@
 use crate::ast::node::{Node, Op};
 use rand::RngExt;
 
-pub fn random_node_of_arity(arity: usize, rng: &mut impl RngExt, num_features: usize) -> Node {
+#[inline(always)]
+pub fn random_node_of_arity(arity: usize, rng: &mut impl RngExt, num_features: u8) -> Node {
     match arity {
         0 => {  
             if rng.random::<bool>() {
@@ -22,13 +23,14 @@ pub fn random_node_of_arity(arity: usize, rng: &mut impl RngExt, num_features: u
     }
 }
 
-pub fn generate_random_ast(max_depth: usize, rng: &mut impl RngExt, num_features: usize) -> Vec<Node> {
-    let mut nodes = Vec::new();
+pub fn generate_random_ast(max_depth: usize, rng: &mut impl RngExt, num_features: u8) -> Vec<Node> {
+    let cap = 1 << (max_depth.min(6)); 
+    let mut nodes = Vec::with_capacity(cap);
     build_ast_recursive(&mut nodes, 0, max_depth, rng, num_features);
     nodes
 }
 
-fn build_ast_recursive(nodes: &mut Vec<Node>, current_depth: usize, max_depth: usize, rng: &mut impl RngExt, num_features: usize) {
+fn build_ast_recursive(nodes: &mut Vec<Node>, current_depth: usize, max_depth: usize, rng: &mut impl RngExt, num_features: u8) {
     let is_terminal = current_depth >= max_depth || (current_depth > 0 && rng.random::<f64>() < 0.2);
     if is_terminal {
         let leaf = random_node_of_arity(0, rng, num_features);

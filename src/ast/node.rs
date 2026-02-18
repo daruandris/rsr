@@ -16,8 +16,8 @@ impl Op {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Node {
     Operator(Op),
-    Variable(usize),
-    Constant(f64),
+    Variable(u8),
+    Constant(f32),
 }
 
 impl Node {

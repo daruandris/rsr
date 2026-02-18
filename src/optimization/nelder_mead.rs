@@ -1,123 +1,142 @@
 use crate::evolution::individual::Individual;
 use crate::metrics::dataset::SimdDataset;
+use crate::metrics::mse::calculate_mse_simd;
 
 pub fn optimize_individual_constants(
     ind: &mut Individual, 
     dataset: &SimdDataset, 
     max_iterations: usize
 ) {
-    let base_consts = ind.get_constants();
-    let n = base_consts.len();
+    if ind.program.is_none() {
+        ind.compile();
+    }
+    
+    let program = match &mut ind.program {
+        Some(p) => p,
+        None => return,
+    };
+
+    let n = program.constants.len();
     if n == 0 { return; }
 
-    // Nelder-Mead hiperparaméterek (Standard értékek)
-    let alpha = 1.0; // Tükrözés (Reflection)
-    let gamma = 2.0; // Kiterjesztés (Expansion)
-    let rho = 0.5;   // Összehúzás (Contraction)
-    let sigma = 0.5; // Zsugorodás (Shrink)
-
-    let mut simplex: Vec<(f64, Vec<f64>)> = Vec::with_capacity(n + 1);
+    // --- HIPERPARAMÉTEREK ---
+    const ALPHA: f32 = 1.0;
+    const GAMMA: f32 = 2.0;
+    const RHO: f32 = 0.5;
+    const SIGMA: f32 = 0.5;
     
-    ind.set_constants(&base_consts);
-    let base_mse = ind.calculate_mse(dataset);
-    simplex.push((base_mse, base_consts.clone()));
+    let mut simplex: Vec<(f32, Vec<f32>)> = Vec::with_capacity(n + 1);
+    let start_consts = program.constants.clone();
+    let start_mse = calculate_mse_simd(program, dataset);
+    simplex.push((start_mse, start_consts.clone()));
 
     for i in 0..n {
-        let mut new_point = base_consts.clone();
-        let step = if new_point[i].abs() < 1e-4 { 0.05 } else { new_point[i] * 0.05 };
+        let mut new_point = start_consts.clone();
+        let step = if new_point[i].abs() < 1e-4 { 0.005 } else { new_point[i] * 0.05 };
         new_point[i] += step;
         
-        ind.set_constants(&new_point);
-        let mse = ind.calculate_mse(dataset);
+        program.constants = new_point.clone(); 
+        let mse = calculate_mse_simd(program, dataset);
         simplex.push((mse, new_point));
     }
+
+    let mut centroid = vec![0.0; n];
+    let mut reflected = vec![0.0; n];
+    let mut expanded = vec![0.0; n];
+    let mut contracted = vec![0.0; n];
 
     for _ in 0..max_iterations {
         simplex.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
         
-        if (simplex.last().unwrap().0 - simplex.first().unwrap().0).abs() < 1e-6 {
+        let best_mse = simplex[0].0;
+        let worst_mse = simplex[n].0;
+
+        if (worst_mse - best_mse).abs() < 1e-6 {
             break;
         }
-
-        let mut centroid = vec![0.0; n];
+        centroid.fill(0.0);
+        
         for i in 0..n {
             for j in 0..n {
                 centroid[j] += simplex[i].1[j];
             }
         }
         for j in 0..n {
-            centroid[j] /= n as f64;
+            centroid[j] /= n as f32;
         }
 
         let worst_point = &simplex[n].1;
-        let worst_mse = simplex[n].0;
         let second_worst_mse = simplex[n - 1].0;
-        let best_mse = simplex[0].0;
 
-        // --- TÜKRÖZÉS (Reflection) ---
-        let mut reflected = vec![0.0; n];
+        // --- REFLECTION ---
         for j in 0..n {
-            reflected[j] = centroid[j] + alpha * (centroid[j] - worst_point[j]);
+            reflected[j] = centroid[j] + ALPHA * (centroid[j] - worst_point[j]);
         }
-        ind.set_constants(&reflected);
-        let reflected_mse = ind.calculate_mse(dataset);
+        program.constants.copy_from_slice(&reflected);
+        let reflected_mse = calculate_mse_simd(program, dataset);
 
         if reflected_mse >= best_mse && reflected_mse < second_worst_mse {
-            simplex[n] = (reflected_mse, reflected);
+            simplex[n] = (reflected_mse, reflected.clone());
             continue;
         }
 
-        // --- KITERJESZTÉS (Expansion) ---
+        // --- EXPANSION ---
         if reflected_mse < best_mse {
-            let mut expanded = vec![0.0; n];
             for j in 0..n {
-                expanded[j] = centroid[j] + gamma * (reflected[j] - centroid[j]);
+                expanded[j] = centroid[j] + GAMMA * (reflected[j] - centroid[j]);
             }
-            ind.set_constants(&expanded);
-            let expanded_mse = ind.calculate_mse(dataset);
+            
+            program.constants.copy_from_slice(&expanded);
+            let expanded_mse = calculate_mse_simd(program, dataset);
 
             if expanded_mse < reflected_mse {
-                simplex[n] = (expanded_mse, expanded);
+                simplex[n] = (expanded_mse, expanded.clone());
             } else {
-                simplex[n] = (reflected_mse, reflected);
+                simplex[n] = (reflected_mse, reflected.clone());
             }
             continue;
         }
-
-        // --- ÖSSZEHÚZÁS (Contraction) ---
-        let mut contracted = vec![0.0; n];
         
-        if reflected_mse < worst_mse {
-            for j in 0..n { contracted[j] = centroid[j] + rho * (reflected[j] - centroid[j]); }
-            ind.set_constants(&contracted);
-            let contract_mse = ind.calculate_mse(dataset);
-            if contract_mse <= reflected_mse {
-                simplex[n] = (contract_mse, contracted);
-                continue;
-            }
+        let limit_mse = if reflected_mse < worst_mse {
+            for j in 0..n { contracted[j] = centroid[j] + RHO * (reflected[j] - centroid[j]); }
+            reflected_mse
         } else {
-            for j in 0..n { contracted[j] = centroid[j] + rho * (worst_point[j] - centroid[j]); }
-            ind.set_constants(&contracted);
-            let contract_mse = ind.calculate_mse(dataset);
-            if contract_mse < worst_mse {
-                simplex[n] = (contract_mse, contracted);
-                continue;
-            }
+            for j in 0..n { contracted[j] = centroid[j] + RHO * (worst_point[j] - centroid[j]); }
+            worst_mse
+        };
+
+        program.constants.copy_from_slice(&contracted);
+        let contracted_mse = calculate_mse_simd(program, dataset);
+
+        if contracted_mse < limit_mse {
+            simplex[n] = (contracted_mse, contracted.clone());
+            continue;
         }
 
-        // --- ZSUGORODÁS ---
+        // --- SHRINK ---
         let best_point = simplex[0].1.clone();
         for i in 1..=n {
-            let mut shrunk = vec![0.0; n];
             for j in 0..n {
-                shrunk[j] = best_point[j] + sigma * (simplex[i].1[j] - best_point[j]);
+                simplex[i].1[j] = best_point[j] + SIGMA * (simplex[i].1[j] - best_point[j]);
             }
-            ind.set_constants(&shrunk);
-            simplex[i].0 = ind.calculate_mse(dataset);
-            simplex[i].1 = shrunk;
+            
+            program.constants.copy_from_slice(&simplex[i].1);
+            simplex[i].0 = calculate_mse_simd(program, dataset);
         }
     }
 
     simplex.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-    ind.set_constants(&simplex[0].1);
+    program.constants = simplex[0].1.clone();
+    
+    let best_consts = &simplex[0].1;
+    let mut const_idx = 0;
+    for node in &mut ind.nodes {
+        if let crate::ast::node::Node::Constant(val) = node {
+            if const_idx < best_consts.len() {
+                *val = best_consts[const_idx];
+                const_idx += 1;
+            }
+        }
+    }
+    ind.fitness = simplex[0].0; 
 }

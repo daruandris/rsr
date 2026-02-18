@@ -2,13 +2,8 @@ use crate::evolution::individual::Individual;
 use rand::RngExt;
 
 fn dominates(a: &Individual, b: &Individual) -> bool {
-    let fit_better_eq = a.fitness <= b.fitness;
-    let age_better_eq = a.age <= b.age;
-    
-    let fit_strictly_better = a.fitness < b.fitness;
-    let age_strictly_better = a.age < b.age;
-
-    fit_better_eq && age_better_eq && (fit_strictly_better || age_strictly_better)
+    (a.fitness <= b.fitness && a.age <= b.age) && 
+    (a.fitness < b.fitness || a.age < b.age)
 }
 
 pub fn tournament_selection_pareto<'a>(
@@ -16,24 +11,21 @@ pub fn tournament_selection_pareto<'a>(
     k: usize,
     rng: &mut impl RngExt
 ) -> &'a Individual {
-    let mut candidates = Vec::with_capacity(k);
-    for _ in 0..k {
-        candidates.push(&population[rng.random_range(0..population.len())]);
-    }
+    let best_idx = rng.random_range(0..population.len());
+    let mut best_ind = &population[best_idx];
 
-    let mut best_candidate = candidates[0];
-    
-    for i in 1..k {
-        let challenger = candidates[i];
-        
-        if dominates(challenger, best_candidate) {
-            best_candidate = challenger;
-        } else if !dominates(best_candidate, challenger) {
-            if challenger.fitness < best_candidate.fitness {
-                best_candidate = challenger;
+    for _ in 1..k {
+        let challenger_idx = rng.random_range(0..population.len());
+        let challenger = &population[challenger_idx];
+
+        if dominates(challenger, best_ind) {
+            best_ind = challenger;
+        } else if !dominates(best_ind, challenger) {
+            if challenger.fitness < best_ind.fitness {
+                best_ind = challenger;
             }
         }
     }
 
-    best_candidate
+    best_ind
 }

@@ -11,12 +11,21 @@ pub fn crossover(parent_a: &Individual, parent_b: &Individual, rng: &mut impl Rn
     let (start_a, end_a) = parent_a.get_subtree_bounds(root_a);
     let (start_b, end_b) = parent_b.get_subtree_bounds(root_b);
 
-    let mut child_nodes = Vec::with_capacity(parent_a.nodes.len() + (end_b - start_b + 1));
+    let new_len = start_a + (end_b - start_b + 1) + (parent_a.nodes.len() - end_a - 1);
+
+    // Bloat control: Ha túl nagy lenne, abort
+    if new_len > 64 { 
+        return parent_a.clone();
+    }
+    let mut child_nodes = Vec::with_capacity(new_len);
     child_nodes.extend_from_slice(&parent_a.nodes[..start_a]);
     child_nodes.extend_from_slice(&parent_b.nodes[start_b..=end_b]);
     child_nodes.extend_from_slice(&parent_a.nodes[end_a + 1..]);
 
-    if child_nodes.len() > 50 { return parent_a.clone(); }
-
-    Individual { nodes: child_nodes, fitness: f64::MAX, age: 0 }
+    Individual { 
+        nodes: child_nodes, 
+        fitness: f32::MAX, 
+        age: 0,
+        program: None 
+    }
 }

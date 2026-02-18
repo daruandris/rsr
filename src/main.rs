@@ -14,7 +14,7 @@ fn main() {
     let mut rng = rand::rng();
     
     let num_features = 3;
-    let sqrt_2pi = (2.0 * std::f64::consts::PI).sqrt();
+    let sqrt_2pi = (2.0 * std::f32::consts::PI).sqrt();
     for _ in 0..num_samples {
         let x = rng.random_range(-5.0..15.0);
         let mu = rng.random_range(0.0..10.0);
@@ -28,24 +28,25 @@ fn main() {
     let dataset = SimdDataset::new(&data_x, &data_y, num_features);
 
     let config = EvolutionConfig {
-        num_islands: 5,
-        island_size: 500,
+        num_islands: 8,
+        island_size: 1000,
         max_generations: 5000,         
-        crossover_rate: 0.85,
-        tournament_size: 3,
-        migration_interval: 25,
-        parsimony_penalty: 0.01,
+        crossover_rate: 0.70,
+        tournament_size: 5,
+        migration_interval: 40,
+        parsimony_penalty: 0.005,
 
-        opt_prob: 0.1,
-        opt_iterations: 15,
+        opt_prob: 0.02,
+        opt_iterations: 50,
+        final_opt_iterations: 2000,
         
-        stagnation_threshold: 100,
+        stagnation_threshold: 150,
         target_mse: 1e-6,
         min_improvement: 1e-6,
 
-        random_injection_rate: 0.04,
-        min_random_injection: 2,
-        verbose : false,
+        random_injection_rate: 0.05,
+        min_random_injection: 5,
+        verbose : true,
     };
     
     println!("Initializing with {} islands, each of {} individuals...", config.num_islands, config.island_size);

@@ -9,11 +9,11 @@ use crate::metrics::dataset::SimdDataset;
 pub struct Engine {
     pub islands: Vec<Island>,
     pub config: EvolutionConfig,
-    pub global_hof: HashMap<usize, (f64, Individual)>,
+    pub global_hof: HashMap<usize, (f32, Individual)>,
 }
 
 impl Engine {
-    pub fn new(config: EvolutionConfig, num_features: usize) -> Self {
+    pub fn new(config: EvolutionConfig, num_features: u8) -> Self {
         let mut islands = Vec::with_capacity(config.num_islands);
         for i in 0..config.num_islands {
             islands.push(Island::new(config.island_size, 42 + i as u64, num_features));
@@ -40,14 +40,12 @@ impl Engine {
                 }
             }
 
-            let global_best = self.get_global_best();
+            let mut global_best = self.get_global_best().clone();
             let pure_mse = global_best.calculate_mse(dataset);
 
             if pure_mse <= config.target_mse {
                 if config.verbose {
                     println!("\n>>> Targert reached in {}. genereation! <<<", generation);
-                    println!("Pure MSE: {:.8}", pure_mse);
-                    println!("Expression: {}", global_best);
                 }
                 break;
             }
@@ -59,6 +57,23 @@ impl Engine {
                 }
             }
         }
+        if config.verbose {
+            println!("\n>>> Starting Final Hard Optimization ({} iterations) <<<", config.final_opt_iterations);
+        }
+        let mut final_best = self.get_global_best().clone();
+        final_best.optimize_constants(dataset, config.final_opt_iterations);
+
+        let final_mse = final_best.calculate_mse(dataset);
+
+        if config.verbose {
+            println!("--------------------------------------------------");
+            println!("FINAL RESULT AFTER OPTIMIZATION:");
+            println!("Original MSE: {:.8}", self.get_global_best().fitness);
+            println!("Optimized MSE: {:.8}", final_mse);
+            println!("Final Expression: {}", final_best);
+            println!("--------------------------------------------------");
+        }
+        
     }
 
     fn migrate_individuals(&mut self) {
@@ -82,14 +97,14 @@ impl Engine {
             .unwrap()
     }
 
-    pub fn get_pareto_front(&self) -> Vec<(usize, f64, Individual)> {
-        let mut front: Vec<(usize, f64, Individual)> = self.global_hof.iter()
+    pub fn get_pareto_front(&self) -> Vec<(usize, f32, Individual)> {
+        let mut front: Vec<(usize, f32, Individual)> = self.global_hof.iter()
             .map(|(&c, &(mse, ref ind))| (c, mse, ind.clone()))
             .collect();
         front.sort_by_key(|k| k.0);
 
         let mut pareto = Vec::new();
-        let mut best_mse = f64::MAX;
+        let mut best_mse = f32::MAX;
 
         for (comp, mse, ind) in front {
             if mse < best_mse {

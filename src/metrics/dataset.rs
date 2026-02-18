@@ -1,55 +1,72 @@
-use wide::f64x4;
+use wide::f32x4;
 
 
 pub struct SimdDataset {
-    pub x_batches: Vec<Vec<f64x4>>,
-    pub y_batches: Vec<f64x4>,
-    pub remainder_x: Vec<Vec<f64>>,
-    pub remainder_y: Vec<f64>,
-    pub num_features: usize
+    pub feature_flat: Vec<f32x4>,
+    pub target_batches: Vec<f32x4>,
+    pub num_features: u8,
+    pub num_batches: usize,
+    pub num_samples: usize,
 }
 
 impl SimdDataset {
-    pub fn new(data_x: &[Vec<f64>], data_y: &[f64], num_features: usize) -> Self {
+    pub fn new(data_x: &[Vec<f32>], data_y: &[f32], num_features: u8) -> Self {
         let num_samples = data_x.len();
-        let chunk_size = 4;
-        let num_chunks = num_samples / chunk_size;
+        let num_features_usize = num_features as usize;
+        let simd_width = 4;
+        let remainder = num_samples % simd_width;
+        let padding = if remainder == 0 { 0 } else { simd_width - remainder };
+        let padded_size = num_samples + padding;
+        let num_batches = padded_size / simd_width;
 
-        let mut x_batches = Vec::with_capacity(num_chunks);
-        let mut y_batches = Vec::with_capacity(num_chunks);
+        let mut feature_flat = Vec::with_capacity(num_batches * num_features_usize);
+        let mut target_batches = Vec::with_capacity(num_batches);
 
-        for i in 0..num_chunks {
-            let start = i* chunk_size;
-            let mut batch_features = Vec::with_capacity(num_features);
-
-            for j in 0..num_features {
-                let vec4 = f64x4::new([
-                    data_x[start][j],
-                    data_x[start + 1][j],
-                    data_x[start + 2][j],
-                    data_x[start + 3][j],
-                ]);
-                batch_features.push(vec4);
+        let get_sample = |idx: usize, feature_idx: usize| -> f32 {
+            if idx < num_samples {
+                data_x[idx][feature_idx]
+            } else {
+                0.0
             }
-            x_batches.push(batch_features);
+        };
 
-            y_batches.push(f64x4::new([
-                data_y[start],
-                data_y[start + 1],
-                data_y[start + 2],
-                data_y[start + 3],
-            ]));
+        let get_target = |idx: usize| -> f32 {
+            if idx < num_samples {
+                data_y[idx]
+            } else {
+                0.0
+            }
+        };
+
+        for i in 0..num_batches {
+            let start_idx = i * simd_width;
+            
+            for f_idx in 0..num_features_usize {
+                let batch = f32x4::new([
+                    get_sample(start_idx, f_idx),
+                    get_sample(start_idx + 1, f_idx),
+                    get_sample(start_idx + 2, f_idx),
+                    get_sample(start_idx + 3, f_idx),
+                ]);
+                feature_flat.push(batch);
+            }
+
+            let target_batch = f32x4::new([
+                get_target(start_idx),
+                get_target(start_idx + 1),
+                get_target(start_idx + 2),
+                get_target(start_idx + 3),
+            ]);
+            target_batches.push(target_batch);
         }
 
-        let remainder_start = num_chunks * chunk_size;
-        let remainder_x = data_x[remainder_start..].to_vec();
-        let remainder_y = data_y[remainder_start..].to_vec();
-
-        Self { x_batches, y_batches, remainder_x, remainder_y, num_features }
-    }
-
-    pub fn total_samples(&self) -> usize {
-        (self.y_batches.len() * 4) + self.remainder_y.len()
+        Self {
+            feature_flat,
+            target_batches,
+            num_features: num_features,
+            num_batches,
+            num_samples,
+        }
     }
 }
 

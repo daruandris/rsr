@@ -5,7 +5,7 @@ use rand::RngExt;
 
 fn get_heavy_config() -> EvolutionConfig {
     EvolutionConfig {
-        num_islands: 5,
+        num_islands: 8,
         island_size: 1000,
         max_generations: 5000,
         crossover_rate: 0.70,
@@ -14,9 +14,10 @@ fn get_heavy_config() -> EvolutionConfig {
         parsimony_penalty: 0.0005,
         opt_prob: 0.02,
         opt_iterations: 50,
-        stagnation_threshold: 150,
-        target_mse: 1e-9,
-        min_improvement: 1e-10,
+        final_opt_iterations: 2000,
+        stagnation_threshold: 200,
+        target_mse: 1e-6,
+        min_improvement: 1e-6,
         random_injection_rate: 0.05,
         min_random_injection: 5,
         verbose : false
@@ -37,7 +38,7 @@ fn benchmark_physics_damped_oscillator() {
     // Paraméterek: A=5.0, gamma=0.5, omega=3.0
     // Képlet: 5.0 * exp(-0.5 * t) * cos(3.0 * t)
     for _ in 0..num_samples {
-        let t: f64 = rng.random_range(0.0..10.0); 
+        let t: f32  = rng.random_range(0.0..10.0); 
         x_data.push(vec![t]);
         
         let noise = rng.random_range(-0.01..0.01);
@@ -52,7 +53,7 @@ fn benchmark_physics_damped_oscillator() {
     engine.run_evolution(&dataset);
 
     let duration = start.elapsed();
-    let best = engine.get_global_best();
+    let mut best = engine.get_global_best().clone();
     let mse = best.calculate_mse(&dataset);
     
     println!("Physics solved in: {:?}", duration);
@@ -92,7 +93,7 @@ fn benchmark_biology_enzyme_kinetics() {
     engine.run_evolution(&dataset);
 
     let duration = start.elapsed();
-    let best = engine.get_global_best();
+    let mut best = engine.get_global_best().clone();
     let mse = best.calculate_mse(&dataset);
     
     println!("Biology solved in: {:?}", duration);
@@ -118,7 +119,7 @@ fn benchmark_stats_maxwell_boltzmann() {
 
     // Egyszerűsített alak: y = x^2 * exp(-0.5 * x^2)
     for _ in 0..num_samples {
-        let v: f64 = rng.random_range(0.0..5.0);
+        let v: f32 = rng.random_range(0.0..5.0);
         x_data.push(vec![v]);
         
         // y = v^2 * exp(-0.5 * v^2)
@@ -135,7 +136,7 @@ fn benchmark_stats_maxwell_boltzmann() {
     engine.run_evolution(&dataset);
 
     let duration = start.elapsed();
-    let best = engine.get_global_best();
+    let mut best = engine.get_global_best().clone();
     let mse = best.calculate_mse(&dataset);
     
     println!("PhStatisticsysics solved in: {:?}", duration);

@@ -12,17 +12,17 @@ pub struct BenchmarkEntry {
     pub timestamp: u64,
     pub commit_hash: String,
     
-    pub biology_mse: Option<f64>,
+    pub biology_mse: Option<f32>,
     pub biology_time_ms: Option<u64>,
     
-    pub physics_mse: Option<f64>,
+    pub physics_mse: Option<f32>,
     pub physics_time_ms: Option<u64>,
     
-    pub stats_mse: Option<f64>,
+    pub stats_mse: Option<f32>,
     pub stats_time_ms: Option<u64>,
 }
 
-pub fn update_history(category: &str, mse: f64, time_ms: u64) {
+pub fn update_history(category: &str, mse: f32, time_ms: u64) {
     let file_path = "benchmark_history.js";
     let prefix = "const benchmarkHistory = ";
     let suffix = ";";
