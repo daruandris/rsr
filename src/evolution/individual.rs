@@ -14,11 +14,21 @@ pub struct Individual {
     pub fitness: f32,
     pub age: usize,
     pub program: Option<Program>,
+    pub rank: u32,
+    pub crowding_distance: f32
 }
 
 impl Individual {
     pub fn new(nodes: Vec<Node>) -> Self {
-        Self { nodes, fitness: f32::MAX, age: 0, program: None }
+        Self { 
+            nodes, 
+            fitness: 
+            f32::MAX, 
+            age: 0, 
+            program: None,
+            rank: 0,
+            crowding_distance: 0.0 
+        }
     }
 
     pub fn compile(&mut self) {

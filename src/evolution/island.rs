@@ -10,6 +10,7 @@ use crate::metrics::dataset::SimdDataset;
 use crate::operators::crossover::crossover;
 use crate::operators::generator::generate_random_ast;
 use crate::operators::mutation::{constant_perturbation, point_mutation, subtree_mutation};
+use crate::operators::selection::assign_rank_and_crowding_distance;
 use crate::operators::selection::{tournament_selection_pareto};
 
 pub struct Island {
@@ -50,6 +51,8 @@ impl Island {
         for ind in self.individuals.iter_mut() {
             ind.age += 1;
         }
+
+        assign_rank_and_crowding_distance(&mut self.individuals);
 
         self.fill_next_generation(config, num_features);
 
