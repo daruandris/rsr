@@ -1,10 +1,10 @@
 use rsr::{EvolutionConfig, SimdDataset};
 
 use std::fs::{OpenOptions, File};
-use std::io::Write;
-use serde::Serialize;
+use std::io::{BufReader, Write};
+use serde::{Serialize, Deserialize};
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct BenchResult {
     name: String,
     unit: String,

@@ -1,3 +1,5 @@
+mod common;
+
 use rsr::{Engine, EvolutionConfig, SimdDataset};
 use rand::RngExt;
 
@@ -57,7 +59,7 @@ fn benchmark_physics_damped_oscillator() {
     println!("Best: {}", best);
     println!("Mse: {}", mse);
 
-    super::common::append_benchmark_result("Physics", mse, duration.as_millis());
+    common::append_benchmark_result("Physics", mse, duration.as_millis());
 
     assert!(mse < 0.01); 
 }
@@ -97,7 +99,7 @@ fn benchmark_biology_enzyme_kinetics() {
     println!("Best: {}", best);
     println!("Mse: {}", mse);
 
-    super::common::append_benchmark_result("Biology", mse, duration.as_millis());
+    common::append_benchmark_result("Biology", mse, duration.as_millis());
 
     
     assert!(mse < 1e-4);
@@ -142,7 +144,7 @@ fn benchmark_stats_maxwell_boltzmann() {
     println!("Best: {}", best);
     println!("Mse: {}", mse);
 
-    super::common::append_benchmark_result("Statistics", mse, duration.as_millis());
+    common::append_benchmark_result("Statistics", mse, duration.as_millis());
 
     
     assert!(mse < 1e-3);
