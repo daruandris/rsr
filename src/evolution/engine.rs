@@ -5,6 +5,7 @@ use crate::evolution::config::EvolutionConfig;
 use crate::evolution::individual::Individual;
 use crate::evolution::island::Island;
 use crate::metrics::dataset::SimdDataset;
+use crate::ast::format::format_real_equation;
 
 pub struct Engine {
     pub islands: Vec<Island>,
@@ -63,14 +64,17 @@ impl Engine {
         let mut final_best = self.get_global_best().clone();
         final_best.optimize_constants(dataset, config.final_opt_iterations);
 
-        let final_mse = final_best.calculate_mse(dataset);
-
         if config.verbose {
             println!("--------------------------------------------------");
             println!("FINAL RESULT AFTER OPTIMIZATION:");
-            println!("Original MSE: {:.8}", self.get_global_best().fitness);
-            println!("Optimized MSE: {:.8}", final_mse);
-            println!("Final Expression: {}", final_best);
+
+            let norm_mse = final_best.calculate_mse(dataset);
+            println!("Normalized MSE: {:.8}", norm_mse);
+
+            let real_mse = norm_mse * (dataset.target_std_dev * dataset.target_std_dev);
+            println!("Real-world MSE: {:.8}", real_mse);
+
+            println!("Final Expression (Real): {}", format_real_equation(&final_best, dataset));
             println!("--------------------------------------------------");
         }
         

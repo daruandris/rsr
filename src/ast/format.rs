@@ -1,4 +1,6 @@
 use crate::ast::node::{Node, Op};
+use crate::metrics::dataset::SimdDataset;
+use crate::evolution::individual::Individual;
 
 pub fn format_ast(nodes: &[Node]) -> String {
     let mut stack: Vec<String> = Vec::with_capacity(32);
@@ -42,4 +44,16 @@ pub fn format_ast(nodes: &[Node]) -> String {
     }
     
     stack.pop().unwrap_or_else(|| "Empty expression".to_string())
+}
+
+pub fn format_real_equation(ind: &Individual, dataset: &SimdDataset) -> String {
+    let core_expr = format_ast(&ind.nodes);
+    
+    // A képlet: OutputStd * ( CoreExpr ) + OutputMean
+    format!(
+        "y = {:.4} * ( {} ) + {:.4}\n\t[Input normalization: X_norm = (X - mean) / std]",
+        dataset.target_std_dev,
+        core_expr,
+        dataset.target_mean
+    )
 }

@@ -41,7 +41,7 @@ impl Individual {
         evaluate_ast(&self.nodes, features)
     }
 
-  pub fn calculate_mse(&mut self, dataset: &SimdDataset) -> f32 {
+     pub fn calculate_mse(&mut self, dataset: &SimdDataset) -> f32 {
         // 1. Lazy compilation
         if self.program.is_none() {
             self.compile();
@@ -107,6 +107,21 @@ impl Individual {
 
     pub fn complexity(&self) -> usize{
         self.nodes.iter().map(|node| node.weight()).sum()
+    }
+
+    pub fn predict_real(&self, raw_inputs: &[f32], dataset: &SimdDataset) -> f32 {
+        let mut norm_inputs = Vec::with_capacity(raw_inputs.len());
+        for (i, &val) in raw_inputs.iter().enumerate() {
+            if i < dataset.feature_means.len() {
+                let mean = dataset.feature_means[i];
+                let std = dataset.feature_std_devs[i];
+                norm_inputs.push((val - mean) / std);
+            } else {
+                norm_inputs.push(val);
+            }
+        }
+        let norm_output = self.evaluate(&norm_inputs);
+        dataset.denormalize_target(norm_output)
     }
 }
 
