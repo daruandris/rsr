@@ -32,7 +32,12 @@ pub fn optimize_individual_constants(
 
     for i in 0..n {
         let mut new_point = start_consts.clone();
-        let step = if new_point[i].abs() < 1e-4 { 0.005 } else { new_point[i] * 0.05 };
+        let val = new_point[i];
+        let step = if val.abs() < 1e-4 { 
+            0.01 // Ha 0, lépjünk el
+        } else { 
+            val * 0.10 // 10%-os elmozdulás a 0.5 helyett (bátrabb nyitás)
+        };
         new_point[i] += step;
         
         program.constants = new_point.clone(); 
@@ -51,7 +56,7 @@ pub fn optimize_individual_constants(
         let best_mse = simplex[0].0;
         let worst_mse = simplex[n].0;
 
-        if (worst_mse - best_mse).abs() < 1e-6 {
+        if (worst_mse - best_mse).abs() < 1e-6 || best_mse < 1e-8 {
             break;
         }
         centroid.fill(0.0);
