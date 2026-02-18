@@ -2,7 +2,6 @@ use crate::ast::node::Node;
 use crate::evolution::individual::Individual;
 use crate::operators::generator::{generate_random_ast, random_node_of_arity};
 use rand::RngExt;
-use rand_distr::{Distribution, Normal};
 
 pub fn point_mutation(ind: &mut Individual, rng: &mut impl RngExt, num_features: u8) {
     if ind.nodes.is_empty() { return; }
@@ -27,8 +26,21 @@ pub fn constant_perturbation(ind: &mut Individual, rng: &mut impl RngExt) {
 
     if let Some(idx) = target_idx {
         if let Node::Constant(ref mut val) = ind.nodes[idx] {
-            let normal = Normal::new(0.0, 0.1).unwrap(); 
-            *val += normal.sample(rng);
+            // Multiplikatív perturbáció (Log-Normal szerű viselkedés)
+            // 80% esély: kicsit szorozzuk meg (0.9 ... 1.1) - finomhangolás
+            // 10% esély: additív zaj (ha esetleg 0 lenne az érték)
+            // 10% esély: teljesen új random szám (menekülés lokális minimumból)
+            
+            let r = rng.random::<f32>();
+            if r < 0.8 {
+                let factor = rng.random_range(0.9..1.1); 
+                *val *= factor;
+            } else if r < 0.9 {
+                let shift = rng.random_range(-0.1..0.1);
+                *val += shift;
+            } else {
+                *val = rng.random_range(-5.0..5.0);
+            }
             
             ind.invalidate();
         }

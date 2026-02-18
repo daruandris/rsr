@@ -28,24 +28,24 @@ fn main() {
     let dataset = SimdDataset::new(&data_x, &data_y, num_features);
 
     let config = EvolutionConfig {
-        num_islands: 8,
+        num_islands: 5,
         island_size: 1000,
-        max_generations: 5000,         
-        crossover_rate: 0.70,
-        tournament_size: 5,
-        migration_interval: 40,
+        max_generations: 500,         
+        crossover_rate: 0.85,
+        tournament_size: 3,
+        migration_interval: 25,
         parsimony_penalty: 0.005,
 
-        opt_prob: 0.02,
-        opt_iterations: 50,
+        opt_prob: 0.1,
+        opt_iterations: 15,
         final_opt_iterations: 2000,
         
-        stagnation_threshold: 150,
+        stagnation_threshold: 100,
         target_mse: 1e-6,
         min_improvement: 1e-6,
 
-        random_injection_rate: 0.05,
-        min_random_injection: 5,
+        random_injection_rate: 0.04,
+        min_random_injection: 2,
         verbose : true,
     };
     
