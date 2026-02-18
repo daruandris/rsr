@@ -11,11 +11,12 @@ use std::fmt;
 pub struct Individual {
     pub nodes: Vec<Node>,
     pub fitness: f64,
+    pub age: usize,
 }
 
 impl Individual {
     pub fn new(nodes: Vec<Node>) -> Self {
-        Self { nodes, fitness: f64::MAX }
+        Self { nodes, fitness: f64::MAX, age: 0 }
     }
 
     pub fn evaluate(&self, features: &[f64]) -> f64 {

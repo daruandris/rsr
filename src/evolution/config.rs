@@ -14,4 +14,7 @@ pub struct EvolutionConfig {
     pub stagnation_threshold: usize,
     pub target_mse: f64,
     pub min_improvement: f64,
+
+    pub random_injection_rate: f64,
+    pub min_random_injection: usize,
 }

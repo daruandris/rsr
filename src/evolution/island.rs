@@ -9,7 +9,7 @@ use crate::metrics::dataset::SimdDataset;
 use crate::operators::crossover::crossover;
 use crate::operators::generator::generate_random_ast;
 use crate::operators::mutation::{constant_perturbation, point_mutation, subtree_mutation};
-use crate::operators::selection::tournament_selection;
+use crate::operators::selection::{tournament_selection_pareto};
 
 pub struct Island {
     pub individuals: Vec<Individual>,
@@ -43,44 +43,25 @@ impl Island {
 
     pub fn step_generation(&mut self, dataset: &SimdDataset, config: &EvolutionConfig) {
         let num_features = dataset.num_features;
+        for ind in self.individuals.iter_mut() {
+            ind.age += 1;
+        }
+        
         let old_best_fitness = self.best_individual.fitness;
-        let mut next_gen = self.create_next_generation(config, num_features);
+        let mut next_gen = self.create_next_generation_afpo(config, num_features);
         self.evaluate_and_optimize(&mut next_gen, dataset, config);
         self.individuals = next_gen;
 
         let improvement = old_best_fitness - self.best_individual.fitness;
-        let is_significant_improvement = improvement > config.min_improvement;
-        self.handle_stagnation(is_significant_improvement, config, dataset);
-    }
-
-    fn create_next_generation(&mut self, config: &EvolutionConfig, num_features: usize) -> Vec<Individual> {
-        let pop_size = self.individuals.capacity();
-        let mut next_gen = Vec::with_capacity(pop_size);
-        next_gen.push(self.best_individual.clone());
-
-        while next_gen.len() < pop_size {
-            let p: f64 = self.rng.random();
-            if p < config.crossover_rate {
-                let parent1 = tournament_selection(&self.individuals, config.tournament_size, &mut self.rng);
-                let parent2 = tournament_selection(&self.individuals, config.tournament_size, &mut self.rng);
-
-                let mut child = crossover(parent1, parent2, &mut self.rng);
-                child.simplify();
-                next_gen.push(child);
-            } else {
-                let mut child = tournament_selection(&self.individuals, config.tournament_size, &mut self.rng).clone();
-                let mut_type = self.rng.random_range(0..3);
-                
-                match mut_type {
-                    0 => point_mutation(&mut child, &mut self.rng, num_features),
-                    1 => constant_perturbation(&mut child, &mut self.rng),
-                    _ => subtree_mutation(&mut child, &mut self.rng, num_features),
-                }
-                child.simplify();
-                next_gen.push(child);
-            }
+        if improvement > config.min_improvement {
+            self.stagnation_counter = 0;
+        } else {
+            self.stagnation_counter += 1;
         }
-        next_gen
+
+        if self.stagnation_counter >= config.stagnation_threshold * 4 { 
+            self.nuke(dataset, config);
+        }
     }
 
     fn evaluate_and_optimize(&mut self, next_gen: &mut Vec<Individual>, dataset: &SimdDataset, config: &EvolutionConfig) {
@@ -119,34 +100,78 @@ impl Island {
         }
     }
 
-    fn handle_stagnation(&mut self, improved: bool, config: &EvolutionConfig, dataset: &SimdDataset) {
-        if improved {
-            self.stagnation_counter = 0;
-        } else {
-            self.stagnation_counter += 1;
+    pub fn nuke(&mut self, dataset: &SimdDataset, config: &EvolutionConfig) {
+        println!("NUKING ISLAND!");
+
+        let num_features = dataset.num_features;
+        let pop_size = self.individuals.capacity();
+
+        self.individuals.clear();
+        self.individuals.push(self.best_individual.clone());
+
+        for _ in 1..pop_size {
+            let ast = generate_random_ast(5, &mut self.rng, num_features);
+            let mut new_ind = Individual::new(ast);
+            new_ind.simplify();
+            
+            let mse = new_ind.calculate_mse(dataset);
+            let penalty = (new_ind.complexity() as f64) * config.parsimony_penalty;
+            if mse.is_finite() {
+                new_ind.fitness = mse + penalty;
+            }
+            self.individuals.push(new_ind);
+        }
+        self.stagnation_counter = 0;
+    }
+
+    fn create_next_generation_afpo(&mut self, config: &EvolutionConfig, num_features: usize) -> Vec<Individual> {
+        let pop_size = self.individuals.capacity();
+        let mut next_gen = Vec::with_capacity(pop_size);
+
+        // A) Elitizmus: A legjobb egyed átkerül (korát megtartva vagy növelve)
+        let elite = self.best_individual.clone();
+        next_gen.push(elite);
+
+        // B) "Friss Vér" (Random Injection): AFPO alapköve
+        let num_randoms = (pop_size as f64 * config.random_injection_rate)
+            .max(config.min_random_injection as f64) as usize; 
+        
+        for _ in 0..num_randoms {
+            if next_gen.len() >= pop_size { break; }
+            let ast = generate_random_ast(5, &mut self.rng, num_features);
+            let mut ind = Individual::new(ast); // Age = 0
+            ind.simplify();
+            next_gen.push(ind);
         }
 
-        if self.stagnation_counter >= config.stagnation_threshold {
-            println!("NUKING!");
-            let pop_size = self.individuals.capacity();
-            self.individuals.clear();
-            self.individuals.push(self.best_individual.clone());
+        // C) Utódok generálása (Szelekció + Keresztezés/Mutáció)
+        while next_gen.len() < pop_size {
+            let p: f64 = self.rng.random();
             
-            for _ in 1..pop_size {
-                let ast = generate_random_ast(5, &mut self.rng, dataset.num_features);
-                let mut new_ind = Individual::new(ast);
-                new_ind.simplify();
+            if p < config.crossover_rate {
+                let parent1 = tournament_selection_pareto(&self.individuals, config.tournament_size, &mut self.rng);
+                let parent2 = tournament_selection_pareto(&self.individuals, config.tournament_size, &mut self.rng);
+
+                let mut child = crossover(parent1, parent2, &mut self.rng);
+                child.age = parent1.age.max(parent2.age);
                 
-                let mse = new_ind.calculate_mse(dataset);
-                let penalty = (new_ind.complexity() as f64) * config.parsimony_penalty;
-                if mse.is_finite() {
-                    new_ind.fitness = mse + penalty;
+                child.simplify();
+                next_gen.push(child);
+            } else {
+                let parent = tournament_selection_pareto(&self.individuals, config.tournament_size, &mut self.rng);
+                let mut child = parent.clone();
+                child.age = parent.age; 
+                
+                let mut_type = self.rng.random_range(0..3);
+                match mut_type {
+                    0 => point_mutation(&mut child, &mut self.rng, num_features),
+                    1 => constant_perturbation(&mut child, &mut self.rng),
+                    _ => subtree_mutation(&mut child, &mut self.rng, num_features),
                 }
-                
-                self.individuals.push(new_ind);
+                child.simplify();
+                next_gen.push(child);
             }
-            
-            self.stagnation_counter = 0;
         }
+        next_gen
     }
 }

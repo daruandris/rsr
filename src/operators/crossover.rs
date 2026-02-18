@@ -18,5 +18,5 @@ pub fn crossover(parent_a: &Individual, parent_b: &Individual, rng: &mut impl Rn
 
     if child_nodes.len() > 50 { return parent_a.clone(); }
 
-    Individual { nodes: child_nodes, fitness: f64::MAX }
+    Individual { nodes: child_nodes, fitness: f64::MAX, age: 0 }
 }

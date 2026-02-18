@@ -28,26 +28,29 @@ fn main() {
         
         // Valószínűségi sűrűség
         let pdf = (1.0 / (sigma * sqrt_2pi)) * (-0.5 * z * z).exp();
-        data_y.push(pdf);
+        data_y.push(pdf * 100.0);
     }
 
     let dataset = SimdDataset::new(&data_x, &data_y, num_features);
 
     let config = EvolutionConfig {
-        num_islands: 8,
-        island_size: 800,
-        max_generations: 2000,         
+        num_islands: 5,
+        island_size: 500,
+        max_generations: 5000,         
         crossover_rate: 0.85,
         tournament_size: 3,
         migration_interval: 25,
-        parsimony_penalty: 0.00001,
+        parsimony_penalty: 0.01,
 
         opt_prob: 0.1,
         opt_iterations: 15,
         
         stagnation_threshold: 100,
-        target_mse: 1e-6,
-        min_improvement: 1e-5,
+        target_mse: 1e-9,
+        min_improvement: 1e-8,
+
+        random_injection_rate: 0.04,
+        min_random_injection: 2,
     };
     
     println!("Motor inicializálása: {} sziget, egyenként {} egyeddel...", config.num_islands, config.island_size);

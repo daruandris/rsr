@@ -1,29 +1,3 @@
-Fázis 1: A motor felpörgetése (Sebesség és Evolúciós logika)
-
-Ebben a fázisban még nem foglalkozunk a típusokkal és a dinamikus paraméterekkel, csak a meglévő logika "szteroidozásával".
-
-1. Függőleges SIMD Kiértékelés (Vertical Vectorization)
-
-    A koncepció: A jelenlegi evaluate egyetlen adatsoron fut végig. A SIMD-hez az adathalmazt át kell forgatnod (Transpose): ne sorok legyenek ([v0, t, a]), hanem oszlopok (v0_array, t_array, a_array).
-
-    A megvalósítás: A fa kiértékelésekor a stack-be nem egyetlen f64 számot teszel be, hanem egy rögzített méretű SIMD tömböt (pl. [f64; 8] vagy a std::simd::f64x8 típust). Ha jön egy Node::Add, akkor egyszerre 8 adatsoron hajtod végre az összeadást egyetlen CPU órajel alatt.
-
-2. Nelder-Mead (Simplex) Integrálása a Konstansokhoz
-
-    A koncepció: A zajos gradiens-süllyedés kukázása. A Nelder-Mead nem kér deriváltat, csak "letapogatja" a hiba-felületet egy n-dimenziós tetraéderrel.
-
-    A megvalósítás: Érdemes behúzni egy könnyű külső crate-et (pl. argmin), vagy megírni egy saját, egyszerűsített Nelder-Mead rutint, amit az Individual::optimize_constants hív meg. Mivel a SIMD miatt a kiértékelésed villámgyors lesz, a Nelder-Mead büntetlenül ki tudja értékelni az egyedet akár 50-szer is egyetlen generáción belül.
-
-3. Age-Fitness Pareto (AFPO) Bevezetése a Nuke helyett
-
-    A koncepció: A sziget generációs cikluson belüli stagnálás-kezelésének cseréje.
-
-    A megvalósítás: * Adj egy age: usize mezőt az Individual struktúrához.
-
-        Minden újonnan generált (mutált/keresztezett) egyed kora 0. Minden generációváltáskor a túlélők kora nő 1-gyel.
-
-        A szelekciós operátorod (Tournament) mostantól ne csak a Fitnesst nézze, hanem a Pareto-dominanciát: Egy 'A' egyed akkor jobb 'B'-nél, ha fiatalabb VAGY jobb a fitnesze. Ez természetes diverzitást biztosít a szigeteken belül.
-
 Fázis 2: Az Önszabályozó Meta-Motor (Dinamikus Stratégia)
 
 Itt építjük meg az intelligens, ön-kalibráló rendszert, ami alkalmazkodik az adatokhoz.
