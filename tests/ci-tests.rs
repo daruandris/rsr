@@ -1,4 +1,5 @@
 use rsr::Engine;
+use std::time::Instant;
 mod common;
 
 #[test]
@@ -7,11 +8,14 @@ fn test_linear_convergence() {
     let config = common::get_basic_config();
     let mut engine = Engine::new(config, num_features);
     
+    let start = Instant::now();
     engine.run_evolution(&dataset);
+    let duration = start.elapsed();
     
     let best = engine.get_global_best();
     let mse = best.calculate_mse(&dataset);
 
+    println!("Linear Solved in: {:.2?}", duration);
     println!("Best Linear Equation: {}", best);
     println!("MSE: {}", mse);
     assert!(mse < 1e-5, "A motornak meg kellett volna találnia a lineáris függvényt!");
@@ -24,13 +28,17 @@ fn test_quadratic_convergence() {
     config.max_generations = 200;
     
     let mut engine = Engine::new(config, num_features);
+
+    let start = Instant::now();
     engine.run_evolution(&dataset);
+    let duration = start.elapsed();
     
     let best = engine.get_global_best();
     let mse = best.calculate_mse(&dataset);
 
+    println!("Quadratic Solved in: {:.2?}", duration);
     println!("Best Quadratic Equation: {}", best);
-    
+    println!("MSE: {}", mse);
     assert!(mse < 1e-4, "A motornak meg kellett volna találnia a másodfokú függvényt!");
 }
 
@@ -40,8 +48,20 @@ fn test_sine_convergence() {
     let mut config = common::get_basic_config();
     config.max_generations = 200;
     let mut engine = Engine::new(config, num_features);
+
+    let start = Instant::now();
     engine.run_evolution(&dataset);
-    assert!(engine.get_global_best().calculate_mse(&dataset) < 1e-4);
+    let duration = start.elapsed();
+
+    let best = engine.get_global_best();
+    let mse = best.calculate_mse(&dataset);
+
+
+    println!("Sine Solved in: {:.2?}", duration);
+    println!("Best Equation: {}", best);
+    println!("MSE: {:.8}", mse);
+
+    assert!(mse < 1e-4, "Hiba: Túl nagy MSE a szinusznál!");
 }
 
 #[test]
@@ -50,6 +70,18 @@ fn test_exp_convergence() {
     let mut config = common::get_basic_config();
     config.max_generations = 500;
     let mut engine = Engine::new(config, num_features);
+    
+    let start = Instant::now();
     engine.run_evolution(&dataset);
-    assert!(engine.get_global_best().calculate_mse(&dataset) < 1e-4);
+    let duration = start.elapsed();
+
+    let best = engine.get_global_best();
+    let mse = best.calculate_mse(&dataset);
+
+
+    println!("Exp Solved in: {:.2?}", duration);
+    println!("Best Equation: {}", best);
+    println!("MSE: {:.8}", mse);
+
+    assert!(mse < 1e-4, "Hiba: Túl nagy MSE az exponenciálisnál!");
 }

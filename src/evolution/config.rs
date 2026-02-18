@@ -17,4 +17,5 @@ pub struct EvolutionConfig {
 
     pub random_injection_rate: f64,
     pub min_random_injection: usize,
+    pub verbose: bool
 }

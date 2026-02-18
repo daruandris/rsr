@@ -101,8 +101,8 @@ impl Island {
     }
 
     pub fn nuke(&mut self, dataset: &SimdDataset, config: &EvolutionConfig) {
-        println!("NUKING ISLAND!");
-
+        if config.verbose {  println!("NUKING ISLAND!"); }
+       
         let num_features = dataset.num_features;
         let pop_size = self.individuals.capacity();
 

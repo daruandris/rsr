@@ -17,6 +17,7 @@ fn get_heavy_config() -> EvolutionConfig {
         min_improvement: 1e-8,
         random_injection_rate: 0.04,
         min_random_injection: 2,
+        verbose : false
     }
 }
 

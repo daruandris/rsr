@@ -51,6 +51,7 @@ fn main() {
 
         random_injection_rate: 0.04,
         min_random_injection: 2,
+        verbose : false,
     };
     
     println!("Motor inicializálása: {} sziget, egyenként {} egyeddel...", config.num_islands, config.island_size);
