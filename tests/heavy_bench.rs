@@ -61,7 +61,7 @@ fn benchmark_physics_damped_oscillator() {
 
     common::update_history("Physics", mse, duration.as_millis() as u64);
 
-    assert!(mse < 0.01); 
+    assert!(mse < 1e-4); 
 }
 
 // 2. BIOLÓGIA: Michaelis-Menten Kinetika
@@ -145,5 +145,5 @@ fn benchmark_stats_maxwell_boltzmann() {
     common::update_history("Statistics", mse, duration.as_millis() as u64);
 
     
-    assert!(mse < 1e-3);
+    assert!(mse < 1e-4);
 }
