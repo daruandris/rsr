@@ -6,12 +6,16 @@ pub trait Domain: Clone + Copy + Send + Sync + PartialEq + 'static {
     type Instruction: Clone + Copy + Send + Sync + std::fmt::Debug;
     type SimdValue: Copy + Send + Sync;
     type ScalarValue: Copy + Send + Sync + std::fmt::Display + PartialEq;
+    type TypeId: Clone + Copy + Send + Sync + std::fmt::Debug + PartialEq;
 
     // --- OPERÁTOR TULAJDONSÁGOK ---
     fn operator_arity(op: &Self::Operator) -> usize;
     fn operator_weight(op: &Self::Operator) -> usize;
     fn format_operator(op: &Self::Operator, args: &[String]) -> String;
-    fn random_operator(arity: usize, parent_op: Option<Self::Operator>, rng: &mut impl RngExt) -> Self::Operator;
+    fn random_operator(
+        target_type: Self::TypeId, 
+        rng: &mut impl RngExt
+    ) -> Option<Self::Operator>;
 
     // --- BYTECODE ÉS KIÉRTÉKELÉS ---
     fn compile_operator(op: &Self::Operator) -> Self::Instruction;
@@ -24,7 +28,7 @@ pub trait Domain: Clone + Copy + Send + Sync + PartialEq + 'static {
     // --- HEURISZTIKÁK ---
     fn simplify(nodes: &[Node<Self>]) -> Vec<Node<Self>>;
 
-    fn random_constant(rng: &mut impl RngExt) -> Self::ScalarValue;
+    fn random_constant(target_type: Self::TypeId, rng: &mut impl RngExt) -> Option<Self::ScalarValue>;
     fn perturb_constant(val: &mut Self::ScalarValue, rng: &mut impl RngExt);
     
     // A Nelder-Mead (ami belsőleg f32-vel matekozik) konverzióihoz:
@@ -37,6 +41,12 @@ pub trait Domain: Clone + Copy + Send + Sync + PartialEq + 'static {
         constants: &[Self::ScalarValue], 
         dataset: &crate::metrics::dataset::SimdDataset
     ) -> f32;
+
+    // -- TYPE függvények --
+    fn return_type(op: &Self::Operator) -> Self::TypeId;
+    fn expected_types(op: &Self::Operator) -> Vec<Self::TypeId>;
+    fn variable_type() -> Self::TypeId;    
+    fn constant_type() -> Self::TypeId;
 }
 
 pub mod basic;

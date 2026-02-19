@@ -32,7 +32,7 @@ impl<S: Strategy, D: Domain> Island<S, D> {
         let mut rng = Xoshiro256PlusPlus::seed_from_u64(seed);
         let mut individuals = Vec::with_capacity(size);
         for _ in 0..size {
-            let ast = generate_random_ast::<D>(5, &mut rng, num_features);
+            let ast = generate_random_ast::<D>(D::variable_type(),5, &mut rng, num_features);
             let mut ind = Individual::new(ast);
             ind.simplify();
             individuals.push(ind);
@@ -89,7 +89,7 @@ impl<S: Strategy, D: Domain> Island<S, D> {
 
         for _ in 0..num_randoms {
             if self.next_gen_buffer.len() >= pop_size { break; }
-            let ast = generate_random_ast::<D>(5, &mut self.rng, num_features);
+            let ast = generate_random_ast::<D>(D::variable_type(), 5, &mut self.rng, num_features);
             let mut ind = Individual::new(ast);
             ind.simplify();
             self.next_gen_buffer.push(ind);
@@ -144,7 +144,7 @@ impl<S: Strategy, D: Domain> Island<S, D> {
         self.individuals.push(self.best_individual.clone());
 
         for _ in 1..pop_size {
-            let ast = generate_random_ast::<D>(5, &mut self.rng, num_features);
+            let ast = generate_random_ast::<D>(D::variable_type(), 5, &mut self.rng, num_features);
             let mut new_ind = Individual::new(ast);
             new_ind.simplify();
             

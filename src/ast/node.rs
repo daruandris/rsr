@@ -46,4 +46,11 @@ impl<D: Domain> Node<D> {
             Node::Operator(op) => D::operator_weight(op),
         }
     }
+    pub fn get_type(&self) -> D::TypeId {
+    match self {
+        Node::Operator(op) => D::return_type(op),
+        Node::Variable(_) => D::variable_type(),
+        Node::Constant(_) => D::constant_type(),
+    }
+}
 }

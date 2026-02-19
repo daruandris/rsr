@@ -7,6 +7,11 @@ use rand::RngExt;
 pub mod heuristic;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+pub enum BasicType {
+    Float,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum BasicOp { Add, Sub, Mul, Div, Sin, Cos, Exp, Sqr, Sqrt, Ln }
 
 #[derive(Clone, Copy, Debug)]
@@ -32,6 +37,7 @@ impl Domain for BasicDomain {
     type Instruction = BasicInstruction;
     type SimdValue = f32x4;
     type ScalarValue = f32;
+    type TypeId = BasicType;
 
     #[inline(always)]
     fn operator_arity(op: &Self::Operator) -> usize {
@@ -70,21 +76,16 @@ impl Domain for BasicDomain {
         }
     }
 
-    fn random_operator(arity: usize, parent_op: Option<Self::Operator>, rng: &mut impl RngExt) -> Self::Operator {
-        let all_ops_arity1 = [BasicOp::Sin, BasicOp::Cos, BasicOp::Exp, BasicOp::Sqr, BasicOp::Sqrt, BasicOp::Ln];        let all_ops_arity2 = [BasicOp::Add, BasicOp::Sub, BasicOp::Mul, BasicOp::Div];
-        let candidates: &[BasicOp] = if arity == 1 { &all_ops_arity1 } else { &all_ops_arity2 };
-        
-        let forbidden = match parent_op {
-            Some(op) => op.forbidden_children(),
-            None => &[],
-        };
-        
-        let allowed: Vec<BasicOp> = candidates.iter().filter(|op| !forbidden.contains(op)).cloned().collect();
-        if allowed.is_empty() {
-            candidates[rng.random_range(0..candidates.len())]
-        } else {
-            allowed[rng.random_range(0..allowed.len())]
-        }
+    fn random_operator(
+        target_type: Self::TypeId,
+        rng: &mut impl RngExt
+    ) -> Option<Self::Operator> {
+        let all_ops = [
+            BasicOp::Add, BasicOp::Sub, BasicOp::Mul, BasicOp::Div,
+            BasicOp::Sin, BasicOp::Cos, BasicOp::Exp, BasicOp::Sqr,
+            BasicOp::Sqrt, BasicOp::Ln
+        ];
+        Some(all_ops[rng.random_range(0..all_ops.len())])
     }
 
     #[inline(always)]
@@ -165,8 +166,12 @@ impl Domain for BasicDomain {
     #[inline(always)] fn scalar_to_f32(val: &Self::ScalarValue) -> f32 { *val }
     #[inline(always)] fn scalar_from_f32(val: f32) -> Self::ScalarValue { val }
 
-    fn random_constant(rng: &mut impl RngExt) -> Self::ScalarValue {
-        rng.random_range(-5.0..5.0)
+    fn random_constant( target_type: Self::TypeId, rng: &mut impl RngExt) -> Option<Self::ScalarValue> {
+        if target_type == BasicType::Float {
+            Some(rng.random_range(-5.0..5.0))
+        } else {
+            None
+        }
     }
 
     fn perturb_constant(val: &mut Self::ScalarValue, rng: &mut impl RngExt) {
@@ -206,4 +211,21 @@ impl Domain for BasicDomain {
         if !sum_squared_error.is_finite() { return f32::MAX; }
         sum_squared_error / (dataset.num_samples as f32)
     }
+
+    // --- TÍPUSRENDSZER IMPLEMENTÁCIÓ ---
+    #[inline(always)]
+    fn return_type(_op: &Self::Operator) -> Self::TypeId {
+        BasicType::Float
+    }
+
+    #[inline(always)]
+    fn expected_types(op: &Self::Operator) -> Vec<Self::TypeId> {
+        vec![BasicType::Float; Self::operator_arity(op)]
+    }
+
+    #[inline(always)]
+    fn variable_type() -> Self::TypeId { BasicType::Float }
+
+    #[inline(always)]
+    fn constant_type() -> Self::TypeId { BasicType::Float }
 }

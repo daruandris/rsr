@@ -1,14 +1,37 @@
 use crate::ast::node::Node;
 use crate::engine::individual::Individual;
 use crate::domain::Domain;
-use crate::operators::generator::{generate_random_ast, random_node_of_arity};
+use crate::operators::generator::generate_random_ast;
 use rand::RngExt;
 
 pub fn point_mutation<D: Domain>(ind: &mut Individual<D>, rng: &mut impl RngExt, num_features: u8) {
     if ind.nodes.is_empty() { return; }
     let idx = rng.random_range(0..ind.nodes.len());
-    let target_arity = ind.nodes[idx].arity();
-    ind.nodes[idx] = random_node_of_arity::<D>(target_arity, rng, num_features);
+    
+    let target_node = &ind.nodes[idx];
+    let target_arity = target_node.arity();
+    let target_type = target_node.get_type();
+
+    if target_arity == 0 {
+        let is_var_valid = D::variable_type() == target_type;
+        let is_const_valid = D::constant_type() == target_type;
+        
+        if is_var_valid && is_const_valid {
+            if rng.random::<bool>() {
+                ind.nodes[idx] = Node::Variable(rng.random_range(0..num_features));
+            } else if let Some(c) = D::random_constant(target_type, rng) {
+                ind.nodes[idx] = Node::Constant(c);
+            }
+        }
+    } else {
+        if let Some(new_op) = D::random_operator(target_type, rng) {
+            if let Node::Operator(old_op) = target_node {
+                if D::expected_types(&new_op) == D::expected_types(old_op) {
+                    ind.nodes[idx] = Node::Operator(new_op);
+                }
+            }
+        }
+    }
     ind.invalidate();
 }
 
@@ -27,7 +50,7 @@ pub fn constant_perturbation<D: Domain>(ind: &mut Individual<D>, rng: &mut impl 
 
     if let Some(idx) = target_idx {
         if let Node::Constant(ref mut val) = ind.nodes[idx] {
-            D::perturb_constant(val, rng); // Generikus hívás!
+            D::perturb_constant(val, rng); 
             ind.invalidate();
         }
     }
@@ -44,12 +67,14 @@ pub fn subtree_mutation<D: Domain>(
     let mutation_point = rng.random_range(0..ind.nodes.len());
     let (start, end) = ind.get_subtree_bounds(mutation_point);
 
+    let required_type = ind.nodes[end].get_type();
+
     let removed_len = end - start + 1;
     let current_len = ind.nodes.len();
     let allowed_new_len = max_size.saturating_sub(current_len - removed_len);
     if allowed_new_len == 0 { return; }
 
-    let new_subtree = generate_random_ast::<D>(mutation_max_depth, rng, num_features);
+    let new_subtree = generate_random_ast::<D>(required_type, mutation_max_depth, rng, num_features);
 
     if new_subtree.len() > allowed_new_len { return; }
 
