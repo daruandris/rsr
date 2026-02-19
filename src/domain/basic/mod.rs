@@ -76,6 +76,7 @@ impl Domain for BasicDomain {
         }
     }
 
+    #[allow(unused_variables)]
     fn random_operator(
         target_type: Self::TypeId,
         rng: &mut impl RngExt
