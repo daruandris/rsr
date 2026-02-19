@@ -7,7 +7,7 @@ fn get_basic_config() -> EvolutionConfig {
     EvolutionConfig {
         num_islands: 24,
         island_size: 25,
-        max_generations: 10000, 
+        max_generations: 5000, 
         crossover_rate: 0.10,
         tournament_size: 2,
         migration_interval: 25,
