@@ -112,7 +112,12 @@ impl Island {
                 match mut_type {
                     0 => point_mutation(&mut child, &mut self.rng, num_features),
                     1 => constant_perturbation(&mut child, &mut self.rng),
-                    _ => subtree_mutation(&mut child, &mut self.rng, num_features, config.max_tree_size),
+                    _ => subtree_mutation(
+                        &mut child, 
+                        &mut self.rng, 
+                        num_features, 
+                        config.max_tree_size, 
+                        config.mutation_max_depth),
                 }
                 child.simplify();
                 child.invalidate();

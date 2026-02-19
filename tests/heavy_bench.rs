@@ -24,6 +24,7 @@ fn get_heavy_config() -> EvolutionConfig {
         random_injection_rate: 0.10,
         min_random_injection: 2,
         max_tree_size: 32,
+        mutation_max_depth: 4,
         verbose : true,
     }
 }
