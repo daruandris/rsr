@@ -5,7 +5,7 @@ mod common;
 
 fn get_basic_config() -> EvolutionConfig {
     EvolutionConfig {
-        num_islands: 24,
+        num_islands: 12,
         island_size: 25,
         max_generations: 5000, 
         crossover_rate: 0.10,
