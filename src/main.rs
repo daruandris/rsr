@@ -16,7 +16,7 @@ fn get_config() -> EvolutionConfig {
         crossover_rate: 0.10,
         tournament_size: 2,
         migration_interval: 25,
-        parsimony_penalty: 0.0,
+        parsimony_penalty: 0.000005,
 
         opt_prob: 0.2,
         opt_iterations: 100,

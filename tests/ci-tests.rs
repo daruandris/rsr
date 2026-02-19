@@ -11,7 +11,7 @@ fn get_basic_config() -> EvolutionConfig {
         crossover_rate: 0.10,
         tournament_size: 2,
         migration_interval: 25,
-        parsimony_penalty: 0.00005,
+        parsimony_penalty: 0.0005,
 
         opt_prob: 0.2,
         opt_iterations: 100,
@@ -26,7 +26,7 @@ fn get_basic_config() -> EvolutionConfig {
         max_tree_size: 32,
         mutation_max_depth: 4,
         mutation_cycles: 5,
-        verbose : false,
+        verbose : true,
     }
 }
 

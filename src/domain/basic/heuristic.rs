@@ -59,6 +59,8 @@ fn handle_unary(op: BasicOp, stack: &mut Vec<ExprInfo>, output: &mut Vec<Node<Ba
                 BasicOp::Cos => val.cos(),
                 BasicOp::Exp => val.exp(),
                 BasicOp::Sqr => val * val,
+                BasicOp::Sqrt => val.abs().sqrt(),
+                BasicOp::Ln => (val.abs() + EPSILON).ln(),
                 _ => f32::NAN, 
             };
 

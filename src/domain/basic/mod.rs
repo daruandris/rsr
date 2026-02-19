@@ -7,10 +7,10 @@ use rand::RngExt;
 pub mod heuristic;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum BasicOp { Add, Sub, Mul, Div, Sin, Cos, Exp, Sqr }
+pub enum BasicOp { Add, Sub, Mul, Div, Sin, Cos, Exp, Sqr, Sqrt, Ln }
 
 #[derive(Clone, Copy, Debug)]
-pub enum BasicInstruction { LoadVar(u8), LoadConst(u16), Add, Sub, Mul, Div, Sin, Cos, Exp, Sqr }
+pub enum BasicInstruction { LoadVar(u8), LoadConst(u16), Add, Sub, Mul, Div, Sin, Cos, Exp, Sqr, Sqrt, Ln }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct BasicDomain;
@@ -20,7 +20,9 @@ impl BasicOp {
         match self {
             BasicOp::Add | BasicOp::Sub | BasicOp::Mul | BasicOp::Div | BasicOp::Sqr => &[],
             BasicOp::Sin | BasicOp::Cos => &[BasicOp::Sin, BasicOp::Cos, BasicOp::Exp],
-            BasicOp::Exp => &[BasicOp::Exp, BasicOp::Sin, BasicOp::Cos, BasicOp::Sqr],
+            BasicOp::Exp => &[BasicOp::Exp, BasicOp::Sin, BasicOp::Cos, BasicOp::Sqr, BasicOp::Ln],
+            BasicOp::Sqrt => &[BasicOp::Sqrt, BasicOp::Sqr],
+            BasicOp::Ln => &[BasicOp::Ln, BasicOp::Exp],
         }
     }
 }
@@ -34,7 +36,7 @@ impl Domain for BasicDomain {
     #[inline(always)]
     fn operator_arity(op: &Self::Operator) -> usize {
         match op {
-            BasicOp::Sin | BasicOp::Cos | BasicOp::Exp | BasicOp::Sqr => 1,
+            BasicOp::Sin | BasicOp::Cos | BasicOp::Exp | BasicOp::Sqr | BasicOp::Sqrt |BasicOp::Ln => 1,
             BasicOp::Add | BasicOp::Sub | BasicOp::Mul | BasicOp::Div => 2,
         }
     }
@@ -43,9 +45,13 @@ impl Domain for BasicDomain {
     fn operator_weight(op: &Self::Operator) -> usize {
         match op {
             BasicOp::Add | BasicOp::Sub | BasicOp::Mul => 1,
+            BasicOp::Div => 2,
             BasicOp::Sqr => 2,
-            BasicOp::Div | BasicOp::Exp => 3,
-            BasicOp::Cos | BasicOp::Sin => 4,
+            BasicOp::Sqrt => 2,
+
+            BasicOp::Sin | BasicOp::Cos => 3,
+
+            BasicOp::Ln | BasicOp::Exp => 4,
         }
     }
 
@@ -59,12 +65,13 @@ impl Domain for BasicDomain {
             BasicOp::Cos => format!("cos({})", args[0]),
             BasicOp::Exp => format!("exp({})", args[0]),
             BasicOp::Sqr => format!("({})^2", args[0]),
+            BasicOp::Sqrt => format!("sqrt(|{}|)", args[0]),
+            BasicOp::Ln => format!("ln(|{}|)", args[0]),
         }
     }
 
     fn random_operator(arity: usize, parent_op: Option<Self::Operator>, rng: &mut impl RngExt) -> Self::Operator {
-        let all_ops_arity1 = [BasicOp::Sin, BasicOp::Cos, BasicOp::Exp, BasicOp::Sqr];
-        let all_ops_arity2 = [BasicOp::Add, BasicOp::Sub, BasicOp::Mul, BasicOp::Div];
+        let all_ops_arity1 = [BasicOp::Sin, BasicOp::Cos, BasicOp::Exp, BasicOp::Sqr, BasicOp::Sqrt, BasicOp::Ln];        let all_ops_arity2 = [BasicOp::Add, BasicOp::Sub, BasicOp::Mul, BasicOp::Div];
         let candidates: &[BasicOp] = if arity == 1 { &all_ops_arity1 } else { &all_ops_arity2 };
         
         let forbidden = match parent_op {
@@ -91,6 +98,8 @@ impl Domain for BasicDomain {
             BasicOp::Cos => BasicInstruction::Cos,
             BasicOp::Exp => BasicInstruction::Exp,
             BasicOp::Sqr => BasicInstruction::Sqr,
+            BasicOp::Sqrt => BasicInstruction::Sqrt,
+            BasicOp::Ln => BasicInstruction::Ln,
         }
     }
     
@@ -126,7 +135,8 @@ impl Domain for BasicDomain {
                     *stack.get_unchecked_mut(sp) = res;
                     sp += 1;
                 },
-                BasicInstruction::Sin | BasicInstruction::Cos | BasicInstruction::Exp | BasicInstruction::Sqr => unsafe {
+                BasicInstruction::Sin | BasicInstruction::Cos | BasicInstruction::Exp | 
+                BasicInstruction::Sqr | BasicInstruction::Sqrt | BasicInstruction::Ln => unsafe {
                     let idx = sp - 1;
                     let a = *stack.get_unchecked(idx);
                     let res = match op {
@@ -134,10 +144,15 @@ impl Domain for BasicDomain {
                         BasicInstruction::Cos => a.cos(),
                         BasicInstruction::Exp => a.exp(),
                         BasicInstruction::Sqr => a * a,
+                        BasicInstruction::Sqrt => a.abs().sqrt(),
+                        BasicInstruction::Ln => {
+                            let safe_a = a.abs() + f32x4::splat(1e-9);
+                            safe_a.ln()
+                        },
                         _ => std::hint::unreachable_unchecked(),
                     };
                     *stack.get_unchecked_mut(idx) = res;
-                }
+                },
             }
         }
         unsafe { *stack.get_unchecked(0) }
