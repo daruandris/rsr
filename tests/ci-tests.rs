@@ -4,9 +4,9 @@ mod common;
 
 fn get_basic_config() -> EvolutionConfig {
     EvolutionConfig {
-        num_islands: 2,
+        num_islands: 8,
         island_size: 100,
-        max_generations: 100,
+        max_generations: 5000,
         crossover_rate: 0.85,
         tournament_size: 3,
         migration_interval: 10,
@@ -14,7 +14,7 @@ fn get_basic_config() -> EvolutionConfig {
         
         opt_prob: 0.1,
         opt_iterations: 5,
-        final_opt_iterations: 500,
+        final_opt_iterations: 1000,
         
         stagnation_threshold: 10,
         min_improvement: 1e-5,

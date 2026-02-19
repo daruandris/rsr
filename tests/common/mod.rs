@@ -71,7 +71,7 @@ pub fn update_history(category: &str, mse: f32, time_ms: u64) {
     if needs_new_entry {
         history.push(BenchmarkEntry {
             timestamp: now,
-            commit_hash: "local".to_string(),
+            commit_hash: env!("GIT_HASH").to_string(),
             biology_mse: None, biology_time_ms: None,
             physics_mse: None, physics_time_ms: None,
             stats_mse: None, stats_time_ms: None,

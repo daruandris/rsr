@@ -26,7 +26,12 @@
             document.body.innerHTML += "<h2 style='color:red'>Nincs adat! Futtasd le a benchmarkot először!</h2>";
         } else {
             const data = benchmarkHistory;
-            const labels = data.map((entry, index) => `Run ${index + 1}`);
+            const labels = data.map((entry, index) => {
+                const shortHash = entry.commit_hash
+                    ? entry.commit_hash.substring(0, 7)
+                    : "unknown";
+                return `Run ${index + 1}\n${shortHash}`;
+            });
 
             const bioMse = data.map(d => d.biology_mse || null);
             const physMse = data.map(d => d.physics_mse || null);
