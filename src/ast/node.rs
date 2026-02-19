@@ -1,3 +1,5 @@
+use crate::domain::Domain;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Op {
     Add, Sub, Mul, Div, Sin, Cos, Exp, Sqr
@@ -24,28 +26,24 @@ impl Op {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Node {
-    Operator(Op),
+pub enum Node<D: Domain> {
+    Operator(D::Operator),
     Variable(u8),
-    Constant(f32),
+    Constant(D::ScalarValue),
 }
 
-impl Node {
+impl<D: Domain> Node<D> {
     pub fn arity(&self) -> usize {
         match self {
             Node::Constant(_) | Node::Variable(_) => 0,
-            Node::Operator(op) => match op {
-                Op::Sin | Op::Cos | Op::Exp | Op::Sqr => 1,
-                Op::Add | Op::Sub | Op::Mul | Op::Div => 2,
-            },
+            Node::Operator(op) => D::operator_arity(op),
         }
     }
 
     pub fn weight(&self) -> usize {
         match self {
             Node::Constant(_) | Node::Variable(_) => 1,
-            Node::Operator(op) => op.weight(),
+            Node::Operator(op) => D::operator_weight(op),
         }
-        
     }
 }

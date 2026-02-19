@@ -1,79 +1,52 @@
-use crate::ast::node::{Node, Op};
+use crate::ast::node::Node;
+use crate::domain::Domain;
 use rand::RngExt;
 
 #[inline(always)]
-pub fn random_node_of_arity(arity: usize, rng: &mut impl RngExt, num_features: u8) -> Node {
+pub fn random_node_of_arity<D: Domain>(arity: usize, rng: &mut impl RngExt, num_features: u8) -> Node<D> {
     match arity {
         0 => {  
             if rng.random::<bool>() {
                 Node::Variable(rng.random_range(0..num_features))
             } else {
-                Node::Constant(rng.random_range(-5.0..5.0))
+                Node::Constant(D::random_constant(rng))
             }
         },
-        1 => {
-            let ops = [Op::Sin, Op::Cos, Op::Exp, Op::Sqr];
-            Node::Operator(ops[rng.random_range(0..ops.len())])
-        },
-        2 => {
-            let ops = [Op::Add, Op::Sub, Op::Mul, Op::Div];
-            Node::Operator(ops[rng.random_range(0..ops.len())])
+        1 | 2 => {
+            Node::Operator(D::random_operator(arity, None, rng))
         },
         _ => unreachable!(),
     }
 }
 
-pub fn generate_random_ast(max_depth: usize, rng: &mut impl RngExt, num_features: u8) -> Vec<Node> {
+pub fn generate_random_ast<D: Domain>(max_depth: usize, rng: &mut impl RngExt, num_features: u8) -> Vec<Node<D>> {
     let cap = 1 << (max_depth.min(6)); 
     let mut nodes = Vec::with_capacity(cap);
-    build_ast_recursive(&mut nodes, 0, max_depth, rng, num_features, None);
+    build_ast_recursive::<D>(&mut nodes, 0, max_depth, rng, num_features, None);
     nodes
 }
 
-fn build_ast_recursive(
-    nodes: &mut Vec<Node>, 
+fn build_ast_recursive<D: Domain>(
+    nodes: &mut Vec<Node<D>>, 
     current_depth: usize, 
     max_depth: usize, 
     rng: &mut impl RngExt, 
-    num_features: u8
-    , parent_op: Option<Op>
+    num_features: u8, 
+    parent_op: Option<D::Operator>
 ) {
     let is_terminal = current_depth >= max_depth || (current_depth > 0 && rng.random::<f32>() < 0.2);
     if is_terminal {
         if rng.random::<bool>() {
             nodes.push(Node::Variable(rng.random_range(0..num_features)));
         } else {
-            nodes.push(Node::Constant(rng.random_range(-5.0..5.0)));
+            nodes.push(Node::Constant(D::random_constant(rng)));
         }
     } else {
         let arity = if rng.random::<bool>() { 2 } else { 1 };
-        let chosen_op = random_op_for_parent(parent_op, arity, rng);
+        let chosen_op = D::random_operator(arity, parent_op.clone(), rng);
         for _ in 0..arity {
-            build_ast_recursive(nodes, current_depth+1, max_depth, rng, num_features, Some(chosen_op));
+            build_ast_recursive::<D>(nodes, current_depth+1, max_depth, rng, num_features, Some(chosen_op.clone()));
         }
         nodes.push(Node::Operator(chosen_op));
-    }
-}
-
-pub fn random_op_for_parent(parent_op: Option<Op>, arity: usize, rng: &mut impl RngExt) -> Op {
-    let all_ops_arity1 = [Op::Sin, Op::Cos, Op::Exp, Op::Sqr];
-    let all_ops_arity2 = [Op::Add, Op::Sub, Op::Mul, Op::Div];
-
-    let candidates: &[Op] = if arity == 1 { &all_ops_arity1 } else { &all_ops_arity2 };
-
-    let forbidden = match parent_op {
-        Some(op) => op.forbidden_children(),
-        None => &[],
-    };
-
-    let allowed: Vec<Op> = candidates.iter()
-        .filter(|op| !forbidden.contains(op))
-        .cloned()
-        .collect();
-
-    if allowed.is_empty() {
-        candidates[rng.random_range(0..candidates.len())]
-    } else {
-        allowed[rng.random_range(0..allowed.len())]
     }
 }

@@ -1,29 +1,26 @@
-use crate::ast::eval::evaluate_ast;
-use crate::ast::format::format_ast;
-use crate::ast::heuristic::simplify_ast;
 use crate::ast::node::Node;
+use crate::ast::bytecode::CompiledExpr;
+use crate::domain::Domain;
 use crate::metrics::dataset::SimdDataset;
-use crate::metrics::mse::calculate_mse_simd;
 use crate::optimization::nelder_mead::optimize_individual_constants;
-use crate::ast::bytecode::{Program};
+use crate::ast::format::format_ast;
 use std::fmt;
 
 #[derive(Clone)]
-pub struct Individual {
-    pub nodes: Vec<Node>,
+pub struct Individual<D: Domain> {
+    pub nodes: Vec<Node<D>>,
     pub fitness: f32,
     pub age: usize,
-    pub program: Option<Program>,
+    pub program: Option<CompiledExpr<D>>,
     pub rank: u32,
     pub crowding_distance: f32
 }
 
-impl Individual {
-    pub fn new(nodes: Vec<Node>) -> Self {
+impl<D: Domain> Individual<D> {
+    pub fn new(nodes: Vec<Node<D>>) -> Self {
         Self { 
             nodes, 
-            fitness: 
-            f32::MAX, 
+            fitness: f32::MAX, 
             age: 0, 
             program: None,
             rank: 0,
@@ -33,34 +30,30 @@ impl Individual {
 
     pub fn compile(&mut self) {
         if self.program.is_none() {
-            self.program = Some(Program::from_nodes(&self.nodes));
+            self.program = Some(CompiledExpr::from_nodes(&self.nodes));
         }
     }
 
-    pub fn evaluate(&self, features: &[f32]) -> f32 {
-        evaluate_ast(&self.nodes, features)
-    }
-
-     pub fn calculate_mse(&mut self, dataset: &SimdDataset) -> f32 {
-        // 1. Lazy compilation
+    pub fn calculate_mse(&mut self, dataset: &SimdDataset) -> f32 {
         if self.program.is_none() {
             self.compile();
         }
 
         if let Some(prog) = &self.program {
-            calculate_mse_simd(prog, dataset)
+            // Javítás: Átadjuk a code és constants slice-okat
+            D::compute_mse(&prog.code, &prog.constants, dataset)
         } else {
             f32::MAX
         }
     }
 
-    pub fn get_constants(&self) -> Vec<f32> {
+    pub fn get_constants(&self) -> Vec<D::ScalarValue> {
         self.nodes.iter().filter_map(|node| {
             if let Node::Constant(c) = node { Some(*c) } else { None }
         }).collect()
     }
 
-    pub fn set_constants(&mut self, new_constants: &[f32]) {
+    pub fn set_constants(&mut self, new_constants: &[D::ScalarValue]) {
         let mut const_idx = 0;
         for node in self.nodes.iter_mut() {
             if let Node::Constant(c) = node {
@@ -80,7 +73,7 @@ impl Individual {
 
     pub fn simplify(&mut self) {
         if self.nodes.is_empty() { return; }
-        self.nodes = simplify_ast(&self.nodes);
+        self.nodes = D::simplify(&self.nodes);
         self.invalidate();
     }
 
@@ -93,39 +86,22 @@ impl Individual {
         let mut needed = 1;
         let mut current_idx = root_idx;
         loop {
-            needed = needed + self.nodes[current_idx].arity() as isize - 1;
+            needed += self.nodes[current_idx].arity() as isize - 1;
             if needed == 0 {
                 return (current_idx, root_idx);
             }
-            if current_idx == 0 {
-                break;
-            }
+            if current_idx == 0 { break; }
             current_idx -= 1;
         }
         (0, root_idx)
     }
 
-    pub fn complexity(&self) -> usize{
+    pub fn complexity(&self) -> usize {
         self.nodes.iter().map(|node| node.weight()).sum()
-    }
-
-    pub fn predict_real(&self, raw_inputs: &[f32], dataset: &SimdDataset) -> f32 {
-        let mut norm_inputs = Vec::with_capacity(raw_inputs.len());
-        for (i, &val) in raw_inputs.iter().enumerate() {
-            if i < dataset.feature_means.len() {
-                let mean = dataset.feature_means[i];
-                let std = dataset.feature_std_devs[i];
-                norm_inputs.push((val - mean) / std);
-            } else {
-                norm_inputs.push(val);
-            }
-        }
-        let norm_output = self.evaluate(&norm_inputs);
-        dataset.denormalize_target(norm_output)
     }
 }
 
-impl fmt::Display for Individual {
+impl<D: Domain> fmt::Display for Individual<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", format_ast(&self.nodes))
     }

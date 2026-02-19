@@ -1,29 +1,30 @@
-use rsr::{Engine, SimdDataset, EvolutionConfig};
+use rsr::{Engine, SimdDataset, EvolutionConfig, StaticStrategy, BasicDomain};
 use std::time::Instant;
+
 mod common;
 
 fn get_basic_config() -> EvolutionConfig {
     EvolutionConfig {
-        num_islands: 8,
-        island_size: 100,
-        max_generations: 5000,
-        crossover_rate: 0.85,
-        tournament_size: 3,
-        migration_interval: 10,
-        parsimony_penalty: 0.01,
-        
-        opt_prob: 0.1,
-        opt_iterations: 5,
-        final_opt_iterations: 1000,
-        
-        stagnation_threshold: 10,
-        min_improvement: 1e-5,
-        target_mse: 1e-7,
+        num_islands: 24,
+        island_size: 25,
+        max_generations: 10000, 
+        crossover_rate: 0.10,
+        tournament_size: 2,
+        migration_interval: 25,
+        parsimony_penalty: 0.00005,
 
-        random_injection_rate: 0.05,
-        min_random_injection: 1,
-        max_tree_size : 30,
-        mutation_max_depth :4,
+        opt_prob: 0.2,
+        opt_iterations: 100,
+        final_opt_iterations: 5000,
+        
+        stagnation_threshold: 500,
+        target_mse: 1e-7,
+        min_improvement: 1e-6,
+
+        random_injection_rate: 0.10,
+        min_random_injection: 2,
+        max_tree_size: 32,
+        mutation_max_depth: 4,
         mutation_cycles: 5,
         verbose : false,
     }
@@ -81,7 +82,10 @@ fn create_exponential_data() -> (SimdDataset, u8) {
 fn test_linear_convergence() {
     let (dataset, num_features) = create_linear_data();
     let config = get_basic_config();
-    let mut engine = Engine::new(config, num_features);
+    let strategy = StaticStrategy::new(config);
+    
+    // <-- Turbofish szintaxis hozzáadva
+    let mut engine = Engine::<StaticStrategy, BasicDomain>::new(strategy, num_features); 
     
     let start = Instant::now();
     engine.run_evolution(&dataset);
@@ -99,10 +103,11 @@ fn test_linear_convergence() {
 #[test]
 fn test_quadratic_convergence() {
     let (dataset, num_features) = create_quadratic_data();
-    let mut config = get_basic_config();
-    config.max_generations = 200;
+    let config = get_basic_config();
     
-    let mut engine = Engine::new(config, num_features);
+    let strategy = StaticStrategy::new(config);
+    // <-- Turbofish szintaxis hozzáadva
+    let mut engine = Engine::<StaticStrategy, BasicDomain>::new(strategy, num_features);
 
     let start = Instant::now();
     engine.run_evolution(&dataset);
@@ -120,9 +125,10 @@ fn test_quadratic_convergence() {
 #[test]
 fn test_sine_convergence() {
     let (dataset, num_features) = create_sine_wave_data();
-    let mut config = get_basic_config();
-    config.max_generations = 200;
-    let mut engine = Engine::new(config, num_features);
+    let config = get_basic_config();
+    let strategy = StaticStrategy::new(config);
+    
+    let mut engine = Engine::<StaticStrategy, BasicDomain>::new(strategy, num_features);
 
     let start = Instant::now();
     engine.run_evolution(&dataset);
@@ -142,9 +148,10 @@ fn test_sine_convergence() {
 #[test]
 fn test_exp_convergence() {
     let (dataset, num_features) = create_exponential_data();
-    let mut config = get_basic_config();
-    config.max_generations = 500;
-    let mut engine = Engine::new(config, num_features);
+    let config = get_basic_config();
+    let strategy = StaticStrategy::new(config);
+
+    let mut engine = Engine::<StaticStrategy, BasicDomain>::new(strategy, num_features);
     
     let start = Instant::now();
     engine.run_evolution(&dataset);

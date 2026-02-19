@@ -1,8 +1,8 @@
-use crate::evolution::individual::Individual;
+use crate::{domain::Domain, engine::individual::Individual};
 use rand::RngExt;
 use std::cmp::Ordering;
 
-fn dominates(a: &Individual, b: &Individual) -> bool {
+fn dominates<D: Domain>(a: &Individual<D>, b: &Individual<D>) -> bool {
     let a_compl = a.complexity() as f32;
     let b_compl = b.complexity() as f32;
 
@@ -14,11 +14,11 @@ fn dominates(a: &Individual, b: &Individual) -> bool {
     (better_eq_mse && better_eq_len) && (better_mse || better_len)
 }
 
-pub fn tournament_selection_pareto<'a>(
-    population: &'a [Individual],
+pub fn tournament_selection_pareto<'a, D:Domain>(
+    population: &'a [Individual<D>],
     k: usize,
     rng: &mut impl RngExt
-) -> &'a Individual {
+) -> &'a Individual<D> {
     let mut best_idx = rng.random_range(0..population.len());
     
     for _ in 1..k {
@@ -32,7 +32,7 @@ pub fn tournament_selection_pareto<'a>(
     &population[best_idx]
 }
 
-pub fn nsga2_compare(a: &Individual, b: &Individual) -> Ordering {
+pub fn nsga2_compare<D: Domain>(a: &Individual<D>, b: &Individual<D>) -> Ordering {
     match a.rank.cmp(&b.rank) {
         Ordering::Less => Ordering::Less, // 'a' jobb rangú
         Ordering::Greater => Ordering::Greater,
@@ -42,7 +42,7 @@ pub fn nsga2_compare(a: &Individual, b: &Individual) -> Ordering {
     }
 }
 
-pub fn assign_rank_and_crowding_distance(pop: &mut [Individual]) {
+pub fn assign_rank_and_crowding_distance<D: Domain>(pop: &mut [Individual<D>]) {
     // 1. Fast Non-Dominated Sort (egyszerűsített, O(N^2))
     let n = pop.len();
     let mut domination_count = vec![0; n];

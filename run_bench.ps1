@@ -1,3 +1,3 @@
 Write-Host "Running benchmarks..."
 
-cargo test --release -- --ignored --nocapture --test-threads=1
+cargo test --release -- --nocapture --test-threads=1

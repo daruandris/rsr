@@ -1,3 +1,5 @@
+(Zaj-kiszűrése, fontos num_features kiválasztása) 
+
 Fázis 2: Az Önszabályozó Meta-Motor (Dinamikus Stratégia)
 
 Itt építjük meg az intelligens, ön-kalibráló rendszert, ami alkalmazkodik az adatokhoz.

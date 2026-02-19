@@ -1,4 +1,5 @@
-use crate::ast::node::{Node, Op};
+use crate::ast::node::Node;
+use crate::domain::basic::{BasicDomain, BasicOp};
 
 #[derive(Clone, Copy, Debug)]
 struct ExprInfo {
@@ -8,7 +9,7 @@ struct ExprInfo {
 
 const EPSILON: f32 = 1e-9;
 
-pub fn simplify_ast(nodes: &[Node]) -> Vec<Node> {
+pub fn simplify_ast(nodes: &[Node<BasicDomain>]) -> Vec<Node<BasicDomain>> {
     if nodes.is_empty() {
         return Vec::new();
     }
@@ -49,15 +50,15 @@ pub fn simplify_ast(nodes: &[Node]) -> Vec<Node> {
 }
 
 #[inline(always)]
-fn handle_unary(op: Op, stack: &mut Vec<ExprInfo>, output: &mut Vec<Node>) {
+fn handle_unary(op: BasicOp, stack: &mut Vec<ExprInfo>, output: &mut Vec<Node<BasicDomain>>) {
     if let Some(arg) = stack.pop() {
         // Konstans folding (pl. sin(0) -> 0)
         if let Some(val) = arg.const_val {
             let res = match op {
-                Op::Sin => val.sin(),
-                Op::Cos => val.cos(),
-                Op::Exp => val.exp(),
-                Op::Sqr => val * val,
+                BasicOp::Sin => val.sin(),
+                BasicOp::Cos => val.cos(),
+                BasicOp::Exp => val.exp(),
+                BasicOp::Sqr => val * val,
                 _ => f32::NAN, 
             };
 
@@ -75,16 +76,16 @@ fn handle_unary(op: Op, stack: &mut Vec<ExprInfo>, output: &mut Vec<Node>) {
 }
 
 #[inline(always)]
-fn handle_binary(op: Op, stack: &mut Vec<ExprInfo>, output: &mut Vec<Node>) {
+fn handle_binary(op: BasicOp, stack: &mut Vec<ExprInfo>, output: &mut Vec<Node<BasicDomain>>) {
     if let (Some(b), Some(a)) = (stack.pop(), stack.pop()) {
         
-        // 2 konstans
+        // 2 konstans foldingja
         if let (Some(val_a), Some(val_b)) = (a.const_val, b.const_val) {
             let res = match op {
-                Op::Add => val_a + val_b,
-                Op::Sub => val_a - val_b,
-                Op::Mul => val_a * val_b,
-                Op::Div => if val_b.abs() < EPSILON { f32::NAN } else { val_a / val_b },
+                BasicOp::Add => val_a + val_b,
+                BasicOp::Sub => val_a - val_b,
+                BasicOp::Mul => val_a * val_b,
+                BasicOp::Div => if val_b.abs() < EPSILON { f32::NAN } else { val_a / val_b },
                 _ => f32::NAN,
             };
 
@@ -97,27 +98,17 @@ fn handle_binary(op: Op, stack: &mut Vec<ExprInfo>, output: &mut Vec<Node>) {
             }
         }
 
-        //algebrai egyszerűsytések
+        // Algebrai egyszerűsítések
         match op {
-            Op::Add => {
+            BasicOp::Add => {
                 // x + 0 = x
                 if is_zero(b.const_val) {
                     output.truncate(b.start_idx);
                     stack.push(a);
                     return;
                 }
-                // 0 + x = x
-                if is_zero(a.const_val) {
-                    // Ez trükkös RPN-nél: [0, x, +] -> [x]
-                    // A 0-t törölni kell, az x-et előre kell mozgatni? 
-                    // Mivel ez drága (memmove), RPN-ben egyszerűbb, ha hagyjuk,
-                    // VAGY ha a 0 nagyon az elején van, rewrite.
-                    // Optimalizáció: inkább hagyjuk most, vagy swap? 
-                    // Mivel a remove lassú, hagyjuk a '0 + x'-et, majd a kövi pass kiszedi,
-                    // vagy: ha 'x' rövid, átmásoljuk.
-                }
             },
-            Op::Sub => {
+            BasicOp::Sub => {
                 // x - 0 = x
                 if is_zero(b.const_val) {
                     output.truncate(b.start_idx);
@@ -133,7 +124,7 @@ fn handle_binary(op: Op, stack: &mut Vec<ExprInfo>, output: &mut Vec<Node>) {
                     return;
                 }
             },
-            Op::Mul => {
+            BasicOp::Mul => {
                 // x * 0 = 0 vagy 0 * x = 0
                 if is_zero(a.const_val) || is_zero(b.const_val) {
                     output.truncate(a.start_idx);
@@ -148,9 +139,8 @@ fn handle_binary(op: Op, stack: &mut Vec<ExprInfo>, output: &mut Vec<Node>) {
                     stack.push(a);
                     return;
                 }
-                // 1 * x = x 
             },
-            Op::Div => {
+            BasicOp::Div => {
                 // 0 / x = 0
                 if is_zero(a.const_val) {
                     output.truncate(a.start_idx);
@@ -192,7 +182,7 @@ fn is_one(val: Option<f32>) -> bool {
     val.map_or(false, |v| (v - 1.0).abs() < EPSILON)
 }
 
-fn nodes_are_equal(buffer: &[Node], a_start: usize, b_start: usize) -> bool {
+fn nodes_are_equal(buffer: &[Node<BasicDomain>], a_start: usize, b_start: usize) -> bool {
     let a_slice = &buffer[a_start..b_start];
     let b_slice = &buffer[b_start..];
     
