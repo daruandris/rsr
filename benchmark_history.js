@@ -278,5 +278,15 @@ const benchmarkHistory = [
     "physics_time_ms": 109034,
     "stats_mse": 0.0010204383,
     "stats_time_ms": 133847
+  },
+  {
+    "timestamp": 1771503852,
+    "commit_hash": "67f4a85",
+    "biology_mse": 5.9732216e-8,
+    "biology_time_ms": 266,
+    "physics_mse": 0.000021398848,
+    "physics_time_ms": 100082,
+    "stats_mse": 0.00046613903,
+    "stats_time_ms": 113619
   }
 ];

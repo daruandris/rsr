@@ -54,7 +54,7 @@ impl Island {
 
         assign_rank_and_crowding_distance(&mut self.individuals);
 
-        self.fill_next_generation(config, num_features);
+        self.fill_next_generation(config, dataset, num_features);
 
         self.evaluate_buffer(dataset, config);
 
@@ -72,7 +72,7 @@ impl Island {
         }
     }
 
-    fn fill_next_generation(&mut self, config: &EvolutionConfig, num_features: u8) {
+    fn fill_next_generation(&mut self, config: &EvolutionConfig, dataset: &SimdDataset, num_features: u8) {
         self.next_gen_buffer.clear();
         let pop_size = self.individuals.capacity();
 
@@ -104,24 +104,36 @@ impl Island {
                 child.invalidate();
                 self.next_gen_buffer.push(child);
             } else {
-                let parent = tournament_selection_pareto(&self.individuals, config.tournament_size, &mut self.rng);
-                let mut child = parent.clone();
-                child.age = parent.age; 
+                let mut candidate = tournament_selection_pareto(&self.individuals, config.tournament_size, &mut self.rng).clone();
                 
-                let mut_type = self.rng.random_range(0..3);
-                match mut_type {
-                    0 => point_mutation(&mut child, &mut self.rng, num_features),
-                    1 => constant_perturbation(&mut child, &mut self.rng),
-                    _ => subtree_mutation(
-                        &mut child, 
-                        &mut self.rng, 
-                        num_features, 
-                        config.max_tree_size, 
-                        config.mutation_max_depth),
+                if candidate.fitness == f32::MAX {
+                     candidate.fitness = candidate.calculate_mse(dataset); 
                 }
-                child.simplify();
-                child.invalidate();
-                self.next_gen_buffer.push(child);
+                let mut current_fitness = candidate.fitness;
+
+                let cycles = config.mutation_cycles;
+
+                for _ in 0..cycles {
+                    let mut mutated_candidate = candidate.clone();
+                    
+                    match self.rng.random_range(0..3) {
+                        0 => point_mutation(&mut mutated_candidate, &mut self.rng, num_features),
+                        1 => constant_perturbation(&mut mutated_candidate, &mut self.rng),
+                        _ => subtree_mutation(&mut mutated_candidate, &mut self.rng, num_features, config.max_tree_size, config.mutation_max_depth),
+                    }
+                    mutated_candidate.simplify();
+                    
+                    let new_mse = mutated_candidate.calculate_mse(dataset);
+                    
+                    // (Ha Simulated Annealinget akarsz, itt kell az 'else if random() < exp(...)' ág)
+                    if new_mse < current_fitness {
+                        candidate = mutated_candidate;
+                        current_fitness = new_mse;
+                        candidate.fitness = new_mse;
+                    }
+                }
+
+                self.next_gen_buffer.push(candidate);
             }
         }
     }

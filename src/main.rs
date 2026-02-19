@@ -48,6 +48,7 @@ fn main() {
         min_random_injection: 2,
         max_tree_size :30,
         mutation_max_depth: 4,
+        mutation_cycles: 20,
         verbose : true,
     };
     

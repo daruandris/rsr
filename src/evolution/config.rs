@@ -20,5 +20,6 @@ pub struct EvolutionConfig {
     pub min_random_injection: usize,
     pub max_tree_size : usize,
     pub mutation_max_depth: usize,
+    pub mutation_cycles: usize,
     pub verbose: bool
 }

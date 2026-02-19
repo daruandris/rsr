@@ -23,6 +23,8 @@ fn get_basic_config() -> EvolutionConfig {
         random_injection_rate: 0.05,
         min_random_injection: 1,
         max_tree_size : 30,
+        mutation_max_depth :4,
+        mutation_cycles: 5,
         verbose : false,
     }
 }
