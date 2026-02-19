@@ -49,9 +49,9 @@ pub fn constant_perturbation(ind: &mut Individual, rng: &mut impl RngExt) {
 
 pub fn subtree_mutation(ind: &mut Individual, rng: &mut impl RngExt, num_features: u8) {
     if ind.nodes.is_empty() { return; }
-    let root_idx = rng.random_range(0..ind.nodes.len());
-    let (start, end) = ind.get_subtree_bounds(root_idx);
-    let new_subtree = generate_random_ast(7, rng, num_features);
+    let mutation_point = rng.random_range(0..ind.nodes.len());
+    let (start, end) = ind.get_subtree_bounds(mutation_point);
+    let new_subtree = generate_random_ast(5, rng, num_features);
     ind.nodes.splice(start..=end, new_subtree);
     ind.invalidate();
 }

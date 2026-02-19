@@ -5,7 +5,7 @@ use serde::{Serialize, Deserialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use fs2::FileExt;
 
-const MAX_ENTRIES: usize = 100;
+const MAX_ENTRIES: usize = 30;
 const TIME_LIMIT: u64 = 43200;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

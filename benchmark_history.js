@@ -100,13 +100,93 @@ const benchmarkHistory = [
     "stats_time_ms": 65239
   },
   {
-    "timestamp": 1771458931,
+    "timestamp": 1771459345,
     "commit_hash": "local",
-    "biology_mse": 0.0000019096835,
-    "biology_time_ms": 40199,
-    "physics_mse": null,
-    "physics_time_ms": null,
-    "stats_mse": null,
-    "stats_time_ms": null
+    "biology_mse": 0.0002780819,
+    "biology_time_ms": 38448,
+    "physics_mse": 0.00010678675,
+    "physics_time_ms": 46910,
+    "stats_mse": 0.0021106103,
+    "stats_time_ms": 64446
+  },
+  {
+    "timestamp": 1771460390,
+    "commit_hash": "local",
+    "biology_mse": 9.571305e-8,
+    "biology_time_ms": 3008,
+    "physics_mse": 0.01245859,
+    "physics_time_ms": 41775,
+    "stats_mse": 0.0005881067,
+    "stats_time_ms": 46667
+  },
+  {
+    "timestamp": 1771460661,
+    "commit_hash": "local",
+    "biology_mse": 0.000075201446,
+    "biology_time_ms": 32463,
+    "physics_mse": 0.00076650083,
+    "physics_time_ms": 49566,
+    "stats_mse": 0.0004435529,
+    "stats_time_ms": 56226
+  },
+  {
+    "timestamp": 1771460783,
+    "commit_hash": "local",
+    "biology_mse": 2.2891202e-8,
+    "biology_time_ms": 1947,
+    "physics_mse": 0.013968488,
+    "physics_time_ms": 62216,
+    "stats_mse": 0.0042547635,
+    "stats_time_ms": 103632
+  },
+  {
+    "timestamp": 1771461037,
+    "commit_hash": "local",
+    "biology_mse": 8.7076366e-8,
+    "biology_time_ms": 2966,
+    "physics_mse": 0.0011040273,
+    "physics_time_ms": 55837,
+    "stats_mse": 0.00049648026,
+    "stats_time_ms": 81072
+  },
+  {
+    "timestamp": 1771461485,
+    "commit_hash": "local",
+    "biology_mse": 6.2828754e-8,
+    "biology_time_ms": 6773,
+    "physics_mse": 0.000021625094,
+    "physics_time_ms": 58422,
+    "stats_mse": 0.00045855215,
+    "stats_time_ms": 93251
+  },
+  {
+    "timestamp": 1771461799,
+    "commit_hash": "local",
+    "biology_mse": 1.7367299e-8,
+    "biology_time_ms": 2795,
+    "physics_mse": 0.00002544129,
+    "physics_time_ms": 60476,
+    "stats_mse": 0.0015759583,
+    "stats_time_ms": 81412
+  },
+  {
+    "timestamp": 1771462418,
+    "commit_hash": "local",
+    "biology_mse": 7.453259e-8,
+    "biology_time_ms": 3459,
+    "physics_mse": 0.00003184862,
+    "physics_time_ms": 94027,
+    "stats_mse": 0.000081849976,
+    "stats_time_ms": 124824
+  },
+  {
+    "timestamp": 1771463021,
+    "commit_hash": "local",
+    "biology_mse": 9.527779e-8,
+    "biology_time_ms": 9310,
+    "physics_mse": 0.00032579654,
+    "physics_time_ms": 67661,
+    "stats_mse": 0.00046532185,
+    "stats_time_ms": 83044
   }
 ];
