@@ -46,6 +46,7 @@ fn main() {
 
         random_injection_rate: 0.05,
         min_random_injection: 2,
+        max_tree_size :30,
         verbose : true,
     };
     

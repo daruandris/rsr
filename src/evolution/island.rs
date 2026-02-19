@@ -97,7 +97,7 @@ impl Island {
                 let parent1 = tournament_selection_pareto(&self.individuals, config.tournament_size, &mut self.rng);
                 let parent2 = tournament_selection_pareto(&self.individuals, config.tournament_size, &mut self.rng);
 
-                let mut child = crossover(parent1, parent2, &mut self.rng);
+                let mut child = crossover(parent1, parent2, &mut self.rng, config.max_tree_size);
                 child.age = parent1.age.max(parent2.age);
                 
                 child.simplify();
@@ -112,7 +112,7 @@ impl Island {
                 match mut_type {
                     0 => point_mutation(&mut child, &mut self.rng, num_features),
                     1 => constant_perturbation(&mut child, &mut self.rng),
-                    _ => subtree_mutation(&mut child, &mut self.rng, num_features),
+                    _ => subtree_mutation(&mut child, &mut self.rng, num_features, config.max_tree_size),
                 }
                 child.simplify();
                 child.invalidate();

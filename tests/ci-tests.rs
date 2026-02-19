@@ -22,6 +22,7 @@ fn get_basic_config() -> EvolutionConfig {
 
         random_injection_rate: 0.05,
         min_random_injection: 1,
+        max_tree_size : 30,
         verbose : false,
     }
 }

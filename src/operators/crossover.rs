@@ -1,7 +1,7 @@
 use crate::evolution::individual::Individual;
 use rand::RngExt;
 
-pub fn crossover(parent_a: &Individual, parent_b: &Individual, rng: &mut impl RngExt) -> Individual {
+pub fn crossover(parent_a: &Individual, parent_b: &Individual, rng: &mut impl RngExt, max_size: usize) -> Individual {
     if parent_a.nodes.is_empty() || parent_b.nodes.is_empty() {
         return parent_a.clone();
     }
@@ -14,7 +14,7 @@ pub fn crossover(parent_a: &Individual, parent_b: &Individual, rng: &mut impl Rn
 
     let new_len = start_a + (end_b - start_b + 1) + (parent_a.nodes.len() - end_a - 1);
     
-    if new_len > 64 { 
+    if new_len > max_size { 
         return parent_a.clone();
     }
     

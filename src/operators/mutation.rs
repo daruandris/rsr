@@ -47,11 +47,22 @@ pub fn constant_perturbation(ind: &mut Individual, rng: &mut impl RngExt) {
     }
 }
 
-pub fn subtree_mutation(ind: &mut Individual, rng: &mut impl RngExt, num_features: u8) {
+pub fn subtree_mutation(ind: &mut Individual, rng: &mut impl RngExt, num_features: u8, max_size: usize) {
     if ind.nodes.is_empty() { return; }
     let mutation_point = rng.random_range(0..ind.nodes.len());
     let (start, end) = ind.get_subtree_bounds(mutation_point);
+
+    let removed_len = end - start + 1;
+    let current_len = ind.nodes.len();
+    let allowed_new_len = max_size.saturating_sub(current_len - removed_len);
+    if allowed_new_len == 0 { return; }
+
     let new_subtree = generate_random_ast(5, rng, num_features);
+
+    if new_subtree.len() > allowed_new_len {
+        return; 
+    }
+    
     ind.nodes.splice(start..=end, new_subtree);
     ind.invalidate();
 }

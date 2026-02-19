@@ -18,5 +18,6 @@ pub struct EvolutionConfig {
 
     pub random_injection_rate: f32,
     pub min_random_injection: usize,
+    pub max_tree_size : usize,
     pub verbose: bool
 }
