@@ -1,35 +1,5 @@
 const benchmarkHistory = [
   {
-    "timestamp": 1771453380,
-    "commit_hash": "local",
-    "biology_mse": 2.3630125e-7,
-    "biology_time_ms": 1548,
-    "physics_mse": 0.011750804,
-    "physics_time_ms": 63824,
-    "stats_mse": 0.01196107,
-    "stats_time_ms": 73992
-  },
-  {
-    "timestamp": 1771454804,
-    "commit_hash": "local",
-    "biology_mse": 9.937509e-8,
-    "biology_time_ms": 10212,
-    "physics_mse": 0.00003345843,
-    "physics_time_ms": 18091,
-    "stats_mse": 0.09096073,
-    "stats_time_ms": 21966
-  },
-  {
-    "timestamp": 1771455591,
-    "commit_hash": "local",
-    "biology_mse": 0.047647055,
-    "biology_time_ms": 7011,
-    "physics_mse": 0.00003603412,
-    "physics_time_ms": 7881,
-    "stats_mse": 0.12045264,
-    "stats_time_ms": 9978
-  },
-  {
     "timestamp": 1771455844,
     "commit_hash": "local",
     "biology_mse": 0.032558914,
@@ -288,5 +258,45 @@ const benchmarkHistory = [
     "physics_time_ms": 100082,
     "stats_mse": 0.00046613903,
     "stats_time_ms": 113619
+  },
+  {
+    "timestamp": 1771505080,
+    "commit_hash": "67f4a85",
+    "biology_mse": 3.959056e-8,
+    "biology_time_ms": 431,
+    "physics_mse": 0.00003245978,
+    "physics_time_ms": 170579,
+    "stats_mse": 0.0005914878,
+    "stats_time_ms": 208640
+  },
+  {
+    "timestamp": 1771505483,
+    "commit_hash": "67f4a85",
+    "biology_mse": 8.7411266e-8,
+    "biology_time_ms": 907,
+    "physics_mse": 0.000022883612,
+    "physics_time_ms": 212298,
+    "stats_mse": 0.0005425394,
+    "stats_time_ms": 250148
+  },
+  {
+    "timestamp": 1771506350,
+    "commit_hash": "67f4a85",
+    "biology_mse": 6.4673635e-11,
+    "biology_time_ms": 152,
+    "physics_mse": 0.000025163876,
+    "physics_time_ms": 522203,
+    "stats_mse": 0.0005528103,
+    "stats_time_ms": 635543
+  },
+  {
+    "timestamp": 1771508254,
+    "commit_hash": "67f4a85",
+    "biology_mse": 2.6422773e-8,
+    "biology_time_ms": 120,
+    "physics_mse": 0.000034868484,
+    "physics_time_ms": 613264,
+    "stats_mse": 0.0000016627828,
+    "stats_time_ms": 581372
   }
 ];

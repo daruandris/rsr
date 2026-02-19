@@ -7,25 +7,25 @@ fn get_heavy_config() -> EvolutionConfig {
     EvolutionConfig {
         num_islands: 24,
         island_size: 25,
-        max_generations: 20000,   
-        crossover_rate: 0.40,
+        max_generations: 10000, 
+        crossover_rate: 0.10,
         tournament_size: 2,
         migration_interval: 25,
-        parsimony_penalty: 0.0005,
+        parsimony_penalty: 0.0,
 
-        opt_prob: 0.15,
-        opt_iterations: 50,
+        opt_prob: 0.2,
+        opt_iterations: 100,
         final_opt_iterations: 5000,
         
         stagnation_threshold: 500,
         target_mse: 1e-7,
-        min_improvement: 1e-5,
+        min_improvement: 1e-6,
 
         random_injection_rate: 0.10,
         min_random_injection: 2,
         max_tree_size: 32,
         mutation_max_depth: 4,
-        mutation_cycles: 20,
+        mutation_cycles: 5,
         verbose : true,
     }
 }

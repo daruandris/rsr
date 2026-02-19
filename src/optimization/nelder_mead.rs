@@ -56,7 +56,7 @@ pub fn optimize_individual_constants(
         let best_mse = simplex[0].0;
         let worst_mse = simplex[n].0;
 
-        if (worst_mse - best_mse).abs() < 1e-6 || best_mse < 1e-8 {
+        if (worst_mse - best_mse).abs() < 1e-7 || best_mse < 1e-8 {
             break;
         }
         centroid.fill(0.0);
