@@ -809,9 +809,10 @@ impl Domain for UniversalDomain {
             let diff = prediction - target;
             let sqr = diff * diff;
             sum_squared_error += sqr.reduce_add();
+            if !sum_squared_error.is_finite() { return f32::MAX; }
         }
 
-        if !sum_squared_error.is_finite() { return f32::MAX; }
+        
         sum_squared_error / (dataset.num_samples as f32)
     }
 }
