@@ -76,8 +76,9 @@ impl Strategy for StaticStrategy {
         for module in &self.config.allowed_modules {
             match module {
                 OpModule::Basic => ops.extend_from_slice(&[
-                    UniversalOp::AddF, UniversalOp::SubF, UniversalOp::MulF, 
-                    UniversalOp::DivF, UniversalOp::SinF, UniversalOp::CosF
+                    UniversalOp::AddF, UniversalOp::SubF, UniversalOp::MulF, UniversalOp::DivF, 
+                    UniversalOp::SinF, UniversalOp::CosF, UniversalOp::ExpF, UniversalOp::SqrF,
+                    UniversalOp::LnF, UniversalOp::SqrtF
                 ]),
                 OpModule::Linalg => ops.extend_from_slice(&[
                     UniversalOp::AddV3, UniversalOp::DotV3, UniversalOp::ScaleV3

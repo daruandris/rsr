@@ -15,7 +15,9 @@ pub trait Domain: Clone + Copy + Send + Sync + PartialEq + 'static {
     fn random_operator(
         target_type: Self::TypeId,
         allowed_ops: &[Self::Operator],
+        parent_op: Option<Self::Operator>,
         rng: &mut impl RngExt
+        
     ) -> Option<Self::Operator>;
 
     // --- BYTECODE ÉS KIÉRTÉKELÉS ---

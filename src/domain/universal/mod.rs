@@ -17,11 +17,29 @@ pub enum UniversalType {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum UniversalOp {
     // Basic
-    AddF, SubF, MulF, DivF, SinF, CosF, ExpF, SqrF,
+    AddF, SubF, MulF, DivF, SinF, CosF, ExpF, SqrF, LnF, SqrtF,
     // Linalg
     AddV3, DotV3, ScaleV3,
     // Logic
     IfElseF,
+}
+
+impl UniversalOp {
+    pub fn forbidden_children(&self) -> &'static [UniversalOp] {
+        match self {
+            UniversalOp::SinF | UniversalOp::CosF => &[
+                UniversalOp::SinF, UniversalOp::CosF, UniversalOp::ExpF
+            ],
+            UniversalOp::ExpF => &[
+                UniversalOp::ExpF, UniversalOp::SinF, UniversalOp::CosF, 
+                UniversalOp::SqrF, UniversalOp::LnF
+            ],
+            UniversalOp::SqrtF => &[UniversalOp::SqrtF, UniversalOp::SqrF],
+            UniversalOp::SqrF => &[UniversalOp::SqrF, UniversalOp::SqrtF],
+            UniversalOp::LnF => &[UniversalOp::LnF, UniversalOp::ExpF],
+            _ => &[],
+        }
+    }
 }
 
 // --- 3. BYTECODE UTASÍTÁSOK ---
@@ -31,7 +49,7 @@ pub enum UniversalInstruction {
     LoadVarV3(u8), LoadConstV3(u16),
     LoadVarB(u8), LoadConstB(u16),
     LoadVarI(u8), LoadConstI(u16),
-    AddF, SubF, MulF, DivF, SinF, CosF, ExpF, SqrF,
+    AddF, SubF, MulF, DivF, SinF, CosF, ExpF, SqrF, LnF, SqrtF,
     AddV3, DotV3, ScaleV3,
     IfElseF,
 }
@@ -71,7 +89,8 @@ impl Domain for UniversalDomain {
     #[inline(always)]
     fn operator_arity(op: &Self::Operator) -> usize {
         match op {
-            UniversalOp::SinF | UniversalOp::CosF | UniversalOp::ExpF | UniversalOp::SqrF => 1,
+            UniversalOp::SinF | UniversalOp::CosF | UniversalOp::ExpF | UniversalOp::SqrF |
+            UniversalOp::LnF | UniversalOp::SqrtF => 1,
             UniversalOp::AddF | UniversalOp::SubF | UniversalOp::MulF | UniversalOp::DivF | 
             UniversalOp::AddV3 | UniversalOp::DotV3 | UniversalOp::ScaleV3 => 2,
             UniversalOp::IfElseF => 3,
@@ -82,9 +101,10 @@ impl Domain for UniversalDomain {
     fn operator_weight(op: &Self::Operator) -> usize {
         match op {
             UniversalOp::AddF | UniversalOp::SubF | UniversalOp::MulF | UniversalOp::AddV3 => 1,
-            UniversalOp::DivF | UniversalOp::DotV3 | UniversalOp::ScaleV3 | UniversalOp::SqrF => 2,
+            UniversalOp::DivF | UniversalOp::DotV3 | UniversalOp::ScaleV3 | UniversalOp::SqrF |
+            UniversalOp::SqrtF => 2,
             UniversalOp::SinF | UniversalOp::CosF => 3,
-            UniversalOp::IfElseF | UniversalOp::ExpF => 4,
+            UniversalOp::IfElseF | UniversalOp::ExpF | UniversalOp::LnF => 4,
         }
     }
 
@@ -93,12 +113,15 @@ impl Domain for UniversalDomain {
             UniversalOp::AddF => format!("({} + {})", args[0], args[1]),
             UniversalOp::SubF => format!("({} - {})", args[0], args[1]),
             UniversalOp::SinF => format!("sin({})", args[0]),
+            UniversalOp::CosF => format!("cos({})", args[0]),
             UniversalOp::DotV3 => format!("({} • {})", args[0], args[1]),
             UniversalOp::ScaleV3 | UniversalOp::MulF => format!("({} * {})", args[0], args[1]),
             UniversalOp::IfElseF => format!("(if {} then {} else {})", args[0], args[1], args[2]),
             UniversalOp::ExpF => format!("exp({})", args[0]),
             UniversalOp::SqrF => format!("({})^2", args[0]),
             UniversalOp::DivF => format!("({} / {})", args[0], args[1]),
+            UniversalOp::SqrtF => format!("sqrt(|{}|)", args[0]),
+            UniversalOp::LnF => format!("ln(|{}|)", args[0]),
             _ => format!("{:?}({})", op, args.join(", ")),
         }
     }
@@ -107,21 +130,18 @@ impl Domain for UniversalDomain {
     #[inline(always)]
     fn return_type(op: &Self::Operator) -> Self::TypeId {
         match op {
-            UniversalOp::AddF | UniversalOp::SubF | UniversalOp::MulF | UniversalOp::DivF | 
-            UniversalOp::SinF | UniversalOp::CosF | UniversalOp::DotV3 | UniversalOp::IfElseF |
-            UniversalOp::ExpF | UniversalOp::SqrF => UniversalType::Float,
             UniversalOp::AddV3 | UniversalOp::ScaleV3 => UniversalType::Vec3,
+            _ => UniversalType::Float,
         }
     }
 
     #[inline(always)]
     fn expected_types(op: &Self::Operator) -> Vec<Self::TypeId> {
-        match op {
-            UniversalOp::AddF | UniversalOp::SubF | UniversalOp::MulF | UniversalOp::DivF | 
-            UniversalOp::ExpF | UniversalOp::SqrF => vec![UniversalType::Float, UniversalType::Float],
-            UniversalOp::SinF | UniversalOp::CosF => vec![UniversalType::Float],
-            UniversalOp::AddV3 => vec![UniversalType::Vec3, UniversalType::Vec3],
-            UniversalOp::DotV3 => vec![UniversalType::Vec3, UniversalType::Vec3],
+       match op {
+            UniversalOp::AddF | UniversalOp::SubF | UniversalOp::MulF | UniversalOp::DivF => vec![UniversalType::Float, UniversalType::Float],
+            UniversalOp::SinF | UniversalOp::CosF | UniversalOp::ExpF | 
+            UniversalOp::SqrF | UniversalOp::LnF | UniversalOp::SqrtF => vec![UniversalType::Float],
+            UniversalOp::AddV3 | UniversalOp::DotV3 => vec![UniversalType::Vec3, UniversalType::Vec3],
             UniversalOp::ScaleV3 => vec![UniversalType::Float, UniversalType::Vec3],
             UniversalOp::IfElseF => vec![UniversalType::Bool, UniversalType::Float, UniversalType::Float],
         }
@@ -133,10 +153,16 @@ impl Domain for UniversalDomain {
     #[inline(always)] fn variable_type() -> Self::TypeId { UniversalType::Float }
     #[inline(always)] fn constant_type() -> Self::TypeId { UniversalType::Float }
 
-    fn random_operator(target_type: Self::TypeId, allowed_ops: &[Self::Operator], rng: &mut impl RngExt) -> Option<Self::Operator> {
+    fn random_operator(
+        target_type: Self::TypeId, 
+        allowed_ops: &[Self::Operator], 
+        parent_op: Option<Self::Operator>,
+        rng: &mut impl RngExt
+    ) -> Option<Self::Operator> {
+        let forbidden = parent_op.map(|p| p.forbidden_children()).unwrap_or(&[]);
         let valid_ops: Vec<Self::Operator> = allowed_ops.iter()
             .copied()
-            .filter(|op| Self::return_type(op) == target_type)
+            .filter(|op| Self::return_type(op) == target_type && !forbidden.contains(op))
             .collect();
 
         if valid_ops.is_empty() { 
@@ -180,7 +206,8 @@ impl Domain for UniversalDomain {
             UniversalOp::CosF => UniversalInstruction::CosF,
             UniversalOp::ExpF => UniversalInstruction::ExpF,
             UniversalOp::SqrF => UniversalInstruction::SqrF,
-            
+            UniversalOp::LnF => UniversalInstruction::LnF,
+            UniversalOp::SqrtF => UniversalInstruction::SqrtF,
             UniversalOp::AddV3 => UniversalInstruction::AddV3,
             UniversalOp::DotV3 => UniversalInstruction::DotV3,
             UniversalOp::ScaleV3 => UniversalInstruction::ScaleV3,
@@ -236,15 +263,13 @@ impl Domain for UniversalDomain {
                         continue;
                     }
 
-                    // Gyerekek levétele a veremről
                     let mut children = Vec::with_capacity(arity);
                     for _ in 0..arity {
                         children.push(stack.pop().unwrap());
                     }
-                    children.reverse(); // Mert LIFO a verem
+                    children.reverse(); // LIFO miatt visszafordítjuk
 
-                    // 1. CONSTANT FOLDING (Konstansok előre kiszámítása)
-                    // Megnézzük, hogy minden gyerek egyetlen Float konstans-e
+                    // === 1. KONSTANS ÖSSZEVONÁS (Constant Folding) ===
                     let all_float_const = children.iter().all(|c| {
                         c.len() == 1 && matches!(c[0], Node::Constant(UniversalScalar::Float(_), _))
                     });
@@ -261,75 +286,97 @@ impl Domain for UniversalDomain {
                             UniversalOp::AddF => Some(vals[0] + vals[1]),
                             UniversalOp::SubF => Some(vals[0] - vals[1]),
                             UniversalOp::MulF => Some(vals[0] * vals[1]),
-                            UniversalOp::DivF => {
-                                if vals[1].abs() > 1e-6 { Some(vals[0] / vals[1]) } else { None }
-                            },
+                            UniversalOp::DivF => if vals[1].abs() > 1e-9 { Some(vals[0] / vals[1]) } else { None },
                             UniversalOp::SinF => Some(vals[0].sin()),
                             UniversalOp::CosF => Some(vals[0].cos()),
                             UniversalOp::ExpF => Some(vals[0].exp()),
                             UniversalOp::SqrF => Some(vals[0] * vals[0]),
+                            UniversalOp::SqrtF => Some(vals[0].abs().sqrt()),
+                            UniversalOp::LnF => Some((vals[0].abs() + 1e-9).ln()),
                             _ => None,
                         };
 
                         if let Some(f) = folded {
                             if f.is_finite() {
                                 stack.push(vec![Node::Constant(UniversalScalar::Float(f), UniversalType::Float)]);
-                                continue;
+                                continue; // Kész, kiváltottuk a részfát egy konstanssal!
                             }
                         }
                     }
 
-                    // 2. ALGEBRAI EGYSZERŰSÍTÉSEK (x + 0, x * 1, stb.)
-                    if arity == 2 {
+                    // === 2. ALGEBRAI EGYSZERŰSÍTÉSEK ===
+                    let mut simplified = false;
+
+                    // Egyváltozós inverz szabályok (pl. ln(exp(x)) -> x)
+                    if arity == 1 {
+                        let child_expr = &children[0];
+                        if let Some(Node::Operator(child_op)) = child_expr.last() {
+                            match (op, child_op) {
+                                (UniversalOp::LnF, UniversalOp::ExpF) |
+                                (UniversalOp::ExpF, UniversalOp::LnF) |
+                                (UniversalOp::SqrtF, UniversalOp::SqrF) |
+                                (UniversalOp::SqrF, UniversalOp::SqrtF) => {
+                                    // Mivel postfix, a gyermek operátor az utolsó elem. 
+                                    // Ezt levágjuk, a maradék maga az 'x'.
+                                    let mut inner_x = child_expr.clone();
+                                    inner_x.pop(); 
+                                    stack.push(inner_x);
+                                    simplified = true;
+                                },
+                                _ => {}
+                            }
+                        }
+                    } 
+                    // Kétváltozós szabályok (x*0, x+0, x/x, x-x)
+                    else if arity == 2 {
                         let left_is_const = children[0].len() == 1 && matches!(children[0][0], Node::Constant(UniversalScalar::Float(_), _));
                         let right_is_const = children[1].len() == 1 && matches!(children[1][0], Node::Constant(UniversalScalar::Float(_), _));
                         
-                        let left_val = if left_is_const { 
-                            if let Node::Constant(UniversalScalar::Float(v), _) = children[0][0] { v } else { 0.0 } 
-                        } else { 0.0 };
-                        
-                        let right_val = if right_is_const { 
-                            if let Node::Constant(UniversalScalar::Float(v), _) = children[1][0] { v } else { 0.0 } 
-                        } else { 0.0 };
+                        let left_val = if left_is_const { if let Node::Constant(UniversalScalar::Float(v), _) = children[0][0] { v } else { 0.0 } } else { 0.0 };
+                        let right_val = if right_is_const { if let Node::Constant(UniversalScalar::Float(v), _) = children[1][0] { v } else { 0.0 } } else { 0.0 };
 
                         match op {
-                            UniversalOp::AddF | UniversalOp::SubF => {
-                                if right_is_const && right_val.abs() < 1e-6 {
-                                    stack.push(children[0].clone()); // x +/- 0 -> x
-                                    continue;
-                                }
-                                if op == &UniversalOp::AddF && left_is_const && left_val.abs() < 1e-6 {
-                                    stack.push(children[1].clone()); // 0 + x -> x
-                                    continue;
+                            UniversalOp::AddF => {
+                                if right_is_const && right_val.abs() < 1e-6 { stack.push(children[0].clone()); simplified = true; } // x + 0
+                                else if left_is_const && left_val.abs() < 1e-6 { stack.push(children[1].clone()); simplified = true; } // 0 + x
+                            },
+                            UniversalOp::SubF => {
+                                if right_is_const && right_val.abs() < 1e-6 { stack.push(children[0].clone()); simplified = true; } // x - 0
+                                else if children[0] == children[1] { 
+                                    stack.push(vec![Node::Constant(UniversalScalar::Float(0.0), UniversalType::Float)]); simplified = true; // x - x = 0
                                 }
                             },
                             UniversalOp::MulF => {
                                 if right_is_const {
-                                    if (right_val - 1.0).abs() < 1e-6 { stack.push(children[0].clone()); continue; } // x * 1 -> x
-                                    if right_val.abs() < 1e-6 { stack.push(vec![Node::Constant(UniversalScalar::Float(0.0), UniversalType::Float)]); continue; } // x * 0 -> 0
-                                }
-                                if left_is_const {
-                                    if (left_val - 1.0).abs() < 1e-6 { stack.push(children[1].clone()); continue; } // 1 * x -> x
-                                    if left_val.abs() < 1e-6 { stack.push(vec![Node::Constant(UniversalScalar::Float(0.0), UniversalType::Float)]); continue; } // 0 * x -> 0
+                                    if (right_val - 1.0).abs() < 1e-6 { stack.push(children[0].clone()); simplified = true; } // x * 1
+                                    else if right_val.abs() < 1e-6 { stack.push(vec![Node::Constant(UniversalScalar::Float(0.0), UniversalType::Float)]); simplified = true; } // x * 0
+                                } else if left_is_const {
+                                    if (left_val - 1.0).abs() < 1e-6 { stack.push(children[1].clone()); simplified = true; } // 1 * x
+                                    else if left_val.abs() < 1e-6 { stack.push(vec![Node::Constant(UniversalScalar::Float(0.0), UniversalType::Float)]); simplified = true; } // 0 * x
                                 }
                             },
                             UniversalOp::DivF => {
-                                if right_is_const && (right_val - 1.0).abs() < 1e-6 {
-                                    stack.push(children[0].clone()); // x / 1 -> x
-                                    continue;
+                                if right_is_const && (right_val - 1.0).abs() < 1e-6 { stack.push(children[0].clone()); simplified = true; } // x / 1
+                                else if children[0] == children[1] { 
+                                    stack.push(vec![Node::Constant(UniversalScalar::Float(1.0), UniversalType::Float)]); simplified = true; // x / x = 1
                                 }
-                            }
+                                else if left_is_const && left_val.abs() < 1e-6 {
+                                    stack.push(vec![Node::Constant(UniversalScalar::Float(0.0), UniversalType::Float)]); simplified = true; // 0 / x = 0
+                                }
+                            },
                             _ => {}
                         }
                     }
 
-                    // 3. HA NEM TUDTUK EGYSZERŰSÍTENI, ÉPÍTSÜK VISSZA A RÉSZFÁT
-                    let mut subtree = Vec::new();
-                    for mut child in children {
-                        subtree.append(&mut child);
+                    // === 3. HA NINCS EGYSZERŰSÍTÉS, RAKJUK ÖSSZE ===
+                    if !simplified {
+                        let mut subtree = Vec::new();
+                        for mut child in children {
+                            subtree.append(&mut child);
+                        }
+                        subtree.push(*node);
+                        stack.push(subtree);
                     }
-                    subtree.push(*node);
-                    stack.push(subtree);
                 }
             }
         }
@@ -418,6 +465,17 @@ impl Domain for UniversalDomain {
                     let idx = sp_f - 1;
                     let a = *stack_f.get_unchecked(idx);
                     *stack_f.get_unchecked_mut(idx) = a * a;
+                },
+                UniversalInstruction::SqrtF => unsafe {
+                    let idx = sp_f - 1;
+                    let a = *stack_f.get_unchecked(idx);
+                    *stack_f.get_unchecked_mut(idx) = a.abs().sqrt(); // Ne legyen NaN negatívokból!
+                },
+                UniversalInstruction::LnF => unsafe {
+                    let idx = sp_f - 1;
+                    let a = *stack_f.get_unchecked(idx);
+                    let safe_a = a.abs() + f32x4::splat(1e-9); // Védelem a log(0) ellen
+                    *stack_f.get_unchecked_mut(idx) = safe_a.ln();
                 },
                 _ => {} // A Linalg és Logic egyelőre maradhat így
             }

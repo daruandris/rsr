@@ -40,7 +40,7 @@ pub fn point_mutation<D: Domain>(ind: &mut Individual<D>, rng: &mut impl RngExt,
         }
     } else {
         // --- OPERÁTOR MUTÁCIÓ ---
-        if let Some(new_op) = D::random_operator(target_type, allowed_ops, rng) {
+        if let Some(new_op) = D::random_operator(target_type, allowed_ops, None, rng) {
             if let Node::Operator(old_op) = target_node {
                 // Szigorú STGP szabály: Csak akkor cserélhetjük ki, ha a gyerekeinek a száma ÉS TÍPUSA megegyezik!
                 if D::expected_types(&new_op) == D::expected_types(old_op) {
