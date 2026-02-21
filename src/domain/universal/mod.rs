@@ -264,9 +264,22 @@ impl Domain for UniversalDomain {
             UniversalType::Float => Some(UniversalScalar::Float(rng.random_range(-5.0..5.0))),
             UniversalType::Vec2 => Some(UniversalScalar::Vec2([rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0)])),
             UniversalType::Vec3 => Some(UniversalScalar::Vec3([rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0)])),
+            
+            // ÚJ: Mat2 Konstans generálása
+            UniversalType::Mat2 => Some(UniversalScalar::Mat2([
+                rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0),
+                rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0)
+            ])),
+            
+            // ÚJ: Mat3 Konstans generálása
+            UniversalType::Mat3 => Some(UniversalScalar::Mat3([
+                rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0),
+                rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0),
+                rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0)
+            ])),
+            
             UniversalType::Bool => Some(UniversalScalar::Bool(rng.random::<bool>())),
             UniversalType::Int => Some(UniversalScalar::Int(rng.random_range(-10..10))),
-            _ => None,
         }
     }
 
@@ -283,6 +296,13 @@ impl Domain for UniversalDomain {
             },
             UniversalScalar::Vec3(v) => {
                 for i in 0..3 { v[i] += rng.random_range(-0.5..0.5); }
+            },
+            // ÚJ: Mátrixok perturbációja a Nelder-Mead és a Mutáció számára
+            UniversalScalar::Mat2(m) => {
+                for i in 0..4 { m[i] += rng.random_range(-0.5..0.5); }
+            },
+            UniversalScalar::Mat3(m) => {
+                for i in 0..9 { m[i] += rng.random_range(-0.5..0.5); }
             },
             _ => {} 
         }
