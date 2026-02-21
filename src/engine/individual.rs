@@ -49,14 +49,14 @@ impl<D: Domain> Individual<D> {
 
     pub fn get_constants(&self) -> Vec<D::ScalarValue> {
         self.nodes.iter().filter_map(|node| {
-            if let Node::Constant(c) = node { Some(*c) } else { None }
+            if let Node::Constant(c,_) = node { Some(*c) } else { None }
         }).collect()
     }
 
     pub fn set_constants(&mut self, new_constants: &[D::ScalarValue]) {
         let mut const_idx = 0;
         for node in self.nodes.iter_mut() {
-            if let Node::Constant(c) = node {
+            if let Node::Constant(c,_) = node {
                 if const_idx < new_constants.len() {
                     *c = new_constants[const_idx];
                     const_idx += 1;

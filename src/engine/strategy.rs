@@ -1,4 +1,5 @@
-use crate::engine::config::EvolutionConfig;
+use crate::engine::config::{EvolutionConfig, OpModule};
+use crate::domain::universal::{UniversalOp};
 
 pub trait Strategy: Clone + Send + Sync {
     // Architektúrális paraméterek
@@ -31,6 +32,7 @@ pub trait Strategy: Clone + Send + Sync {
     
     // Egyéb
     fn verbose(&self) -> bool;
+    fn get_allowed_operators(&self) -> Vec<UniversalOp>;
 
     // --- ESEMÉNYEK (Hooks) a későbbi dinamikus tanuláshoz ---
     fn on_generation_end(&mut self, _best_mse: f32, _stagnation_counter: usize) {}
@@ -68,4 +70,23 @@ impl Strategy for StaticStrategy {
     #[inline(always)] fn stagnation_threshold(&self) -> usize { self.config.stagnation_threshold }
     #[inline(always)] fn min_improvement(&self) -> f32 { self.config.min_improvement }
     #[inline(always)] fn verbose(&self) -> bool { self.config.verbose }
+
+    fn get_allowed_operators(&self) -> Vec<UniversalOp> {
+        let mut ops = Vec::new();
+        for module in &self.config.allowed_modules {
+            match module {
+                OpModule::Basic => ops.extend_from_slice(&[
+                    UniversalOp::AddF, UniversalOp::SubF, UniversalOp::MulF, 
+                    UniversalOp::DivF, UniversalOp::SinF, UniversalOp::CosF
+                ]),
+                OpModule::Linalg => ops.extend_from_slice(&[
+                    UniversalOp::AddV3, UniversalOp::DotV3, UniversalOp::ScaleV3
+                ]),
+                OpModule::Logic => ops.extend_from_slice(&[
+                    UniversalOp::IfElseF
+                ]),
+            }
+        }
+        ops
+    }
 }

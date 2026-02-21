@@ -24,15 +24,16 @@ pub struct Island<S: Strategy, D: Domain> {
     pub stagnation_counter: usize,
     pub local_hof: HashMap<usize, (f32, Individual<D>)>,
     pub strategy: S,
+    pub allowed_ops: Vec<D::Operator>,
 }
 
 impl<S: Strategy, D: Domain> Island<S, D> {
-    pub fn new(seed: u64, num_features: u8, strategy: S) -> Self {
+    pub fn new(seed: u64, num_features: u8, strategy: S, allowed_ops: Vec<D::Operator>) -> Self {
         let size = strategy.island_size();
         let mut rng = Xoshiro256PlusPlus::seed_from_u64(seed);
         let mut individuals = Vec::with_capacity(size);
         for _ in 0..size {
-            let ast = generate_random_ast::<D>(D::variable_type(),5, &mut rng, num_features);
+            let ast = generate_random_ast::<D>(D::variable_type(),5, &mut rng, num_features, &allowed_ops);
             let mut ind = Individual::new(ast);
             ind.simplify();
             individuals.push(ind);
@@ -48,6 +49,7 @@ impl<S: Strategy, D: Domain> Island<S, D> {
             stagnation_counter: 0,
             local_hof: HashMap::new(),
             strategy,
+            allowed_ops,
         }
     }
 
@@ -89,7 +91,7 @@ impl<S: Strategy, D: Domain> Island<S, D> {
 
         for _ in 0..num_randoms {
             if self.next_gen_buffer.len() >= pop_size { break; }
-            let ast = generate_random_ast::<D>(D::variable_type(), 5, &mut self.rng, num_features);
+            let ast = generate_random_ast::<D>(D::variable_type(), 5, &mut self.rng, num_features, &self.allowed_ops);
             let mut ind = Individual::new(ast);
             ind.simplify();
             self.next_gen_buffer.push(ind);
@@ -118,9 +120,14 @@ impl<S: Strategy, D: Domain> Island<S, D> {
                     let mut mutated_candidate = candidate.clone();
                     
                     match self.rng.random_range(0..3) {
-                        0 => point_mutation::<D>(&mut mutated_candidate, &mut self.rng, num_features),
+                        0 => point_mutation::<D>(&mut mutated_candidate, &mut self.rng, num_features, &self.allowed_ops),
                         1 => constant_perturbation::<D>(&mut mutated_candidate, &mut self.rng),
-                        _ => subtree_mutation::<D>(&mut mutated_candidate, &mut self.rng, num_features, self.strategy.max_tree_size(), self.strategy.mutation_max_depth()),
+                        _ => subtree_mutation::<D>(
+                            &mut mutated_candidate, 
+                            &mut self.rng, num_features, 
+                            self.strategy.max_tree_size(), 
+                            self.strategy.mutation_max_depth(),
+                            &self.allowed_ops),
                     }
                     mutated_candidate.simplify();
                     let new_mse = mutated_candidate.calculate_mse(dataset);
@@ -144,7 +151,7 @@ impl<S: Strategy, D: Domain> Island<S, D> {
         self.individuals.push(self.best_individual.clone());
 
         for _ in 1..pop_size {
-            let ast = generate_random_ast::<D>(D::variable_type(), 5, &mut self.rng, num_features);
+            let ast = generate_random_ast::<D>(D::variable_type(), 5, &mut self.rng, num_features, &self.allowed_ops);
             let mut new_ind = Individual::new(ast);
             new_ind.simplify();
             

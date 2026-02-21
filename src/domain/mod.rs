@@ -13,14 +13,15 @@ pub trait Domain: Clone + Copy + Send + Sync + PartialEq + 'static {
     fn operator_weight(op: &Self::Operator) -> usize;
     fn format_operator(op: &Self::Operator, args: &[String]) -> String;
     fn random_operator(
-        target_type: Self::TypeId, 
+        target_type: Self::TypeId,
+        allowed_ops: &[Self::Operator],
         rng: &mut impl RngExt
     ) -> Option<Self::Operator>;
 
     // --- BYTECODE ÉS KIÉRTÉKELÉS ---
     fn compile_operator(op: &Self::Operator) -> Self::Instruction;
-    fn load_var_instruction(idx: u8) -> Self::Instruction;
-    fn load_const_instruction(idx: u16) -> Self::Instruction;
+    fn load_var_instruction(idx: u8, target_type: Self::TypeId) -> Self::Instruction;
+    fn load_const_instruction(idx: u16, target_type: Self::TypeId) -> Self::Instruction;
     
     // Itt delegáljuk a SIMD kiértékelést a specifikus implementációhoz
     fn eval_simd(code: &[Self::Instruction], constants: &[Self::ScalarValue], features: &[Self::SimdValue]) -> Self::SimdValue;
@@ -49,4 +50,4 @@ pub trait Domain: Clone + Copy + Send + Sync + PartialEq + 'static {
     fn constant_type() -> Self::TypeId;
 }
 
-pub mod basic;
+pub mod universal;

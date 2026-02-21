@@ -114,7 +114,7 @@ pub fn optimize_individual_constants<D: Domain>(
     let best_consts = &program.constants;
     let mut const_idx = 0;
     for node in &mut ind.nodes {
-        if let crate::ast::node::Node::Constant(val) = node {
+        if let crate::ast::node::Node::Constant(val,_) = node {
             if const_idx < best_consts.len() {
                 *val = best_consts[const_idx];
                 const_idx += 1;

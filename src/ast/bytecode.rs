@@ -14,13 +14,13 @@ impl<D: Domain> CompiledExpr<D> {
 
         for node in nodes {
             match node {
-                Node::Variable(idx) => {
-                    code.push(D::load_var_instruction(*idx));
+                Node::Variable(idx,type_id) => {
+                    code.push(D::load_var_instruction(*idx, *type_id));
                 },
-                Node::Constant(val) => {
+                Node::Constant(val, type_id) => {
                     let c_idx = constants.len();
                     constants.push(*val);
-                    code.push(D::load_const_instruction(c_idx as u16));
+                    code.push(D::load_const_instruction(c_idx as u16, *type_id));
                 },
                 Node::Operator(op) => {
                     code.push(D::compile_operator(op));

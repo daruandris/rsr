@@ -8,6 +8,6 @@ pub mod optimization;
 
 pub use engine::Engine;
 pub use engine::strategy::{Strategy, StaticStrategy};
-pub use domain::basic::BasicDomain;
+pub use domain::universal::{UniversalDomain, UniversalOp, UniversalType};
 pub use metrics::dataset::SimdDataset;
 pub use engine::config::EvolutionConfig;

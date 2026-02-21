@@ -2,9 +2,10 @@ use rsr::EvolutionConfig;
 use rsr::Engine;
 use rsr::SimdDataset;
 use rsr::StaticStrategy;
-use rsr::BasicDomain;
-// Ha a symengine import máshogy van nálad, igazítsd a sajátodhoz:
-use rsr::ffi::symengine::simplify_symengine; 
+use rsr::Strategy;
+use rsr::{UniversalDomain};
+use rsr::ffi::symengine::simplify_symengine;
+use rsr::engine::config::OpModule;
 use rand::RngExt;
 use std::time::Instant;
 
@@ -12,7 +13,7 @@ fn get_config() -> EvolutionConfig {
     EvolutionConfig {
         num_islands: 24,
         island_size: 25,
-        max_generations: 10000,   
+        max_generations: 5000,   
         crossover_rate: 0.10,
         tournament_size: 2,
         migration_interval: 25,
@@ -32,6 +33,7 @@ fn get_config() -> EvolutionConfig {
         mutation_max_depth: 4,
         mutation_cycles: 5,
         verbose: true,
+        allowed_modules: vec![OpModule::Basic],
     }
 }
 
@@ -46,7 +48,7 @@ fn run_benchmark(
     println!(">>> RUNNING BENCHMARK: {} <<<", name);
     println!("Features: {}, Samples: {}", num_features, data_x.len());
     
-    let dataset = SimdDataset::new(&data_x, &data_y, num_features);
+    let dataset = SimdDataset::new(&data_x, &data_y, num_features, false);
     let mut config = get_config();
     
     if let Some(noise_mse) = expected_noise_mse {
@@ -55,8 +57,9 @@ fn run_benchmark(
     }
 
     let strategy = StaticStrategy::new(config);
+    let allowed_ops = strategy.get_allowed_operators();
 
-    let mut engine = Engine::<StaticStrategy, BasicDomain>::new(strategy, num_features);
+    let mut engine = Engine::<StaticStrategy, UniversalDomain>::new(strategy, num_features, allowed_ops);
     
     let start_time = Instant::now();
     engine.run_evolution(&dataset);

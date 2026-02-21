@@ -1,4 +1,11 @@
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum OpModule {
+    Basic,
+    Linalg,
+    Logic,
+    // NumTheory,
+}
+#[derive(Clone, Debug)]
 pub struct EvolutionConfig {
     pub num_islands: usize,
     pub island_size: usize,
@@ -21,5 +28,6 @@ pub struct EvolutionConfig {
     pub max_tree_size : usize,
     pub mutation_max_depth: usize,
     pub mutation_cycles: usize,
-    pub verbose: bool
+    pub verbose: bool,
+    pub allowed_modules: Vec<OpModule>,
 }

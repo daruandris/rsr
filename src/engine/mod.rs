@@ -20,12 +20,12 @@ pub struct Engine<S: Strategy, D: Domain> {
 }
 
 impl<S: Strategy, D: Domain> Engine<S, D> {
-    pub fn new(strategy: S, num_features: u8) -> Self {
+    pub fn new(strategy: S, num_features: u8, allowed_ops: Vec<D::Operator>) -> Self {
         let num_islands = strategy.num_islands();
         let mut islands = Vec::with_capacity(num_islands);
         
         for i in 0..num_islands {
-            islands.push(Island::new(42 + i as u64, num_features, strategy.clone()));
+            islands.push(Island::new(42 + i as u64, num_features, strategy.clone(), allowed_ops.clone()));
         }
         
         Self { islands, global_strategy: strategy, global_hof: HashMap::new() }
@@ -57,13 +57,13 @@ impl<S: Strategy, D: Domain> Engine<S, D> {
             let pure_mse = self.get_global_best().clone().calculate_mse(dataset);
 
             if pure_mse <= target_mse {
-                if verbose { println!("\n>>> Target reached in {}. generation! <<<", generation); }
+                if verbose { println!("\n>>> Target reached in {}. generation: {}! <<<", generation, self.get_global_best()); }
                 break;
             }
 
             if generation > 0 && generation % migration_interval == 0 {
                 self.migrate_individuals();
-                if verbose { println!("Generation: {}, Best MSE: {}", generation, pure_mse); }
+                if verbose { println!("Generation: {}, Best MSE: {}, Equation: {}", generation, pure_mse, self.get_global_best()); }
             }
         }
         

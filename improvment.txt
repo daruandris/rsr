@@ -1,56 +1,6 @@
-(Zaj-kiszűrése, fontos num_features kiválasztása, csak bizonyos esetben normalizálás)
+(Zaj-kiszűrése, fontos num_features kiválasztása, L1/L2 regularizációt a konstansokra, hogy a motor automatikusan kiszűrje a felesleges (nullához közeli) együtthatókat)
 
-Fázis 1:
-A SOTA Architektúra Terve (A "Szétválasztott" Modell)
-
-A lényeg: a fát generáló és mutáló algoritmusnak (Frontend) fogalma sem kell legyen arról, hogyan fut le a kód a SIMD-ben. A SIMD Virtuális Gépnek (Backend) pedig fogalma sem kell legyen a genetikáról.
-1. Lépés: Az Erősen Típusos Szótár (The Type System & Grammar)
-
-A típusrendszert kiemeljük a Domainekből. Lesz egy globális, független enumunk a típusokról:
-Rust
-
-pub enum Type { Float, Vector3, Matrix3x3, Bool }
-
-A generátornak nem egy statikus trait kell, hanem egy dinamikus Registry (Szótár), ami tartalmazza az aktív operátorok szignatúráit (pl. DotProduct: [Vector3, Vector3] -> Float).
-Amikor inicializálod az Engine-t, "regisztrálod" azokat a Domaineket, amiket használni akarsz. A Registry összegyűjti az összes engedélyezett operátort, és ebből építi fel a fát.
-2. Lépés: A Heterogén Adathalmaz (Feature Signatures)
-
-Ez a te általad felvetett legnagyobb probléma megoldása. Az adathalmaz (Dataset) betöltésekor nem azt mondod, hogy num_features = 3, hanem átadsz egy Szignatúrát:
-let signature = vec![Type::Vector3, Type::Float, Type::Matrix3x3];
-A rendszer (a fordító) ez alapján kiszámolja az eltolásokat (offsets) a lapos (flat) SIMD memóriában. Így amikor a fa azt mondja: LoadVar(1, Float), a fordító pontosan tudja, hogy a memóriában ezt honnan kell f32x4-ként beolvasni, függetlenül attól, hogy előtte egy vektor van.
-3. Lépés: Az ISA és a Multi-Stack VM (A Backend)
-
-Az eval_simd kikerül a Domainekből! Létrehozunk egy egyetlen, masszív, szupergyors Instruction Set Architecture (ISA)-t (Utasításkészletet).
-Ez a Virtuális Gép (VM) ugyanazt a Multi-Stack rendszert használja, amit írtunk (Float Stack, Vector Stack, Matrix Stack). Ez a gép "mindent is" tud (szorozni, mátrixot invertálni, szummázni), de csak azokat az utasításokat hajtja végre, amiket a lefordított AST (a Bytecode) tartalmaz. A sebesség zero-cost marad.
-4. Lépés: A Domainek, mint "Pluginek" és a Heurisztika
-
-A Domainek (Basic, LinAlg, Calculus) többé nem istenek, hanem Modulok. Egy Modul mindössze 3 dolgot csinál:
-
-    Regisztrálja az operátorait a Szótárba (név, bemeneti típusok, kimeneti típus).
-
-    Lefordítja a saját AST csomópontjait a VM által ismert ISA Bytecode-ra.
-
-    Szolgáltat egy Heurisztika-csövet (Pipeline): Ha több domaint kapcsolsz össze, a fa egyszerűsítésekor (simplify) a rendszer sorban meghívja a regisztrált domainek heurisztikáit. Pl. a LinAlg leegyszerűsíti a Tr(M)-et valamire, aztán a Basic leegyszerűsíti a X * 0-t.
-
-Mit nyerünk ezzel a dizájnnal?
-
-    Végtelen Kompozíció: Ha a Basic regisztrálja, hogy a MulF két Floatot vár, a LinAlg pedig, hogy a DotProduct Floatot ad vissza, a Típusrendszer automatikusan összekötheti őket: (V1 · V2) * 3.14. Sosem kell "BasicAndLinAlg" kódot írnod!
-
-    Szabad Adatstruktúrák: Bármilyen bemenetet megadhatsz a datasetben (Vektor, Skalár, Mátrix vegyesen).
-
-    Későbbi Bővíthetőség (Calculus): Az analízishez (pl. Szumma) csak egy új típust (pl. Type::Expression) és új VM utasításokat (pl. LoopStart, LoopEnd) kell betennünk.
-
-A Fejlesztési Terv (A Következő Lépések)
-
-Ezt a refaktort nem lehet egy lépésben megcsinálni, különben darabokra hullik a kód. Így érdemes haladni:
-
-    Fázis 1: A Registry és a Típusrendszer Kiemelése. Létrehozzuk a Type enumot és az OperatorRegistry-t. Az AST csomópontok immár nem a konkrét Domain operátorokat, hanem regisztrált operátor-azonosítókat fognak tartalmazni.
-
-    Fázis 2: A Heterogén Dataset és a Fordító (Compiler). Átírjuk a datasetet, hogy szignatúrákat ([Vector, Float]) fogadjon el, és megírjuk azt a fordítót, ami a fát Multi-Stack Bytecode-ra fordítja.
-
-    Fázis 3: Az Univerzális Multi-Stack VM. Összerakjuk a központi kiértékelőt, ami a bytecode-ot futtatja a SIMD memórián.
-
-    Fázis 4: A Heurisztika Pipeline. Bekötjük a simplifikációs lépéseket úgy, hogy több modul is végigmehessen a fán.
+Harder math, Linalg, Analysys, Num theory, (Complex analysis, Complex linalg)
 
 Fázis 2: Az Önszabályozó Meta-Motor (Dinamikus Stratégia)
 

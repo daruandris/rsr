@@ -10,8 +10,8 @@ pub fn format_ast<D: Domain>(nodes: &[Node<D>]) -> String {
     for node in nodes {
         match node {
             // A D::ScalarValue-ra kikötöttük a traitben, hogy implementálja a Display-t
-            Node::Constant(c) => stack.push(format!("{:.3}", c)),
-            Node::Variable(v) => stack.push(format!("X{}", v)),
+            Node::Constant(c,_) => stack.push(format!("{:.3}", c)),
+            Node::Variable(v,_) => stack.push(format!("X{}", v)),
             Node::Operator(op) => {
                 let arity = D::operator_arity(op);
                 let mut args = Vec::with_capacity(arity);
