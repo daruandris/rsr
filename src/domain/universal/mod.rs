@@ -95,6 +95,12 @@ impl fmt::Display for UniversalScalar {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+struct ExprInfo {
+    start_idx: usize,
+    const_val: Option<f32>,
+}
+
 // --- 5. A DOMAIN IMPLEMENTÁCIÓJA ---
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct UniversalDomain;
@@ -406,132 +412,176 @@ impl Domain for UniversalDomain {
     fn simplify(nodes: &[Node<Self>]) -> Vec<Node<Self>> {
         if nodes.is_empty() { return vec![]; }
         
-        let mut stack: Vec<Vec<Node<Self>>> = Vec::with_capacity(32);
+        let mut output = Vec::with_capacity(nodes.len());
+        let mut stack: Vec<ExprInfo> = Vec::with_capacity(32);
 
-        for node in nodes {
+        for &node in nodes {
             match node {
-                Node::Variable(_, _) | Node::Constant(_, _) => {
-                    stack.push(vec![*node]);
+                Node::Constant(val, type_id) => {
+                    let start_idx = output.len();
+                    output.push(node);
+                    let float_val = if let UniversalScalar::Float(f) = val { Some(f) } else { None };
+                    stack.push(ExprInfo { start_idx, const_val: float_val });
+                },
+                Node::Variable(_, _) => {
+                    let start_idx = output.len();
+                    output.push(node);
+                    stack.push(ExprInfo { start_idx, const_val: None });
                 },
                 Node::Operator(op) => {
-                    let arity = Self::operator_arity(op);
+                    let arity = Self::operator_arity(&op);
+                    
                     if stack.len() < arity {
-                        stack.push(vec![*node]);
+                        let start_idx = output.len();
+                        output.push(node);
+                        stack.push(ExprInfo { start_idx, const_val: None });
                         continue;
                     }
 
-                    let mut children = Vec::with_capacity(arity);
-                    for _ in 0..arity {
-                        children.push(stack.pop().unwrap());
-                    }
-                    children.reverse();
-
-                    // === 1. KONSTANS ÖSSZEVONÁS ===
-                    let all_float_const = children.iter().all(|c| {
-                        c.len() == 1 && matches!(c[0], Node::Constant(UniversalScalar::Float(_), _))
-                    });
-
-                    if all_float_const {
-                        let mut vals = Vec::new();
-                        for c in &children {
-                            if let Node::Constant(UniversalScalar::Float(v), _) = c[0] {
-                                vals.push(v);
-                            }
-                        }
-
-                        let folded = match op {
-                            UniversalOp::AddF => Some(vals[0] + vals[1]),
-                            UniversalOp::SubF => Some(vals[0] - vals[1]),
-                            UniversalOp::MulF => Some(vals[0] * vals[1]),
-                            UniversalOp::DivF => if vals[1].abs() > 1e-9 { Some(vals[0] / vals[1]) } else { None },
-                            UniversalOp::SinF => Some(vals[0].sin()),
-                            UniversalOp::CosF => Some(vals[0].cos()),
-                            UniversalOp::ExpF => Some(vals[0].exp()),
-                            UniversalOp::SqrF => Some(vals[0] * vals[0]),
-                            UniversalOp::SqrtF => Some(vals[0].abs().sqrt()),
-                            UniversalOp::LnF => Some((vals[0].abs() + 1e-9).ln()),
-                            _ => None,
-                        };
-
-                        if let Some(f) = folded {
-                            if f.is_finite() {
-                                stack.push(vec![Node::Constant(UniversalScalar::Float(f), UniversalType::Float)]);
-                                continue;
-                            }
-                        }
-                    }
-
-                    // === 2. ALGEBRAI EGYSZERŰSÍTÉSEK ===
-                    let mut simplified = false;
-
+                    // --- UNÁRIS OPERÁTOROK ---
                     if arity == 1 {
-                        let child_expr = &children[0];
-                        if let Some(Node::Operator(child_op)) = child_expr.last() {
-                            match (op, child_op) {
-                                (UniversalOp::LnF, UniversalOp::ExpF) |
-                                (UniversalOp::ExpF, UniversalOp::LnF) |
-                                (UniversalOp::SqrtF, UniversalOp::SqrF) |
-                                (UniversalOp::SqrF, UniversalOp::SqrtF) => {
-                                    let mut inner_x = child_expr.clone();
-                                    inner_x.pop(); 
-                                    stack.push(inner_x);
-                                    simplified = true;
-                                },
-                                _ => {}
+                        let arg = stack.pop().unwrap();
+                        
+                        // Konstans folding
+                        if let Some(val) = arg.const_val {
+                            let folded = match op {
+                                UniversalOp::SinF => Some(val.sin()),
+                                UniversalOp::CosF => Some(val.cos()),
+                                UniversalOp::ExpF => Some(val.exp()),
+                                UniversalOp::SqrF => Some(val * val),
+                                UniversalOp::SqrtF => Some(val.abs().sqrt()),
+                                UniversalOp::LnF => Some((val.abs() + 1e-9).ln()),
+                                _ => None,
+                            };
+                            
+                            if let Some(f) = folded {
+                                if f.is_finite() {
+                                    output.truncate(arg.start_idx); // Zero-cost visszavágás!
+                                    let new_start = output.len();
+                                    output.push(Node::Constant(UniversalScalar::Float(f), UniversalType::Float));
+                                    stack.push(ExprInfo { start_idx: new_start, const_val: Some(f) });
+                                    continue;
+                                }
                             }
                         }
-                    } else if arity == 2 {
-                        let left_is_const = children[0].len() == 1 && matches!(children[0][0], Node::Constant(UniversalScalar::Float(_), _));
-                        let right_is_const = children[1].len() == 1 && matches!(children[1][0], Node::Constant(UniversalScalar::Float(_), _));
                         
-                        let left_val = if left_is_const { if let Node::Constant(UniversalScalar::Float(v), _) = children[0][0] { v } else { 0.0 } } else { 0.0 };
-                        let right_val = if right_is_const { if let Node::Constant(UniversalScalar::Float(v), _) = children[1][0] { v } else { 0.0 } } else { 0.0 };
+                        // Algebrai egyszerűsítés (Pl: sqrt(sqr(x)))
+                        // Megnézzük az output utolsó előtti elemét
+                        if output.len() > arg.start_idx {
+                            if let Node::Operator(child_op) = output[output.len() - 1] {
+                                match (op, child_op) {
+                                    (UniversalOp::LnF, UniversalOp::ExpF) |
+                                    (UniversalOp::ExpF, UniversalOp::LnF) |
+                                    (UniversalOp::SqrtF, UniversalOp::SqrF) |
+                                    (UniversalOp::SqrF, UniversalOp::SqrtF) => {
+                                        // Visszavágjuk az operátort
+                                        output.pop();
+                                        // Nem pusholjuk a jelenlegit
+                                        stack.push(ExprInfo { start_idx: arg.start_idx, const_val: None });
+                                        continue;
+                                    },
+                                    _ => {}
+                                }
+                            }
+                        }
+
+                        output.push(node);
+                        stack.push(ExprInfo { start_idx: arg.start_idx, const_val: None });
+                    }
+                    // --- BINÁRIS OPERÁTOROK ---
+                    else if arity == 2 {
+                        let b = stack.pop().unwrap();
+                        let a = stack.pop().unwrap();
+
+                        // Konstans folding
+                        if let (Some(val_a), Some(val_b)) = (a.const_val, b.const_val) {
+                            let folded = match op {
+                                UniversalOp::AddF => Some(val_a + val_b),
+                                UniversalOp::SubF => Some(val_a - val_b),
+                                UniversalOp::MulF => Some(val_a * val_b),
+                                UniversalOp::DivF => if val_b.abs() > 1e-9 { Some(val_a / val_b) } else { None },
+                                _ => None,
+                            };
+                            
+                            if let Some(f) = folded {
+                                if f.is_finite() {
+                                    output.truncate(a.start_idx); // Zero-cost visszavágás
+                                    let new_start = output.len();
+                                    output.push(Node::Constant(UniversalScalar::Float(f), UniversalType::Float));
+                                    stack.push(ExprInfo { start_idx: new_start, const_val: Some(f) });
+                                    continue;
+                                }
+                            }
+                        }
+
+                        // Algebrai egyszerűsítések (Pl: x * 0 = 0)
+                        let b_is_zero = b.const_val.map_or(false, |v| v.abs() < 1e-6);
+                        let a_is_zero = a.const_val.map_or(false, |v| v.abs() < 1e-6);
+                        let b_is_one = b.const_val.map_or(false, |v| (v - 1.0).abs() < 1e-6);
+                        let a_is_one = a.const_val.map_or(false, |v| (v - 1.0).abs() < 1e-6);
+
+                        let are_equal = || output[a.start_idx..b.start_idx] == output[b.start_idx..];
 
                         match op {
                             UniversalOp::AddF => {
-                                if right_is_const && right_val.abs() < 1e-6 { stack.push(children[0].clone()); simplified = true; } 
-                                else if left_is_const && left_val.abs() < 1e-6 { stack.push(children[1].clone()); simplified = true; } 
+                                if b_is_zero { output.truncate(b.start_idx); stack.push(a); continue; }
+                                // Mivel RPN, az 'a' törlése bonyolultabb (memmove), azt most skipeljük, csak a tailt vágjuk
                             },
                             UniversalOp::SubF => {
-                                if right_is_const && right_val.abs() < 1e-6 { stack.push(children[0].clone()); simplified = true; } 
-                                else if children[0] == children[1] { 
-                                    stack.push(vec![Node::Constant(UniversalScalar::Float(0.0), UniversalType::Float)]); simplified = true; 
+                                if b_is_zero { output.truncate(b.start_idx); stack.push(a); continue; }
+                                if are_equal() {
+                                    output.truncate(a.start_idx);
+                                    let new_start = output.len();
+                                    output.push(Node::Constant(UniversalScalar::Float(0.0), UniversalType::Float));
+                                    stack.push(ExprInfo { start_idx: new_start, const_val: Some(0.0) });
+                                    continue;
                                 }
                             },
                             UniversalOp::MulF => {
-                                if right_is_const {
-                                    if (right_val - 1.0).abs() < 1e-6 { stack.push(children[0].clone()); simplified = true; } 
-                                    else if right_val.abs() < 1e-6 { stack.push(vec![Node::Constant(UniversalScalar::Float(0.0), UniversalType::Float)]); simplified = true; } 
-                                } else if left_is_const {
-                                    if (left_val - 1.0).abs() < 1e-6 { stack.push(children[1].clone()); simplified = true; } 
-                                    else if left_val.abs() < 1e-6 { stack.push(vec![Node::Constant(UniversalScalar::Float(0.0), UniversalType::Float)]); simplified = true; } 
+                                if b_is_one { output.truncate(b.start_idx); stack.push(a); continue; }
+                                if b_is_zero || a_is_zero {
+                                    output.truncate(a.start_idx);
+                                    let new_start = output.len();
+                                    output.push(Node::Constant(UniversalScalar::Float(0.0), UniversalType::Float));
+                                    stack.push(ExprInfo { start_idx: new_start, const_val: Some(0.0) });
+                                    continue;
                                 }
                             },
                             UniversalOp::DivF => {
-                                if right_is_const && (right_val - 1.0).abs() < 1e-6 { stack.push(children[0].clone()); simplified = true; } 
-                                else if children[0] == children[1] { 
-                                    stack.push(vec![Node::Constant(UniversalScalar::Float(1.0), UniversalType::Float)]); simplified = true; 
+                                if b_is_one { output.truncate(b.start_idx); stack.push(a); continue; }
+                                if a_is_zero {
+                                    output.truncate(a.start_idx);
+                                    let new_start = output.len();
+                                    output.push(Node::Constant(UniversalScalar::Float(0.0), UniversalType::Float));
+                                    stack.push(ExprInfo { start_idx: new_start, const_val: Some(0.0) });
+                                    continue;
                                 }
-                                else if left_is_const && left_val.abs() < 1e-6 {
-                                    stack.push(vec![Node::Constant(UniversalScalar::Float(0.0), UniversalType::Float)]); simplified = true; 
+                                if are_equal() {
+                                    output.truncate(a.start_idx);
+                                    let new_start = output.len();
+                                    output.push(Node::Constant(UniversalScalar::Float(1.0), UniversalType::Float));
+                                    stack.push(ExprInfo { start_idx: new_start, const_val: Some(1.0) });
+                                    continue;
                                 }
                             },
                             _ => {}
                         }
-                    }
 
-                    if !simplified {
-                        let mut subtree = Vec::new();
-                        for mut child in children {
-                            subtree.append(&mut child);
-                        }
-                        subtree.push(*node);
-                        stack.push(subtree);
+                        output.push(node);
+                        stack.push(ExprInfo { start_idx: a.start_idx, const_val: None });
+                    } 
+                    // --- 3 ARITY OPERÁTOROK ---
+                    else {
+                        for _ in 0..arity { stack.pop(); }
+                        let start_idx = if output.len() > arity { output.len() - arity } else { 0 }; // Ez durva becslés, ha kell 3 arity egyszerűsítés, ide jöhet
+                        output.push(node);
+                        stack.push(ExprInfo { start_idx, const_val: None });
                     }
                 }
             }
         }
-        stack.pop().unwrap_or_else(|| nodes.to_vec())
+        
+        output
     }
 
     #[inline(always)]

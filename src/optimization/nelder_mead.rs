@@ -28,13 +28,20 @@ pub fn optimize_individual_constants<D: Domain>(
     let start_mse = D::compute_mse(&program.code, &program.constants, dataset);
     simplex.push((start_mse, start_consts_f32.clone()));
 
+    //zero-cost allocation
+    let update_constants = |prog_consts: &mut Vec<D::ScalarValue>, new_vals: &[f32]| {
+        for (i, &v) in new_vals.iter().enumerate() {
+            prog_consts[i] = D::scalar_from_f32(v);
+        }
+    };
+
     for i in 0..n {
         let mut new_point = start_consts_f32.clone();
         let val = new_point[i];
         let step = if val.abs() < 1e-4 { 0.01 } else { val * 0.10 };
         new_point[i] += step;
         
-        program.constants = new_point.iter().map(|&x| D::scalar_from_f32(x)).collect(); 
+        update_constants(&mut program.constants, &new_point);
         let mse = D::compute_mse(&program.code, &program.constants, dataset);
         simplex.push((mse, new_point));
     }
@@ -63,7 +70,7 @@ pub fn optimize_individual_constants<D: Domain>(
 
         // --- REFLECTION ---
         for j in 0..n { reflected[j] = centroid[j] + ALPHA * (centroid[j] - worst_point[j]); }
-        program.constants = reflected.iter().map(|&x| D::scalar_from_f32(x)).collect();
+        update_constants(&mut program.constants, &reflected);
         let reflected_mse = D::compute_mse(&program.code, &program.constants, dataset);
 
         if reflected_mse >= best_mse && reflected_mse < second_worst_mse {
@@ -74,7 +81,7 @@ pub fn optimize_individual_constants<D: Domain>(
         // --- EXPANSION ---
         if reflected_mse < best_mse {
             for j in 0..n { expanded[j] = centroid[j] + GAMMA * (reflected[j] - centroid[j]); }
-            program.constants = expanded.iter().map(|&x| D::scalar_from_f32(x)).collect();
+            update_constants(&mut program.constants, &expanded);
             let expanded_mse = D::compute_mse(&program.code, &program.constants, dataset);
 
             if expanded_mse < reflected_mse { simplex[n] = (expanded_mse, expanded.clone()); } 
@@ -91,7 +98,7 @@ pub fn optimize_individual_constants<D: Domain>(
             worst_mse
         };
 
-        program.constants = contracted.iter().map(|&x| D::scalar_from_f32(x)).collect();
+        update_constants(&mut program.constants, &contracted);
         let contracted_mse = D::compute_mse(&program.code, &program.constants, dataset);
 
         if contracted_mse < limit_mse {
@@ -103,13 +110,13 @@ pub fn optimize_individual_constants<D: Domain>(
         let best_point = simplex[0].1.clone();
         for i in 1..=n {
             for j in 0..n { simplex[i].1[j] = best_point[j] + SIGMA * (simplex[i].1[j] - best_point[j]); }
-            program.constants = simplex[i].1.iter().map(|&x| D::scalar_from_f32(x)).collect();
+            update_constants(&mut program.constants, &simplex[i].1);
             simplex[i].0 = D::compute_mse(&program.code, &program.constants, dataset);
         }
     }
 
     simplex.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-    program.constants = simplex[0].1.iter().map(|&x| D::scalar_from_f32(x)).collect();
+    update_constants(&mut program.constants, &simplex[0].1);
     
     let best_consts = &program.constants;
     let mut const_idx = 0;
