@@ -250,20 +250,23 @@ impl Domain for UniversalDomain {
     #[inline(always)] fn constant_type() -> Self::TypeId { UniversalType::Float }
 
     fn random_operator(
-        target_type: Self::TypeId, 
-        allowed_ops: &[Self::Operator], 
-        parent_op: Option<Self::Operator>,
-        rng: &mut impl RngExt
-    ) -> Option<Self::Operator> {
-        let forbidden = parent_op.map(|p| p.forbidden_children()).unwrap_or(&[]);
-        let valid_ops: Vec<Self::Operator> = allowed_ops.iter()
-            .copied()
-            .filter(|op| Self::return_type(op) == target_type && !forbidden.contains(op))
-            .collect();
-
-        if valid_ops.is_empty() { return None; }
-        Some(valid_ops[rng.random_range(0..valid_ops.len())])
-    }
+    target_type: Self::TypeId, 
+    allowed_ops: &[Self::Operator], 
+    parent_op: Option<Self::Operator>,
+    rng: &mut impl RngExt
+) -> Option<Self::Operator> {
+    let forbidden = parent_op.map(|p| p.forbidden_children()).unwrap_or(&[]);
+    let valid_count = allowed_ops.iter()
+        .copied()
+        .filter(|op| Self::return_type(op) == target_type && !forbidden.contains(op))
+        .count();
+    if valid_count == 0 { return None; }
+    let chosen_idx = rng.random_range(0..valid_count);
+    allowed_ops.iter()
+        .copied()
+        .filter(|op| Self::return_type(op) == target_type && !forbidden.contains(op))
+        .nth(chosen_idx)
+}
 
     fn random_constant(target_type: Self::TypeId, rng: &mut impl RngExt) -> Option<Self::ScalarValue> {
         match target_type {
