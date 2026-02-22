@@ -35,7 +35,7 @@ pub trait Domain: Clone + Copy + Send + Sync + PartialEq + 'static {
     fn perturb_constant(val: &mut Self::ScalarValue, rng: &mut impl RngExt);
     
     // A Nelder-Mead (ami belsőleg f32-vel matekozik) konverzióihoz:
-    fn scalar_to_f32(val: &Self::ScalarValue) -> f32;
+    fn scalar_to_f32(val: &Self::ScalarValue) -> Option<f32>;
     fn scalar_from_f32(val: f32) -> Self::ScalarValue;
 
     // --- HIBA SZÁMÍTÁS (A régi mse.rs helyett!) ---

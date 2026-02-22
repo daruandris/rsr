@@ -253,7 +253,8 @@ impl Domain for UniversalDomain {
         }
     }
 
-    #[inline(always)] fn scalar_to_f32(val: &Self::ScalarValue) -> f32 { if let UniversalScalar::Float(f) = val { *f } else { 0.0 } }
+    #[inline(always)] fn scalar_to_f32(val: &Self::ScalarValue) ->Option<f32> {
+         if let UniversalScalar::Float(f) = val { Some(*f) } else { None } }
     #[inline(always)] fn scalar_from_f32(val: f32) -> Self::ScalarValue { UniversalScalar::Float(val) }
 
     fn simplify(nodes: &[Node<Self>]) -> Vec<Node<Self>> {
@@ -406,6 +407,18 @@ impl Domain for UniversalDomain {
                 UniversalInstruction::LoadConstV3(idx) => unsafe {
                     if let UniversalScalar::Vec3(val) = constants.get_unchecked(*idx as usize) { *stack_v3.get_unchecked_mut(sp_v3) = [f32x4::splat(val[0]), f32x4::splat(val[1]), f32x4::splat(val[2])]; }
                     sp_v3 += 1;
+                },
+                UniversalInstruction::LoadConstM2(idx) => unsafe {
+                    if let UniversalScalar::Mat2(val) = constants.get_unchecked(*idx as usize) { 
+                        *stack_m2.get_unchecked_mut(sp_m2) = [f32x4::splat(val[0]), f32x4::splat(val[1]), f32x4::splat(val[2]), f32x4::splat(val[3])]; 
+                    }
+                    sp_m2 += 1;
+                },
+                UniversalInstruction::LoadConstM3(idx) => unsafe {
+                    if let UniversalScalar::Mat3(val) = constants.get_unchecked(*idx as usize) { 
+                        *stack_m3.get_unchecked_mut(sp_m3) = [f32x4::splat(val[0]), f32x4::splat(val[1]), f32x4::splat(val[2]), f32x4::splat(val[3]), f32x4::splat(val[4]), f32x4::splat(val[5]), f32x4::splat(val[6]), f32x4::splat(val[7]), f32x4::splat(val[8])]; 
+                    }
+                    sp_m3 += 1;
                 },
 
                 // --- BASIC ---
