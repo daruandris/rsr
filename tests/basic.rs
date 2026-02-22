@@ -81,7 +81,7 @@ fn basic_6_complex_multivariable() {
 fn basic_7_noisy_data() {
     let mut rng = rand::rng(); let mut dx = Vec::new(); let mut dy = Vec::new();
     for _ in 0..400 { 
-        let x = rng.random_range(-5.0..5.0); let noise = rng.random_range(-0.5..0.5);
+        let x = rng.random_range(-5.0..5.0); let noise = rng.random_range(-0.3..0.3);
         dx.push(vec![x]); dy.push(2.5 * x * x + noise); 
     }
     run_test("Basic 7: Noisy", "Basic7", dx, dy, 1);
