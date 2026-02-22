@@ -163,12 +163,12 @@ use crate::domain::universal::UniversalOp;
 
 pub fn format_op(op: UniversalOp, args: &[String]) -> Option<String> {
     match op {
-        UniversalOp::MakeVec2 => Some(format!("vec2({}, {})", args[0], args[1])),
-        UniversalOp::MakeVec3 => Some(format!("vec3({}, {}, {})", args[0], args[1], args[2])),
+        UniversalOp::MakeVec2 => Some(format!("({}, {})", args[0], args[1])),
+        UniversalOp::MakeVec3 => Some(format!("({}, {}, {})", args[0], args[1], args[2])),
         UniversalOp::GetXV2 | UniversalOp::GetXV3 => Some(format!("{}.x", args[0])),
         UniversalOp::GetYV2 | UniversalOp::GetYV3 => Some(format!("{}.y", args[0])),
         UniversalOp::GetZV3 => Some(format!("{}.z", args[0])),
-        UniversalOp::DotV2 | UniversalOp::DotV3 => Some(format!("({} • {})", args[0], args[1])),
+        UniversalOp::DotV2 | UniversalOp::DotV3 => Some(format!("<{} • {}>", args[0], args[1])),
         UniversalOp::CrossV3 => Some(format!("({} x {})", args[0], args[1])),
         UniversalOp::NormV2 | UniversalOp::NormV3 => Some(format!("||{}||", args[0])),
         UniversalOp::ScaleV2 | UniversalOp::ScaleV3 | UniversalOp::ScaleM2 | UniversalOp::ScaleM3 => Some(format!("({} * {})", args[0], args[1])),
@@ -176,6 +176,8 @@ pub fn format_op(op: UniversalOp, args: &[String]) -> Option<String> {
         UniversalOp::TransposeM2 | UniversalOp::TransposeM3 => Some(format!("{}^T", args[0])),
         UniversalOp::DetM2 | UniversalOp::DetM3 => Some(format!("det({})", args[0])),
         UniversalOp::TraceM2 | UniversalOp::TraceM3 => Some(format!("tr({})", args[0])),
+        UniversalOp::AddV2 | UniversalOp::AddV3 | UniversalOp::AddM2 | UniversalOp::AddM3 => Some(format!("({} + {})", args[0], args[1])),
+        UniversalOp::SubV2 | UniversalOp::SubV3 | UniversalOp::SubM2 | UniversalOp::SubM3 => Some(format!("({} + {})", args[0], args[1])),
         _ => None,
     }
 }
