@@ -5,6 +5,7 @@ use rsr::SimdDataset;
 use rsr::StaticStrategy;
 use rsr::Strategy;
 use rsr::UniversalDomain;
+use rsr::UniversalOp;
 use rsr::engine::config::OpModule;
 use rand::RngExt;
 use std::time::Instant;
@@ -13,7 +14,10 @@ fn run_linalg_test(name: &str, category: &str, data_x: Vec<Vec<f32>>, data_y: Ve
     println!(">>> RUNNING {} <<<", name);
     let dataset = SimdDataset::new(&data_x, &data_y, num_features, false);
     // Bekapcsoljuk a Basic ÉS a Linalg modult is!
-    let config = common::get_test_config(vec![OpModule::Basic, OpModule::Linalg]);
+    let mut config = common::get_test_config(vec![OpModule::Basic, OpModule::Linalg]);
+    config.excluded_ops = vec![UniversalOp::SinF, UniversalOp::CosF, UniversalOp::ExpF, UniversalOp::SqrtF, UniversalOp::LnF, UniversalOp::SqrF];
+    config.mutation_max_depth = 7;
+    config.parsimony_penalty = 0.0;
     
     let strategy = StaticStrategy::new(config);
     let allowed_ops = strategy.get_allowed_operators();

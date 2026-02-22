@@ -1,3 +1,5 @@
+#![allow(unsafe_op_in_unsafe_fn)]
+
 use wide::{f32x4, CmpLt};
 use crate::domain::universal::{UniversalOp, UniversalScalar, SimplifyAction};
 // --- VEKTOR KONSTRUKTOROK ÉS GETTEREK ---

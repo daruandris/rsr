@@ -38,6 +38,13 @@ impl UniversalOp {
             UniversalOp::SqrtF => &[UniversalOp::SqrtF, UniversalOp::SqrF],
             UniversalOp::SqrF => &[UniversalOp::SqrF, UniversalOp::SqrtF],
             UniversalOp::LnF => &[UniversalOp::LnF, UniversalOp::ExpF],
+            //linalg
+            UniversalOp::TransposeM2 => &[UniversalOp::TransposeM2],
+            UniversalOp::TransposeM3 => &[UniversalOp::TransposeM3],
+            UniversalOp::InverseM2 => &[UniversalOp::InverseM2],
+            UniversalOp::InverseM3 => &[UniversalOp::InverseM3],
+            UniversalOp::GetXV2 | UniversalOp::GetYV2 => &[UniversalOp::MakeVec2],
+            UniversalOp::GetXV3 | UniversalOp::GetYV3 | UniversalOp::GetZV3 => &[UniversalOp::MakeVec3],
             _ => &[],
         }
     }
@@ -384,12 +391,20 @@ impl Domain for UniversalDomain {
 
     #[inline(always)]
     fn eval_simd(code: &[Self::Instruction], constants: &[Self::ScalarValue], features: &[Self::SimdValue]) -> Self::SimdValue {
-        let mut stack_f: [f32x4; 32] = [f32x4::splat(0.0); 32]; let mut sp_f: usize = 0;
-        let mut stack_v2: [[f32x4; 2]; 32] = [[f32x4::splat(0.0); 2]; 32]; let mut sp_v2: usize = 0;
-        let mut stack_v3: [[f32x4; 3]; 32] = [[f32x4::splat(0.0); 3]; 32]; let mut sp_v3: usize = 0;
-        let mut stack_m2: [[f32x4; 4]; 32] = [[f32x4::splat(0.0); 4]; 32]; let mut sp_m2: usize = 0;
-        let mut stack_m3: [[f32x4; 9]; 32] = [[f32x4::splat(0.0); 9]; 32]; let mut sp_m3: usize = 0;
-
+        let mut stack_f: [f32x4; 32] = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
+        let mut sp_f: usize = 0;
+        
+        let mut stack_v2: [[f32x4; 2]; 32] = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
+        let mut sp_v2: usize = 0;
+        
+        let mut stack_v3: [[f32x4; 3]; 32] = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
+        let mut sp_v3: usize = 0;
+        
+        let mut stack_m2: [[f32x4; 4]; 32] = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
+        let mut sp_m2: usize = 0;
+        
+        let mut stack_m3: [[f32x4; 9]; 32] = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
+        let mut sp_m3: usize = 0;
         for op in code {
             match op {
                 UniversalInstruction::LoadVarF(idx) => unsafe { *stack_f.get_unchecked_mut(sp_f) = *features.get_unchecked(*idx as usize); sp_f += 1; },

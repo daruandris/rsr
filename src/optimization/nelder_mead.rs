@@ -123,12 +123,17 @@ pub fn optimize_individual_constants<D: Domain>(
     simplex[0..=n].sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
     update_constants(&mut program.constants, &simplex[0].1);
     
-    // Szinkronizálás az AST csomópontokkal (csak Floatokat írjuk vissza)
     let best_consts = &program.constants;
-    for (_, &idx) in opt_indices.iter().enumerate().take(n) {
-        if let crate::ast::node::Node::Constant(val, _) = &mut ind.nodes[idx] {
-            *val = best_consts[idx]; // Az új lebegőpontos értéket írjuk be
+    let mut const_idx = 0;
+    
+    for node in ind.nodes.iter_mut() {
+        if let crate::ast::node::Node::Constant(val, _) = node {
+            if const_idx < best_consts.len() {
+                *val = best_consts[const_idx];
+                const_idx += 1;
+            }
         }
     }
+    
     ind.fitness = simplex[0].0;
 }
