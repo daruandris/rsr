@@ -31,7 +31,8 @@ pub struct BenchmarkEntry {
     pub linalg4_mse: Option<f32>, pub linalg4_time_ms: Option<u64>,
 }
 
-pub fn update_history(category: &str, mse: f32, time_ms: u64) {
+pub fn update_history(category: &str, mut mse: f32, time_ms: u64) {
+    if mse == 0.0 {mse = 1e-8;}
     let file_path = "benchmark_history.js";
     let prefix = "const benchmarkHistory = ";
     let suffix = ";";

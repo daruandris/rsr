@@ -10,9 +10,8 @@ use rsr::engine::config::OpModule;
 use rand::RngExt;
 use std::time::Instant;
 
-fn run_linalg_test(name: &str, category: &str, data_x: Vec<Vec<f32>>, data_y: Vec<f32>, num_features: u8) {
+fn run_linalg_test(name: &str, category: &str, data_x: Vec<Vec<f32>>, data_y: Vec<f32>, feature_types: Vec<UniversalType>) {
     println!(">>> RUNNING {} <<<", name);
-    let feature_types = vec![UniversalType::Float; num_features as usize];
     let dataset = SimdDataset::new(&data_x, &data_y, feature_types, false);
     // Bekapcsoljuk a Basic ÉS a Linalg modult is!
     let mut config = common::get_test_config(vec![OpModule::Basic, OpModule::Linalg]);
@@ -48,7 +47,7 @@ fn linalg_1_distance_3d() {
         let dist = ((x0-x3).powi(2) + (x1-x4).powi(2) + (x2-x5).powi(2)).sqrt();
         dy.push(dist); 
     }
-    run_linalg_test("Linalg 1: 3D Distance", "Linalg1", dx, dy, 6);
+    run_linalg_test("Linalg 1: 3D Distance", "Linalg1", dx, dy, vec![UniversalType::Vec3, UniversalType::Vec3]);
 }
 
 #[test]
@@ -62,7 +61,7 @@ fn linalg_2_determinant_2x2() {
         
         dy.push(x0*x3 - x1*x2); 
     }
-    run_linalg_test("Linalg 2: 2x2 Determinant", "Linalg2", dx, dy, 4);
+    run_linalg_test("Linalg 2: 2x2 Determinant", "Linalg2", dx, dy, vec![UniversalType::Mat2]);
 }
 
 #[test]
@@ -76,7 +75,7 @@ fn linalg_3_dot_product_2d() {
         
         dy.push(x0*x2 + x1*x3); 
     }
-    run_linalg_test("Linalg 3: 2D Dot Product", "Linalg3", dx, dy, 4);
+    run_linalg_test("Linalg 3: 2D Dot Product", "Linalg3", dx, dy, vec![UniversalType::Vec2, UniversalType::Vec2]);
 }
 
 #[test]
@@ -93,5 +92,5 @@ fn linalg_4_cross_product_norm_3d() {
         let cz = x0*x4 - x1*x3;
         dy.push((cx*cx + cy*cy + cz*cz).sqrt()); 
     }
-    run_linalg_test("Linalg 4: 3D Cross Product Norm", "Linalg4", dx, dy, 6);
+    run_linalg_test("Linalg 4: 3D Cross Product Norm", "Linalg4", dx, dy, vec![UniversalType::Vec3, UniversalType::Vec3]);
 }
