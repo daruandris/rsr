@@ -1,9 +1,10 @@
+// src/main.rs
 use rsr::EvolutionConfig;
 use rsr::Engine;
 use rsr::SimdDataset;
 use rsr::StaticStrategy;
 use rsr::Strategy;
-use rsr::{UniversalDomain, UniversalType};
+use rsr::{UniversalDomain, UniversalType, UniversalOp};
 use rsr::ffi::symengine::simplify_symengine;
 use rsr::engine::config::OpModule;
 use rand::RngExt;
@@ -13,11 +14,11 @@ fn get_config() -> EvolutionConfig {
     EvolutionConfig {
         num_islands: 24,
         island_size: 25,
-        max_generations: 5000,   
+        max_generations: 6000,   
         crossover_rate: 0.10,
         tournament_size: 2,
         migration_interval: 25,
-        parsimony_penalty: 0.000005,
+        parsimony_penalty: 0.00000,
 
         opt_prob: 0.2,
         opt_iterations: 100,
@@ -30,34 +31,81 @@ fn get_config() -> EvolutionConfig {
         random_injection_rate: 0.10,
         min_random_injection: 2,
         max_tree_size: 32,
-        mutation_max_depth: 4,
+        mutation_max_depth: 7,
         mutation_cycles: 5,
         verbose: true,
-        allowed_modules: vec![OpModule::Basic],
-        custom_ops: vec![], excluded_ops: vec![],
+       
+        // Linalg és Basic modul engedélyezve
+        allowed_modules: vec![OpModule::Basic, OpModule::Linalg],
+        custom_ops: vec![], 
+        excluded_ops: vec![
+        ], // Ezzel drasztikusan felgyorsítod a keresést!
     }
 }
 
-fn run_benchmark(
-    name: &str, 
-    data_x: Vec<Vec<f32>>, 
-    data_y: Vec<f32>, 
-    num_features: u8,
-    expected_noise_mse: Option<f32>
-) {
-    println!("\n========================================================");
-    println!(">>> RUNNING BENCHMARK: {} <<<", name);
-    println!("Features: {}, Samples: {}", num_features, data_x.len());
+// -----------------------------------------------------------------------------
+// ADATGENERÁLÁS KÉPLET NÉLKÜL: Numerikus szimuláció
+// -----------------------------------------------------------------------------
+// Ez a függvény nem egy zárt egyenletet használ! Lépésről lépésre szimulálja 
+// a gravitációt (Euler módszerrel). Nincs ismert véges képlet a végeredményre.
+fn simulate_3body_final_distance(
+    mut p: [[f32; 3]; 3], 
+    mut v: [[f32; 3]; 3]
+) -> f32 {
+    let dt = 0.01;
+    let steps = 100_000; // t = 1.0 másodperc szimulálása
+    let g = 1.0;     // Gravitációs állandó
+    let m = [1.0, 1.0, 1.0]; // Tömegek (legyenek azonosak az egyszerűség kedvéért)
 
-    let feature_types = vec![UniversalType::Float; num_features as usize];
-    let dataset = SimdDataset::new(&data_x, &data_y, feature_types, true);
-    let mut config = get_config();
-    
-    if let Some(noise_mse) = expected_noise_mse {
-        config.target_mse = noise_mse;
-        println!("Note: Noisy data detected. Adjusted Target MSE to {:.6}", noise_mse);
+    for _ in 0..steps {
+        let mut f = [[0.0; 3]; 3];
+        // Erők kiszámítása (Newton féle gravitáció)
+        for i in 0..3 {
+            for j in 0..3 {
+                if i != j {
+                    let dx = p[j][0] - p[i][0];
+                    let dy = p[j][1] - p[i][1];
+                    let dz = p[j][2] - p[i][2];
+                    
+                    // Pici hozzáadás (softening), hogy ne szálljon el nullával osztásnál, ha ütköznek
+                    let dist_sq = dx*dx + dy*dy + dz*dz + 0.01; 
+                    let dist = dist_sq.sqrt();
+                    
+                    let force = (g * m[i] * m[j]) / dist_sq;
+                    
+                    f[i][0] += force * (dx / dist);
+                    f[i][1] += force * (dy / dist);
+                    f[i][2] += force * (dz / dist);
+                }
+            }
+        }
+        
+        // Pozíciók és sebességek frissítése
+        for i in 0..3 {
+            v[i][0] += (f[i][0] / m[i]) * dt;
+            v[i][1] += (f[i][1] / m[i]) * dt;
+            v[i][2] += (f[i][2] / m[i]) * dt;
+            
+            p[i][0] += v[i][0] * dt;
+            p[i][1] += v[i][1] * dt;
+            p[i][2] += v[i][2] * dt;
+        }
     }
+    
+    // A cél: Mi lesz a távolság a 0. és 1. test között a szimuláció végén?
+    let dx = p[1][0] - p[0][0];
+    let dy = p[1][1] - p[0][1];
+    let dz = p[1][2] - p[0][2];
+    (dx*dx + dy*dy + dz*dz).sqrt()
+}
 
+fn run_open_problem_benchmark(name: &str, data_x: Vec<Vec<f32>>, data_y: Vec<f32>, feature_types: Vec<UniversalType>) {
+    println!("\n========================================================");
+    println!(">>> RUNNING OPEN PROBLEM: {} <<<", name);
+    println!("Samples: {}", data_x.len());
+
+    let dataset = SimdDataset::new(&data_x, &data_y, feature_types, true);
+    let config = get_config();
     let strategy = StaticStrategy::new(config);
     let allowed_ops = strategy.get_allowed_operators();
 
@@ -72,10 +120,10 @@ fn run_benchmark(
     println!("Time taken: {:?}", duration);
     
     let pareto_front = engine.get_pareto_front();
-    println!("{:<6} | {:<15} | {}", "Compl", "MSE", "Simplified Expression");
+    println!("{:<6} | {:<15} | {}", "Compl", "MSE", "Discovered Equation");
     println!("--------------------------------------------------------");
     
-    let display_count = pareto_front.len().min(10);
+    let display_count = pareto_front.len();
     for (complexity, mse, ind) in pareto_front.into_iter().take(display_count) {
         let raw_eq = ind.to_string();
         let clean_eq = simplify_symengine(&raw_eq); 
@@ -86,121 +134,49 @@ fn run_benchmark(
 
 fn main() {
     let mut rng = rand::rng();
-    let n = 400; // Minták száma
+    let n = 400; // 500 egyedi univerzum-kifutás
 
-    // ----------------------------------------------------------------------
-    // 1. Egyszerű Négyzetes: y = 2.5 * x^2 - 1.2
-    let mut dx1 = Vec::new(); let mut dy1 = Vec::new();
-    for _ in 0..n {
-        let x = rng.random_range(-5.0..5.0);
-        dx1.push(vec![x]);
-        dy1.push(2.5 * x * x - 1.2);
-    }
-    run_benchmark("1. Simple Square (Sqr)", dx1, dy1, 1, None);
+    let mut dx = Vec::with_capacity(n);
+    let mut dy = Vec::with_capacity(n);
 
-    // ----------------------------------------------------------------------
-    // 2. Egyszerű Trigonometria: y = 3.0 * cos(2.0 * x) + 1.0
-    let mut dx2 = Vec::new(); let mut dy2 = Vec::new();
+    println!("Generating ground-truth data via numerical simulation...");
     for _ in 0..n {
-        let x: f32 = rng.random_range(-3.14..3.14);
-        dx2.push(vec![x]);
-        dy2.push(3.0 * (2.0 * x).cos() + 1.0);
-    }
-    run_benchmark("2. Simple Trigonometry (Cos)", dx2, dy2, 1, None);
+        // Véletlenszerű kezdeti pozíciók (-5.0 .. 5.0)
+        let p = [
+            [rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0)],
+            [rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0)],
+            [rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0)],
+        ];
+        
+        // Véletlenszerű kezdeti sebességek (-1.0 .. 1.0)
+        let v = [
+            [rng.random_range(-1.0..1.0), rng.random_range(-1.0..1.0), rng.random_range(-1.0..1.0)],
+            [rng.random_range(-1.0..1.0), rng.random_range(-1.0..1.0), rng.random_range(-1.0..1.0)],
+            [rng.random_range(-1.0..1.0), rng.random_range(-1.0..1.0), rng.random_range(-1.0..1.0)],
+        ];
 
-    // ----------------------------------------------------------------------
-    // 3. Egyszerű Exponenciális: y = 1.5 * exp(0.5 * x)
-    let mut dx3 = Vec::new(); let mut dy3 = Vec::new();
-    for _ in 0..n {
-        let x: f32 = rng.random_range(-2.0..4.0);
-        dx3.push(vec![x]);
-        dy3.push(1.5 * (0.5 * x).exp());
-    }
-    run_benchmark("3. Simple Exponential (Exp)", dx3, dy3, 1, None);
+        // "Megmérjük" a valóságot a szimulátorral
+        let final_distance = simulate_3body_final_distance(p, v);
 
-    // ----------------------------------------------------------------------
-    // 4. Bonyolult Egyváltozós: y = exp(-0.5 * x) * cos(3.0 * x)
-    let mut dx4 = Vec::new(); let mut dy4 = Vec::new();
-    for _ in 0..n {
-        let x: f32 = rng.random_range(0.0..10.0);
-        dx4.push(vec![x]);
-        dy4.push((-0.5 * x).exp() * (3.0 * x).cos());
+        // Bemeneti vektorok ellapítása a SR motornak (6 db Vec3 = 18 float)
+        let mut row = Vec::with_capacity(18);
+        row.extend_from_slice(&p[0]); row.extend_from_slice(&p[1]); row.extend_from_slice(&p[2]);
+        row.extend_from_slice(&v[0]); row.extend_from_slice(&v[1]); row.extend_from_slice(&v[2]);
+        
+        dx.push(row);
+        dy.push(final_distance);
     }
-    run_benchmark("4. Complex 1D (Damped Osc.)", dx4, dy4, 1, None);
 
-    // ----------------------------------------------------------------------
-    // 5. Egyszerű Többváltozós: y = 2.0*x0 - 3.5*x1 + 1.2*x2
-    let mut dx5 = Vec::new(); let mut dy5 = Vec::new();
-    for _ in 0..n {
-        let x0 = rng.random_range(-5.0..5.0);
-        let x1 = rng.random_range(-5.0..5.0);
-        let x2 = rng.random_range(-5.0..5.0);
-        dx5.push(vec![x0, x1, x2]);
-        dy5.push(2.0 * x0 - 3.5 * x1 + 1.2 * x2);
-    }
-    run_benchmark("5. Simple Multivariable (Linear)", dx5, dy5, 3, None);
+    // Elmondjuk a motornak, hogy a 18 float valójában 6 darab 3D vektor
+    let feature_types = vec![
+        UniversalType::Vec3, UniversalType::Vec3, UniversalType::Vec3, // P0, P1, P2
+        UniversalType::Vec3, UniversalType::Vec3, UniversalType::Vec3  // V0, V1, V2
+    ];
 
-    // ----------------------------------------------------------------------
-    // 6. Bonyolult Többváltozós: y = x0^2 + sin(x1) - x2
-    let mut dx6 = Vec::new(); let mut dy6 = Vec::new();
-    for _ in 0..n {
-        let x0 = rng.random_range(-3.0..3.0);
-        let x1: f32 = rng.random_range(-3.14..3.14);
-        let x2 = rng.random_range(-5.0..5.0);
-        dx6.push(vec![x0, x1, x2]);
-        dy6.push(x0 * x0 + x1.sin() - x2);
-    }
-    run_benchmark("6. Complex Multivariable", dx6, dy6, 3, None);
-
-    // ----------------------------------------------------------------------
-    // 7. Zajos Adat: y = 2.5 * x^2 + noise(-0.5..0.5)
-    let mut dx7 = Vec::new(); let mut dy7 = Vec::new();
-    for _ in 0..n {
-        let x = rng.random_range(-5.0..5.0);
-        let noise = rng.random_range(-0.5..0.5);
-        dx7.push(vec![x]);
-        dy7.push(2.5 * x * x + noise);
-    }
-    // Noise range 1.0 -> Variance (Expected MSE) = 1.0^2 / 12 = 0.0833
-    // Mivel az adataid Z-score normalizálva lesznek belül, az elvárt MSE is skálázódik, 
-    // de hagyjuk None-on, és nézzük meg, hol áll meg.
-    run_benchmark("7. Noisy Data (Robustness)", dx7, dy7, 1, None); 
-
-    // ----------------------------------------------------------------------
-    // 8. Rejtett Dimenziók: 5 bemenet, de csak 2 számít (y = x0 * x3)
-    let mut dx8 = Vec::new(); let mut dy8 = Vec::new();
-    for _ in 0..n {
-        let x0 = rng.random_range(-5.0..5.0);
-        let x1 = rng.random_range(-5.0..5.0);
-        let x2 = rng.random_range(-5.0..5.0);
-        let x3 = rng.random_range(-5.0..5.0);
-        let x4 = rng.random_range(-5.0..5.0); 
-        dx8.push(vec![x0, x1, x2, x3, x4]);
-        dy8.push(x0 * x3);
-    }
-    run_benchmark("8. Hidden Dimensions (Feature Select)", dx8, dy8, 5, None);
-
-    // ----------------------------------------------------------------------
-    // 9. Racionális Törtfüggvény: y = (x0 + 1.5) / (x0^2 + 2.0)
-    let mut dx9 = Vec::new(); let mut dy9 = Vec::new();
-    for _ in 0..n {
-        let x = rng.random_range(-5.0..5.0);
-        dx9.push(vec![x]);
-        dy9.push((x + 1.5) / (x * x + 2.0));
-    }
-    run_benchmark("9. Rational Function (Div)", dx9, dy9, 1, None);
-
-    // ----------------------------------------------------------------------
-    // 10. "Minden Egyben": y = exp(-x0) + cos(x1) - (x2^2 / (x3 + 1.1))
-    // Csel: az adathatárt úgy állítjuk, hogy a nevező ne lehessen 0.
-    let mut dx10 = Vec::new(); let mut dy10 = Vec::new();
-    for _ in 0..n {
-        let x0: f32 = rng.random_range(0.0..3.0);
-        let x1: f32 = rng.random_range(-3.14..3.14);
-        let x2 = rng.random_range(-3.0..3.0);
-        let x3 = rng.random_range(0.0..5.0);
-        dx10.push(vec![x0, x1, x2, x3]);
-        dy10.push((-x0).exp() + x1.cos() - ((x2 * x2) / (x3 + 1.1)));
-    }
-    run_benchmark("10. Ultimate Multivariable All-Ops", dx10, dy10, 4, None);
+    run_open_problem_benchmark(
+        "General 3-Body Problem (Finding closed-form approx)", 
+        dx, 
+        dy, 
+        feature_types
+    );
 }

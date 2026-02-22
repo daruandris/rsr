@@ -105,8 +105,19 @@ impl fmt::Display for UniversalScalar {
             UniversalScalar::Bool(val) => write!(f, "{}", val),
             UniversalScalar::Vec2(arr) => write!(f, "[{:.2}, {:.2}]", arr[0], arr[1]),
             UniversalScalar::Vec3(arr) => write!(f, "[{:.2}, {:.2}, {:.2}]", arr[0], arr[1], arr[2]),
-            UniversalScalar::Mat2(_) => write!(f, "[Mat2]"),
-            UniversalScalar::Mat3(_) => write!(f, "[Mat3]"),
+            UniversalScalar::Mat2(m) => write!(
+                f, 
+                "[{:.2}, {:.2}; {:.2}, {:.2}]", 
+                m[0], m[2], // 1. sor
+                m[1], m[3]  // 2. sor
+            ),
+            UniversalScalar::Mat3(m) => write!(
+                f, 
+                "[{:.2}, {:.2}, {:.2}; {:.2}, {:.2}, {:.2}; {:.2}, {:.2}, {:.2}]", 
+                m[0], m[3], m[6], // 1. sor
+                m[1], m[4], m[7], // 2. sor
+                m[2], m[5], m[8]  // 3. sor
+            ),
         }
     }
 }
