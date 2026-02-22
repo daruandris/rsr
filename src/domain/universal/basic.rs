@@ -1,6 +1,5 @@
 use wide::{f32x4, CmpLt};
-use crate::domain::universal::UniversalOp;
-
+use crate::domain::universal::{UniversalOp, UniversalScalar, SimplifyAction};
 // --- SIMD KIÉRTÉKELÉS ---
 
 #[inline(always)] pub unsafe fn eval_add_f(sp_f: &mut usize, stack_f: &mut [f32x4; 32]) {
@@ -54,26 +53,64 @@ pub fn format_op(op: UniversalOp, args: &[String]) -> Option<String> {
     }
 }
 
-// --- KONSTANS FOLDING DELEGÁLÁS (Simplify számára) ---
-
-pub fn fold_unary_const(op: UniversalOp, val: f32) -> Option<f32> {
-    match op {
-        UniversalOp::SinF => Some(val.sin()),
-        UniversalOp::CosF => Some(val.cos()),
-        UniversalOp::ExpF => Some(val.exp()),
-        UniversalOp::SqrF => Some(val * val),
-        UniversalOp::SqrtF => Some(val.abs().sqrt()),
-        UniversalOp::LnF => Some((val.abs() + 1e-9).ln()),
-        _ => None,
+// --- BASIC ALGEBRAIC SIMPLIFICATION ---
+pub fn try_simplify(op: UniversalOp, const_vals: &[Option<UniversalScalar>], args_equal: bool) -> SimplifyAction {
+    // 1. Teljes konstans kiértékelés (Folding)
+    let all_const = const_vals.iter().all(|c| c.is_some());
+    if all_const {
+        let vals: Vec<UniversalScalar> = const_vals.iter().map(|c| c.unwrap()).collect();
+        if let Some(folded) = fold_constants(op, &vals) {
+            if let UniversalScalar::Float(f) = folded {
+                if f.is_finite() { return SimplifyAction::ReplaceWithConstant(folded); }
+            } else { return SimplifyAction::ReplaceWithConstant(folded); }
+        }
     }
+
+    // 2. Szabály alapú egyszerűsítések (Algebrai identitások)
+    if const_vals.len() == 2 {
+        let a_is_zero = const_vals[0].as_ref().map_or(false, |c| c.is_zero());
+        let b_is_zero = const_vals[1].as_ref().map_or(false, |c| c.is_zero());
+        let a_is_one = const_vals[0].as_ref().map_or(false, |c| c.is_one());
+        let b_is_one = const_vals[1].as_ref().map_or(false, |c| c.is_one());
+
+        match op {
+            UniversalOp::AddF => {
+                if b_is_zero { return SimplifyAction::KeepArg(0); }
+                if a_is_zero { return SimplifyAction::KeepArg(1); }
+            },
+            UniversalOp::SubF => {
+                if b_is_zero { return SimplifyAction::KeepArg(0); }
+                if args_equal { return SimplifyAction::ReplaceWithConstant(UniversalScalar::Float(0.0)); }
+            },
+            UniversalOp::MulF => {
+                if b_is_one { return SimplifyAction::KeepArg(0); }
+                if a_is_one { return SimplifyAction::KeepArg(1); }
+                if a_is_zero || b_is_zero { return SimplifyAction::ReplaceWithConstant(UniversalScalar::Float(0.0)); }
+            },
+            UniversalOp::DivF => {
+                if b_is_one { return SimplifyAction::KeepArg(0); }
+                if a_is_zero && !b_is_zero { return SimplifyAction::ReplaceWithConstant(UniversalScalar::Float(0.0)); }
+                if args_equal { return SimplifyAction::ReplaceWithConstant(UniversalScalar::Float(1.0)); }
+            },
+            _ => {}
+        }
+    }
+    SimplifyAction::None
 }
 
-pub fn fold_binary_const(op: UniversalOp, a: f32, b: f32) -> Option<f32> {
-    match op {
-        UniversalOp::AddF => Some(a + b),
-        UniversalOp::SubF => Some(a - b),
-        UniversalOp::MulF => Some(a * b),
-        UniversalOp::DivF => if b.abs() > 1e-9 { Some(a / b) } else { None },
+fn fold_constants(op: UniversalOp, args: &[UniversalScalar]) -> Option<UniversalScalar> {
+    use UniversalScalar::Float;
+    match (op, args) {
+        (UniversalOp::SinF, [Float(a)]) => Some(Float(a.sin())),
+        (UniversalOp::CosF, [Float(a)]) => Some(Float(a.cos())),
+        (UniversalOp::ExpF, [Float(a)]) => Some(Float(a.exp())),
+        (UniversalOp::SqrF, [Float(a)]) => Some(Float(a * a)),
+        (UniversalOp::SqrtF, [Float(a)]) => Some(Float(a.abs().sqrt())),
+        (UniversalOp::LnF, [Float(a)]) => Some(Float((a.abs() + 1e-9).ln())),
+        (UniversalOp::AddF, [Float(a), Float(b)]) => Some(Float(a + b)),
+        (UniversalOp::SubF, [Float(a), Float(b)]) => Some(Float(a - b)),
+        (UniversalOp::MulF, [Float(a), Float(b)]) => Some(Float(a * b)),
+        (UniversalOp::DivF, [Float(a), Float(b)]) => if b.abs() > 1e-9 { Some(Float(a / b)) } else { None },
         _ => None,
     }
 }

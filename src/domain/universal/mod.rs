@@ -7,6 +7,12 @@ use wide::{f32x4};
 use rand::RngExt;
 use std::fmt;
 
+pub enum SimplifyAction {
+    ReplaceWithConstant(UniversalScalar),
+    KeepArg(usize),
+    None,
+}
+
 // --- 1. TÍPUSRENDSZER ---
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum UniversalType {
@@ -59,6 +65,31 @@ pub enum UniversalScalar {
     Vec2([f32; 2]), Vec3([f32; 3]), Mat2([f32; 4]), Mat3([f32; 9]),
 }
 
+impl UniversalScalar {
+    pub fn is_zero(&self) -> bool {
+        match self {
+            Self::Float(f) => f.abs() < 1e-6,
+            Self::Vec2(v) => v.iter().all(|&x| x.abs() < 1e-6),
+            Self::Vec3(v) => v.iter().all(|&x| x.abs() < 1e-6),
+            Self::Mat2(m) => m.iter().all(|&x| x.abs() < 1e-6),
+            Self::Mat3(m) => m.iter().all(|&x| x.abs() < 1e-6),
+            _ => false,
+        }
+    }
+    pub fn is_one(&self) -> bool {
+        match self { Self::Float(f) => (f - 1.0).abs() < 1e-6, _ => false }
+    }
+    pub fn is_identity(&self) -> bool {
+        match self {
+            Self::Mat2(m) => (m[0]-1.0).abs()<1e-6 && m[1].abs()<1e-6 && m[2].abs()<1e-6 && (m[3]-1.0).abs()<1e-6,
+            Self::Mat3(m) => (m[0]-1.0).abs()<1e-6 && m[1].abs()<1e-6 && m[2].abs()<1e-6 &&
+                             m[3].abs()<1e-6 && (m[4]-1.0).abs()<1e-6 && m[5].abs()<1e-6 &&
+                             m[6].abs()<1e-6 && m[7].abs()<1e-6 && (m[8]-1.0).abs()<1e-6,
+            _ => false,
+        }
+    }
+}
+
 impl fmt::Display for UniversalScalar {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -74,7 +105,7 @@ impl fmt::Display for UniversalScalar {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct ExprInfo { start_idx: usize, const_val: Option<f32>, }
+struct ExprInfo { start_idx: usize, const_val: Option<UniversalScalar>, }
 
 // --- 5. MAKRO A METAADATOKHOZ ÉS A COMPILE MAPPINGHEZ ---
 macro_rules! generate_domain_metadata {
@@ -266,8 +297,7 @@ impl Domain for UniversalDomain {
             match node {
                 Node::Constant(val, _type_id) => {
                     let start_idx = output.len(); output.push(node);
-                    let float_val = if let UniversalScalar::Float(f) = val { Some(f) } else { None };
-                    stack.push(ExprInfo { start_idx, const_val: float_val });
+                    stack.push(ExprInfo { start_idx, const_val: Some(val) });
                 },
                 Node::Variable(_, _) => {
                     let start_idx = output.len(); output.push(node);
@@ -281,103 +311,70 @@ impl Domain for UniversalDomain {
                         continue;
                     }
 
-                    if arity == 1 {
-                        let arg = stack.pop().unwrap();
-                        if let Some(val) = arg.const_val {
-                            let folded = basic::fold_unary_const(op, val);
-                            if let Some(f) = folded {
-                                if f.is_finite() {
-                                    output.truncate(arg.start_idx);
-                                    let new_start = output.len();
-                                    output.push(Node::Constant(UniversalScalar::Float(f), UniversalType::Float));
-                                    stack.push(ExprInfo { start_idx: new_start, const_val: Some(f) });
-                                    continue;
-                                }
-                            }
+                    // 1. Argumentumok leszedése a veremből
+                    let mut args = Vec::with_capacity(arity);
+                    for _ in 0..arity { args.push(stack.pop().unwrap()); }
+                    args.reverse();
+
+                    // 2. Csak akkor nézzük az egyezést, ha 2 paraméter van
+                    let mut args_equal = false;
+                    if arity == 2 {
+                        let a = &args[0]; let b = &args[1];
+                        if a.start_idx < b.start_idx && b.start_idx <= output.len() {
+                            args_equal = output[a.start_idx..b.start_idx] == output[b.start_idx..];
                         }
-                        
-                        if output.len() > arg.start_idx {
-                            if let Node::Operator(child_op) = output[output.len() - 1] {
-                                match (op, child_op) {
-                                    (UniversalOp::LnF, UniversalOp::ExpF) | (UniversalOp::ExpF, UniversalOp::LnF) |
-                                    (UniversalOp::SqrtF, UniversalOp::SqrF) | (UniversalOp::SqrF, UniversalOp::SqrtF) => {
-                                        output.pop();
-                                        stack.push(ExprInfo { start_idx: arg.start_idx, const_val: None });
-                                        continue;
-                                    },
-                                    _ => {}
-                                }
-                            }
-                        }
-                        output.push(node);
-                        stack.push(ExprInfo { start_idx: arg.start_idx, const_val: None });
                     }
-                    else if arity == 2 {
-                        let b = stack.pop().unwrap(); let a = stack.pop().unwrap();
 
-                        if let (Some(val_a), Some(val_b)) = (a.const_val, b.const_val) {
-                            let folded = basic::fold_binary_const(op, val_a, val_b);
-                            if let Some(f) = folded {
-                                if f.is_finite() {
-                                    output.truncate(a.start_idx);
-                                    let new_start = output.len();
-                                    output.push(Node::Constant(UniversalScalar::Float(f), UniversalType::Float));
-                                    stack.push(ExprInfo { start_idx: new_start, const_val: Some(f) });
-                                    continue;
+                    let const_vals: Vec<Option<UniversalScalar>> = args.iter().map(|a| a.const_val).collect();
+
+                    // 3. Megkérjük a modulokat, hogy egyszerűsítsenek, ha tudnak
+                    let mut action = linalg::try_simplify(op, &const_vals, args_equal);
+                    if let SimplifyAction::None = action {
+                        action = basic::try_simplify(op, &const_vals, args_equal);
+                    }
+
+                    // 4. Az akció végrehajtása O(1) memóriafoglalással a copy_within (memmove) révén
+                    match action {
+                        SimplifyAction::ReplaceWithConstant(val) => {
+                            output.truncate(args[0].start_idx);
+                            let new_start = output.len();
+                            output.push(Node::Constant(val, Self::return_type(&op)));
+                            stack.push(ExprInfo { start_idx: new_start, const_val: Some(val) });
+                        },
+                        SimplifyAction::KeepArg(idx) => {
+                            let target_arg = &args[idx];
+                            let start_of_args = args[0].start_idx;
+                            
+                            let target_end = if idx == arity - 1 { output.len() } else { args[idx + 1].start_idx };
+                            let target_len = target_end - target_arg.start_idx;
+                            
+                            if target_arg.start_idx > start_of_args {
+                                output.copy_within(target_arg.start_idx..target_end, start_of_args);
+                            }
+                            output.truncate(start_of_args + target_len);
+                            
+                            let mut kept_info = target_arg.clone();
+                            kept_info.start_idx = start_of_args;
+                            stack.push(kept_info);
+                        },
+                        SimplifyAction::None => {
+                            // Csekkoljuk a specifikus struktúrákat, pl ln(exp(x)) (megtartva a zero-cost filozófiát)
+                            if arity == 1 && output.len() > args[0].start_idx {
+                                if let Node::Operator(child_op) = output[output.len() - 1] {
+                                    match (op, child_op) {
+                                        (UniversalOp::LnF, UniversalOp::ExpF) | (UniversalOp::ExpF, UniversalOp::LnF) |
+                                        (UniversalOp::SqrtF, UniversalOp::SqrF) | (UniversalOp::SqrF, UniversalOp::SqrtF) => {
+                                            output.pop();
+                                            stack.push(ExprInfo { start_idx: args[0].start_idx, const_val: None });
+                                            continue;
+                                        },
+                                        _ => {}
+                                    }
                                 }
                             }
+                            output.push(node);
+                            stack.push(ExprInfo { start_idx: args[0].start_idx, const_val: None });
                         }
-
-                        let b_is_zero = b.const_val.map_or(false, |v| v.abs() < 1e-6);
-                        let a_is_zero = a.const_val.map_or(false, |v| v.abs() < 1e-6);
-                        let b_is_one = b.const_val.map_or(false, |v| (v - 1.0).abs() < 1e-6);
-                        let are_equal = || output[a.start_idx..b.start_idx] == output[b.start_idx..];
-
-                        match op {
-                            UniversalOp::AddF => { if b_is_zero { output.truncate(b.start_idx); stack.push(a); continue; } },
-                            UniversalOp::SubF => {
-                                if b_is_zero { output.truncate(b.start_idx); stack.push(a); continue; }
-                                if are_equal() {
-                                    output.truncate(a.start_idx); let new_start = output.len();
-                                    output.push(Node::Constant(UniversalScalar::Float(0.0), UniversalType::Float));
-                                    stack.push(ExprInfo { start_idx: new_start, const_val: Some(0.0) }); continue;
-                                }
-                            },
-                            UniversalOp::MulF => {
-                                if b_is_one { output.truncate(b.start_idx); stack.push(a); continue; }
-                                if b_is_zero || a_is_zero {
-                                    output.truncate(a.start_idx); let new_start = output.len();
-                                    output.push(Node::Constant(UniversalScalar::Float(0.0), UniversalType::Float));
-                                    stack.push(ExprInfo { start_idx: new_start, const_val: Some(0.0) }); continue;
-                                }
-                            },
-                            UniversalOp::DivF => {
-                                if b_is_one { output.truncate(b.start_idx); stack.push(a); continue; }
-                                if a_is_zero {
-                                    output.truncate(a.start_idx); let new_start = output.len();
-                                    output.push(Node::Constant(UniversalScalar::Float(0.0), UniversalType::Float));
-                                    stack.push(ExprInfo { start_idx: new_start, const_val: Some(0.0) }); continue;
-                                }
-                                if are_equal() {
-                                    output.truncate(a.start_idx); let new_start = output.len();
-                                    output.push(Node::Constant(UniversalScalar::Float(1.0), UniversalType::Float));
-                                    stack.push(ExprInfo { start_idx: new_start, const_val: Some(1.0) }); continue;
-                                }
-                            },
-                            _ => {}
-                        }
-                        output.push(node);
-                        stack.push(ExprInfo { start_idx: a.start_idx, const_val: None });
-                    } 
-                    else {
-                        let mut first_start = output.len();
-                        for _ in 0..arity {
-                            first_start = stack.pop().unwrap().start_idx;
-                        }
-                        let start_idx = first_start;
-                        
-                        output.push(node);
-                        stack.push(ExprInfo { start_idx, const_val: None });
                     }
                 }
             }
