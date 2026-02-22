@@ -20,12 +20,12 @@ pub struct Engine<S: Strategy, D: Domain> {
 }
 
 impl<S: Strategy, D: Domain> Engine<S, D> {
-    pub fn new(strategy: S, num_features: u8, allowed_ops: Vec<D::Operator>) -> Self {
+   pub fn new(strategy: S, variable_registry: Vec<(D::TypeId, u8)>, allowed_ops: Vec<D::Operator>) -> Self {
         let num_islands = strategy.num_islands();
         let mut islands = Vec::with_capacity(num_islands);
         
         for i in 0..num_islands {
-            islands.push(Island::new(42 + i as u64, num_features, strategy.clone(), allowed_ops.clone()));
+            islands.push(Island::new(42 + i as u64, variable_registry.clone(), strategy.clone(), allowed_ops.clone()));
         }
         
         Self { islands, global_strategy: strategy, global_hof: HashMap::new() }

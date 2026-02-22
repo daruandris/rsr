@@ -4,7 +4,7 @@ use rsr::Engine;
 use rsr::SimdDataset;
 use rsr::StaticStrategy;
 use rsr::Strategy;
-use rsr::UniversalDomain;
+use rsr::{UniversalDomain, UniversalType};
 use rsr::UniversalOp;
 use rsr::engine::config::OpModule;
 use rand::RngExt;
@@ -12,7 +12,8 @@ use std::time::Instant;
 
 fn run_linalg_test(name: &str, category: &str, data_x: Vec<Vec<f32>>, data_y: Vec<f32>, num_features: u8) {
     println!(">>> RUNNING {} <<<", name);
-    let dataset = SimdDataset::new(&data_x, &data_y, num_features, false);
+    let feature_types = vec![UniversalType::Float; num_features as usize];
+    let dataset = SimdDataset::new(&data_x, &data_y, feature_types, false);
     // Bekapcsoljuk a Basic ÉS a Linalg modult is!
     let mut config = common::get_test_config(vec![OpModule::Basic, OpModule::Linalg]);
     config.excluded_ops = vec![UniversalOp::SinF, UniversalOp::CosF, UniversalOp::ExpF, UniversalOp::SqrtF, UniversalOp::LnF, UniversalOp::SqrF];
@@ -21,8 +22,9 @@ fn run_linalg_test(name: &str, category: &str, data_x: Vec<Vec<f32>>, data_y: Ve
     
     let strategy = StaticStrategy::new(config);
     let allowed_ops = strategy.get_allowed_operators();
-    let mut engine = Engine::<StaticStrategy, UniversalDomain>::new(strategy, num_features, allowed_ops);
-    
+    let var_registry = dataset.get_variable_registry();
+    let mut engine = Engine::<StaticStrategy, UniversalDomain>::new(strategy, var_registry, allowed_ops);
+
     let start_time = Instant::now();
     engine.run_evolution(&dataset);
     let time_ms = start_time.elapsed().as_millis() as u64;

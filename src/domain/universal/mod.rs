@@ -217,7 +217,6 @@ impl Domain for UniversalDomain {
         format!("{:?}({})", op, args.join(", "))
     }
 
-    #[inline(always)] fn variable_type() -> Self::TypeId { UniversalType::Float }
     #[inline(always)] fn constant_type() -> Self::TypeId { UniversalType::Float }
 
     fn random_operator(
@@ -484,6 +483,41 @@ impl Domain for UniversalDomain {
                 UniversalInstruction::TraceM3 => unsafe { linalg::eval_trace_m3(&mut sp_f, &mut stack_f, &mut sp_m3, &stack_m3) },
                 UniversalInstruction::TransposeM3 => unsafe { linalg::eval_transpose_m3(&mut sp_m3, &mut stack_m3) },
                 UniversalInstruction::InverseM3 => unsafe { linalg::eval_inverse_m3(&mut sp_m3, &mut stack_m3) },
+
+                UniversalInstruction::LoadVarV2(idx) => unsafe {
+                    let i = *idx as usize;
+                    *stack_v2.get_unchecked_mut(sp_v2) = [
+                        *features.get_unchecked(i), 
+                        *features.get_unchecked(i + 1)
+                    ];
+                    sp_v2 += 1;
+                },
+                UniversalInstruction::LoadVarV3(idx) => unsafe {
+                    let i = *idx as usize;
+                    *stack_v3.get_unchecked_mut(sp_v3) = [
+                        *features.get_unchecked(i), 
+                        *features.get_unchecked(i + 1), 
+                        *features.get_unchecked(i + 2)
+                    ];
+                    sp_v3 += 1;
+                },
+                UniversalInstruction::LoadVarM2(idx) => unsafe {
+                    let i = *idx as usize;
+                    *stack_m2.get_unchecked_mut(sp_m2) = [
+                        *features.get_unchecked(i), *features.get_unchecked(i + 1),
+                        *features.get_unchecked(i + 2), *features.get_unchecked(i + 3)
+                    ];
+                    sp_m2 += 1;
+                },
+                UniversalInstruction::LoadVarM3(idx) => unsafe {
+                    let i = *idx as usize;
+                    *stack_m3.get_unchecked_mut(sp_m3) = [
+                        *features.get_unchecked(i), *features.get_unchecked(i + 1), *features.get_unchecked(i + 2),
+                        *features.get_unchecked(i + 3), *features.get_unchecked(i + 4), *features.get_unchecked(i + 5),
+                        *features.get_unchecked(i + 6), *features.get_unchecked(i + 7), *features.get_unchecked(i + 8)
+                    ];
+                    sp_m3 += 1;
+                },
                 _ => {} // Logic jöhet
             }
         }

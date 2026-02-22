@@ -1,6 +1,5 @@
 use wide::f32x4;
-// Ha a UniversalType-ot is behúzzuk a jövőbeli oszlop-típusokhoz:
-// use crate::domain::universal::UniversalType;
+use crate::domain::universal::UniversalType;
 
 pub struct SimdDataset {
     pub feature_flat: Vec<f32x4>,
@@ -15,16 +14,27 @@ pub struct SimdDataset {
     pub target_std_dev: f32,
     
     pub is_normalized: bool,
-    
+    pub feature_types: Vec<UniversalType>,
     // ÚJ (Előkészület): Később itt tárolhatjuk, hogy melyik oszlop milyen típusú
     // pub feature_types: Vec<UniversalType>, 
 }
 
 impl SimdDataset {
     // ÚJ: Hozzáadtuk a `normalize` paramétert!
-    pub fn new(data_x: &[Vec<f32>], data_y: &[f32], num_features: u8, normalize: bool) -> Self {
+    pub fn new(data_x: &[Vec<f32>], data_y: &[f32], feature_types: Vec<UniversalType>, normalize: bool) -> Self {
         let num_samples = data_x.len();
-        let num_features_usize = num_features as usize;        
+        let mut num_features_usize = 0;
+        for t in &feature_types {
+            num_features_usize += match t {
+                UniversalType::Float => 1,
+                UniversalType::Vec2 => 2,
+                UniversalType::Vec3 => 3,
+                UniversalType::Mat2 => 4,
+                UniversalType::Mat3 => 9,
+                _ => 1,
+            };
+        }
+        let num_features = num_features_usize as u8;       
         
         let mut feature_means = vec![0.0; num_features_usize];
         let mut feature_std_devs = vec![1.0; num_features_usize];
@@ -118,6 +128,7 @@ impl SimdDataset {
             target_mean,
             target_std_dev,
             is_normalized: normalize,
+            feature_types,
         }
     }
 
@@ -149,4 +160,18 @@ impl SimdDataset {
             normalized_batch
         }
     }
+
+    pub fn get_variable_registry(&self) -> Vec<(UniversalType, u8)> {
+        let mut registry = Vec::new();
+        let mut current_idx = 0;
+        for &t in &self.feature_types {
+            registry.push((t, current_idx));
+            current_idx += match t {
+                UniversalType::Float => 1, UniversalType::Vec2 => 2, UniversalType::Vec3 => 3,
+                UniversalType::Mat2 => 4, UniversalType::Mat3 => 9, _ => 1,
+            };
+        }
+        registry
+    }
+
 }

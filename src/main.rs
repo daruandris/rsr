@@ -3,7 +3,7 @@ use rsr::Engine;
 use rsr::SimdDataset;
 use rsr::StaticStrategy;
 use rsr::Strategy;
-use rsr::{UniversalDomain};
+use rsr::{UniversalDomain, UniversalType};
 use rsr::ffi::symengine::simplify_symengine;
 use rsr::engine::config::OpModule;
 use rand::RngExt;
@@ -48,8 +48,9 @@ fn run_benchmark(
     println!("\n========================================================");
     println!(">>> RUNNING BENCHMARK: {} <<<", name);
     println!("Features: {}, Samples: {}", num_features, data_x.len());
-    
-    let dataset = SimdDataset::new(&data_x, &data_y, num_features, false);
+
+    let feature_types = vec![UniversalType::Float; num_features as usize];
+    let dataset = SimdDataset::new(&data_x, &data_y, feature_types, true);
     let mut config = get_config();
     
     if let Some(noise_mse) = expected_noise_mse {
@@ -60,7 +61,8 @@ fn run_benchmark(
     let strategy = StaticStrategy::new(config);
     let allowed_ops = strategy.get_allowed_operators();
 
-    let mut engine = Engine::<StaticStrategy, UniversalDomain>::new(strategy, num_features, allowed_ops);
+    let var_registry = dataset.get_variable_registry();
+    let mut engine = Engine::<StaticStrategy, UniversalDomain>::new(strategy, var_registry, allowed_ops);
     
     let start_time = Instant::now();
     engine.run_evolution(&dataset);

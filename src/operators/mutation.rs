@@ -4,7 +4,7 @@ use crate::domain::Domain;
 use crate::operators::generator::generate_random_ast;
 use rand::RngExt;
 
-pub fn point_mutation<D: Domain>(ind: &mut Individual<D>, rng: &mut impl RngExt, num_features: u8, allowed_ops: &[D::Operator]) {
+pub fn point_mutation<D: Domain>(ind: &mut Individual<D>, rng: &mut impl RngExt, variables: &[(D::TypeId, u8)], allowed_ops: &[D::Operator]) {
     if ind.nodes.is_empty() { return; }
     let idx = rng.random_range(0..ind.nodes.len());
     
@@ -14,22 +14,23 @@ pub fn point_mutation<D: Domain>(ind: &mut Individual<D>, rng: &mut impl RngExt,
     
     if target_arity == 0 {
         // --- TERMINÁL (Levél) MUTÁCIÓ ---
-        // A D::variable_type() későbbi finomításig maradhat, de a random_constant már STGP kompatibilis
-        let is_var_valid = D::variable_type() == target_type; 
+        let valid_vars: Vec<_> = variables.iter().filter(|v| v.0 == target_type).collect();
+        let is_var_valid = !valid_vars.is_empty();
         let maybe_const = D::random_constant(target_type, rng);
         
         match (is_var_valid, maybe_const) {
             (true, Some(c)) => {
                 if rng.random::<bool>() {
-                    // ÚJ: Átadjuk a típust!
-                    ind.nodes[idx] = Node::Variable(rng.random_range(0..num_features), target_type);
+                    let chosen = valid_vars[rng.random_range(0..valid_vars.len())];
+                    ind.nodes[idx] = Node::Variable(chosen.1, target_type);
                 } else {
                     // ÚJ: Átadjuk a típust!
                     ind.nodes[idx] = Node::Constant(c, target_type);
                 }
             },
             (true, None) => {
-                ind.nodes[idx] = Node::Variable(rng.random_range(0..num_features), target_type);
+                let chosen = valid_vars[rng.random_range(0..valid_vars.len())];
+                ind.nodes[idx] = Node::Variable(chosen.1, target_type);
             },
             (false, Some(c)) => {
                 ind.nodes[idx] = Node::Constant(c, target_type);
@@ -78,7 +79,7 @@ pub fn constant_perturbation<D: Domain>(ind: &mut Individual<D>, rng: &mut impl 
 pub fn subtree_mutation<D: Domain>(
     ind: &mut Individual<D>, 
     rng: &mut impl RngExt, 
-    num_features: u8, 
+    variables: &[(D::TypeId, u8)],
     max_size: usize,
     mutation_max_depth: usize,
     allowed_ops: &[D::Operator],
@@ -97,7 +98,7 @@ pub fn subtree_mutation<D: Domain>(
     if allowed_new_len == 0 { return; }
 
     // Generálunk egy új részfát UGYANABBÓL a típusból
-    let new_subtree = generate_random_ast::<D>(required_type, mutation_max_depth, rng, num_features, allowed_ops);
+    let new_subtree = generate_random_ast::<D>(required_type, mutation_max_depth, rng, variables, allowed_ops);
     
     if new_subtree.len() > allowed_new_len { return; }
 
