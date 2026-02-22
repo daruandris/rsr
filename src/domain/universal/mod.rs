@@ -3,7 +3,7 @@ mod linalg;
 
 use crate::domain::Domain;
 use crate::ast::node::Node;
-use wide::{f32x4, CmpLt};
+use wide::{f32x4};
 use rand::RngExt;
 use std::fmt;
 
@@ -92,7 +92,7 @@ macro_rules! generate_domain_metadata {
         #[inline(always)] fn return_type(op: &Self::Operator) -> Self::TypeId {
             match op { $( UniversalOp::$op => $ret_type, )* }
         }
-        #[inline(always)] fn expected_types(op: &Self::Operator) -> Vec<Self::TypeId> {
+        #[inline(always)] fn expected_types(op: &Self::Operator) -> &'static [Self::TypeId] {
             match op { $( UniversalOp::$op => $expected, )* }
         }
         #[inline(always)] fn compile_operator(op: &Self::Operator) -> Self::Instruction {
@@ -111,65 +111,65 @@ impl Domain for UniversalDomain {
 
     generate_domain_metadata! {
         // Basic
-        AddF => { arity: 2, weight: 1, ret_type: UniversalType::Float, expected: vec![UniversalType::Float, UniversalType::Float] },
-        SubF => { arity: 2, weight: 1, ret_type: UniversalType::Float, expected: vec![UniversalType::Float, UniversalType::Float] },
-        MulF => { arity: 2, weight: 1, ret_type: UniversalType::Float, expected: vec![UniversalType::Float, UniversalType::Float] },
-        DivF => { arity: 2, weight: 2, ret_type: UniversalType::Float, expected: vec![UniversalType::Float, UniversalType::Float] },
-        SinF => { arity: 1, weight: 3, ret_type: UniversalType::Float, expected: vec![UniversalType::Float] },
-        CosF => { arity: 1, weight: 3, ret_type: UniversalType::Float, expected: vec![UniversalType::Float] },
-        ExpF => { arity: 1, weight: 4, ret_type: UniversalType::Float, expected: vec![UniversalType::Float] },
-        SqrF => { arity: 1, weight: 2, ret_type: UniversalType::Float, expected: vec![UniversalType::Float] },
-        SqrtF => { arity: 1, weight: 2, ret_type: UniversalType::Float, expected: vec![UniversalType::Float] },
-        LnF => { arity: 1, weight: 4, ret_type: UniversalType::Float, expected: vec![UniversalType::Float] },
+        AddF => { arity: 2, weight: 1, ret_type: UniversalType::Float, expected: &[UniversalType::Float, UniversalType::Float] },
+        SubF => { arity: 2, weight: 1, ret_type: UniversalType::Float, expected: &[UniversalType::Float, UniversalType::Float] },
+        MulF => { arity: 2, weight: 1, ret_type: UniversalType::Float, expected: &[UniversalType::Float, UniversalType::Float] },
+        DivF => { arity: 2, weight: 2, ret_type: UniversalType::Float, expected: &[UniversalType::Float, UniversalType::Float] },
+        SinF => { arity: 1, weight: 3, ret_type: UniversalType::Float, expected: &[UniversalType::Float] },
+        CosF => { arity: 1, weight: 3, ret_type: UniversalType::Float, expected: &[UniversalType::Float] },
+        ExpF => { arity: 1, weight: 4, ret_type: UniversalType::Float, expected: &[UniversalType::Float] },
+        SqrF => { arity: 1, weight: 2, ret_type: UniversalType::Float, expected: &[UniversalType::Float] },
+        SqrtF => { arity: 1, weight: 2, ret_type: UniversalType::Float, expected: &[UniversalType::Float] },
+        LnF => { arity: 1, weight: 4, ret_type: UniversalType::Float, expected: &[UniversalType::Float] },
         
         // Vec2
-        MakeVec2 => { arity: 2, weight: 2, ret_type: UniversalType::Vec2, expected: vec![UniversalType::Float, UniversalType::Float] },
-        GetXV2 => { arity: 1, weight: 2, ret_type: UniversalType::Float, expected: vec![UniversalType::Vec2] },
-        GetYV2 => { arity: 1, weight: 2, ret_type: UniversalType::Float, expected: vec![UniversalType::Vec2] },
-        AddV2 => { arity: 2, weight: 1, ret_type: UniversalType::Vec2, expected: vec![UniversalType::Vec2, UniversalType::Vec2] },
-        SubV2 => { arity: 2, weight: 1, ret_type: UniversalType::Vec2, expected: vec![UniversalType::Vec2, UniversalType::Vec2] },
-        ScaleV2 => { arity: 2, weight: 2, ret_type: UniversalType::Vec2, expected: vec![UniversalType::Float, UniversalType::Vec2] },
-        DotV2 => { arity: 2, weight: 2, ret_type: UniversalType::Float, expected: vec![UniversalType::Vec2, UniversalType::Vec2] },
-        NormV2 => { arity: 1, weight: 3, ret_type: UniversalType::Float, expected: vec![UniversalType::Vec2] },
+        MakeVec2 => { arity: 2, weight: 2, ret_type: UniversalType::Vec2, expected: &[UniversalType::Float, UniversalType::Float] },
+        GetXV2 => { arity: 1, weight: 2, ret_type: UniversalType::Float, expected: &[UniversalType::Vec2] },
+        GetYV2 => { arity: 1, weight: 2, ret_type: UniversalType::Float, expected: &[UniversalType::Vec2] },
+        AddV2 => { arity: 2, weight: 1, ret_type: UniversalType::Vec2, expected: &[UniversalType::Vec2, UniversalType::Vec2] },
+        SubV2 => { arity: 2, weight: 1, ret_type: UniversalType::Vec2, expected: &[UniversalType::Vec2, UniversalType::Vec2] },
+        ScaleV2 => { arity: 2, weight: 2, ret_type: UniversalType::Vec2, expected: &[UniversalType::Float, UniversalType::Vec2] },
+        DotV2 => { arity: 2, weight: 2, ret_type: UniversalType::Float, expected: &[UniversalType::Vec2, UniversalType::Vec2] },
+        NormV2 => { arity: 1, weight: 3, ret_type: UniversalType::Float, expected: &[UniversalType::Vec2] },
         
         // Vec3
-        MakeVec3 => { arity: 3, weight: 2, ret_type: UniversalType::Vec3, expected: vec![UniversalType::Float, UniversalType::Float, UniversalType::Float] },
-        GetXV3 => { arity: 1, weight: 2, ret_type: UniversalType::Float, expected: vec![UniversalType::Vec3] },
-        GetYV3 => { arity: 1, weight: 2, ret_type: UniversalType::Float, expected: vec![UniversalType::Vec3] },
-        GetZV3 => { arity: 1, weight: 2, ret_type: UniversalType::Float, expected: vec![UniversalType::Vec3] },
-        AddV3 => { arity: 2, weight: 1, ret_type: UniversalType::Vec3, expected: vec![UniversalType::Vec3, UniversalType::Vec3] },
-        SubV3 => { arity: 2, weight: 1, ret_type: UniversalType::Vec3, expected: vec![UniversalType::Vec3, UniversalType::Vec3] },
-        ScaleV3 => { arity: 2, weight: 2, ret_type: UniversalType::Vec3, expected: vec![UniversalType::Float, UniversalType::Vec3] },
-        DotV3 => { arity: 2, weight: 2, ret_type: UniversalType::Float, expected: vec![UniversalType::Vec3, UniversalType::Vec3] },
-        NormV3 => { arity: 1, weight: 3, ret_type: UniversalType::Float, expected: vec![UniversalType::Vec3] },
-        CrossV3 => { arity: 2, weight: 2, ret_type: UniversalType::Vec3, expected: vec![UniversalType::Vec3, UniversalType::Vec3] },
+        MakeVec3 => { arity: 3, weight: 2, ret_type: UniversalType::Vec3, expected: &[UniversalType::Float, UniversalType::Float, UniversalType::Float] },
+        GetXV3 => { arity: 1, weight: 2, ret_type: UniversalType::Float, expected: &[UniversalType::Vec3] },
+        GetYV3 => { arity: 1, weight: 2, ret_type: UniversalType::Float, expected: &[UniversalType::Vec3] },
+        GetZV3 => { arity: 1, weight: 2, ret_type: UniversalType::Float, expected: &[UniversalType::Vec3] },
+        AddV3 => { arity: 2, weight: 1, ret_type: UniversalType::Vec3, expected: &[UniversalType::Vec3, UniversalType::Vec3] },
+        SubV3 => { arity: 2, weight: 1, ret_type: UniversalType::Vec3, expected: &[UniversalType::Vec3, UniversalType::Vec3] },
+        ScaleV3 => { arity: 2, weight: 2, ret_type: UniversalType::Vec3, expected: &[UniversalType::Float, UniversalType::Vec3] },
+        DotV3 => { arity: 2, weight: 2, ret_type: UniversalType::Float, expected: &[UniversalType::Vec3, UniversalType::Vec3] },
+        NormV3 => { arity: 1, weight: 3, ret_type: UniversalType::Float, expected: &[UniversalType::Vec3] },
+        CrossV3 => { arity: 2, weight: 2, ret_type: UniversalType::Vec3, expected: &[UniversalType::Vec3, UniversalType::Vec3] },
         
         // Mat2
-        MakeMat2 => { arity: 2, weight: 2, ret_type: UniversalType::Mat2, expected: vec![UniversalType::Vec2, UniversalType::Vec2] },
-        AddM2 => { arity: 2, weight: 1, ret_type: UniversalType::Mat2, expected: vec![UniversalType::Mat2, UniversalType::Mat2] },
-        SubM2 => { arity: 2, weight: 1, ret_type: UniversalType::Mat2, expected: vec![UniversalType::Mat2, UniversalType::Mat2] },
-        ScaleM2 => { arity: 2, weight: 2, ret_type: UniversalType::Mat2, expected: vec![UniversalType::Float, UniversalType::Mat2] },
-        MulM2 => { arity: 2, weight: 3, ret_type: UniversalType::Mat2, expected: vec![UniversalType::Mat2, UniversalType::Mat2] },
-        MulM2V2 => { arity: 2, weight: 3, ret_type: UniversalType::Vec2, expected: vec![UniversalType::Mat2, UniversalType::Vec2] },
-        DetM2 => { arity: 1, weight: 4, ret_type: UniversalType::Float, expected: vec![UniversalType::Mat2] },
-        TraceM2 => { arity: 1, weight: 3, ret_type: UniversalType::Float, expected: vec![UniversalType::Mat2] },
-        TransposeM2 => { arity: 1, weight: 3, ret_type: UniversalType::Mat2, expected: vec![UniversalType::Mat2] },
-        InverseM2 => { arity: 1, weight: 4, ret_type: UniversalType::Mat2, expected: vec![UniversalType::Mat2] },
+        MakeMat2 => { arity: 2, weight: 2, ret_type: UniversalType::Mat2, expected: &[UniversalType::Vec2, UniversalType::Vec2] },
+        AddM2 => { arity: 2, weight: 1, ret_type: UniversalType::Mat2, expected: &[UniversalType::Mat2, UniversalType::Mat2] },
+        SubM2 => { arity: 2, weight: 1, ret_type: UniversalType::Mat2, expected: &[UniversalType::Mat2, UniversalType::Mat2] },
+        ScaleM2 => { arity: 2, weight: 2, ret_type: UniversalType::Mat2, expected: &[UniversalType::Float, UniversalType::Mat2] },
+        MulM2 => { arity: 2, weight: 3, ret_type: UniversalType::Mat2, expected: &[UniversalType::Mat2, UniversalType::Mat2] },
+        MulM2V2 => { arity: 2, weight: 3, ret_type: UniversalType::Vec2, expected: &[UniversalType::Mat2, UniversalType::Vec2] },
+        DetM2 => { arity: 1, weight: 4, ret_type: UniversalType::Float, expected: &[UniversalType::Mat2] },
+        TraceM2 => { arity: 1, weight: 3, ret_type: UniversalType::Float, expected: &[UniversalType::Mat2] },
+        TransposeM2 => { arity: 1, weight: 3, ret_type: UniversalType::Mat2, expected: &[UniversalType::Mat2] },
+        InverseM2 => { arity: 1, weight: 4, ret_type: UniversalType::Mat2, expected: &[UniversalType::Mat2] },
 
         // Mat3
-        MakeMat3 => { arity: 3, weight: 2, ret_type: UniversalType::Mat3, expected: vec![UniversalType::Vec3, UniversalType::Vec3, UniversalType::Vec3] },
-        AddM3 => { arity: 2, weight: 1, ret_type: UniversalType::Mat3, expected: vec![UniversalType::Mat3, UniversalType::Mat3] },
-        SubM3 => { arity: 2, weight: 1, ret_type: UniversalType::Mat3, expected: vec![UniversalType::Mat3, UniversalType::Mat3] },
-        ScaleM3 => { arity: 2, weight: 2, ret_type: UniversalType::Mat3, expected: vec![UniversalType::Float, UniversalType::Mat3] },
-        MulM3 => { arity: 2, weight: 3, ret_type: UniversalType::Mat3, expected: vec![UniversalType::Mat3, UniversalType::Mat3] },
-        MulM3V3 => { arity: 2, weight: 3, ret_type: UniversalType::Vec3, expected: vec![UniversalType::Mat3, UniversalType::Vec3] },
-        DetM3 => { arity: 1, weight: 4, ret_type: UniversalType::Float, expected: vec![UniversalType::Mat3] },
-        TraceM3 => { arity: 1, weight: 3, ret_type: UniversalType::Float, expected: vec![UniversalType::Mat3] },
-        TransposeM3 => { arity: 1, weight: 3, ret_type: UniversalType::Mat3, expected: vec![UniversalType::Mat3] },
-        InverseM3 => { arity: 1, weight: 4, ret_type: UniversalType::Mat3, expected: vec![UniversalType::Mat3] },
+        MakeMat3 => { arity: 3, weight: 2, ret_type: UniversalType::Mat3, expected: &[UniversalType::Vec3, UniversalType::Vec3, UniversalType::Vec3] },
+        AddM3 => { arity: 2, weight: 1, ret_type: UniversalType::Mat3, expected: &[UniversalType::Mat3, UniversalType::Mat3] },
+        SubM3 => { arity: 2, weight: 1, ret_type: UniversalType::Mat3, expected: &[UniversalType::Mat3, UniversalType::Mat3] },
+        ScaleM3 => { arity: 2, weight: 2, ret_type: UniversalType::Mat3, expected: &[UniversalType::Float, UniversalType::Mat3] },
+        MulM3 => { arity: 2, weight: 3, ret_type: UniversalType::Mat3, expected: &[UniversalType::Mat3, UniversalType::Mat3] },
+        MulM3V3 => { arity: 2, weight: 3, ret_type: UniversalType::Vec3, expected: &[UniversalType::Mat3, UniversalType::Vec3] },
+        DetM3 => { arity: 1, weight: 4, ret_type: UniversalType::Float, expected: &[UniversalType::Mat3] },
+        TraceM3 => { arity: 1, weight: 3, ret_type: UniversalType::Float, expected: &[UniversalType::Mat3] },
+        TransposeM3 => { arity: 1, weight: 3, ret_type: UniversalType::Mat3, expected: &[UniversalType::Mat3] },
+        InverseM3 => { arity: 1, weight: 4, ret_type: UniversalType::Mat3, expected: &[UniversalType::Mat3] },
 
         // Logic
-        IfElseF => { arity: 3, weight: 4, ret_type: UniversalType::Float, expected: vec![UniversalType::Bool, UniversalType::Float, UniversalType::Float] },
+        IfElseF => { arity: 3, weight: 4, ret_type: UniversalType::Float, expected: &[UniversalType::Bool, UniversalType::Float, UniversalType::Float] },
     }
 
     fn format_operator(op: &Self::Operator, args: &[String]) -> String {
@@ -369,8 +369,12 @@ impl Domain for UniversalDomain {
                         stack.push(ExprInfo { start_idx: a.start_idx, const_val: None });
                     } 
                     else {
-                        for _ in 0..arity { stack.pop(); }
-                        let start_idx = if output.len() > arity { output.len() - arity } else { 0 };
+                        let mut first_start = output.len();
+                        for _ in 0..arity {
+                            first_start = stack.pop().unwrap().start_idx;
+                        }
+                        let start_idx = first_start;
+                        
                         output.push(node);
                         stack.push(ExprInfo { start_idx, const_val: None });
                     }

@@ -65,7 +65,7 @@ fn add_operator_node<D: Domain>(
     if let Some(chosen_op) = D::random_operator(target_type, allowed_ops, parent_op, rng) {
         let expected_children_types = D::expected_types(&chosen_op);
         
-        for child_type in expected_children_types {
+        for &child_type in expected_children_types {
             // A rekurzióban a most kisorsolt operátor (chosen_op) lesz az új szülő!
             build_ast_recursive::<D>(nodes, child_type, current_depth + 1, max_depth, rng, num_features, allowed_ops, Some(chosen_op));
         }
