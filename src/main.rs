@@ -34,6 +34,7 @@ fn get_config() -> EvolutionConfig {
         mutation_cycles: 5,
         verbose: true,
         allowed_modules: vec![OpModule::Basic],
+        custom_ops: vec![], excluded_ops: vec![],
     }
 }
 

@@ -73,6 +73,7 @@ impl Strategy for StaticStrategy {
 
     fn get_allowed_operators(&self) -> Vec<UniversalOp> {
         let mut ops = Vec::new();
+
         for module in &self.config.allowed_modules {
             match module {
                 OpModule::Basic => ops.extend_from_slice(&[
@@ -81,36 +82,27 @@ impl Strategy for StaticStrategy {
                     UniversalOp::LnF, UniversalOp::SqrtF
                 ]),
                 OpModule::Linalg => ops.extend_from_slice(&[
-                    // Vektor konstruktorok és kinyerők
-                    UniversalOp::MakeVec2, UniversalOp::MakeVec3,
-                    UniversalOp::GetXV2, UniversalOp::GetYV2,
+                    UniversalOp::MakeVec2, UniversalOp::MakeVec3, UniversalOp::GetXV2, UniversalOp::GetYV2,
                     UniversalOp::GetXV3, UniversalOp::GetYV3, UniversalOp::GetZV3,
-                    
-                    // 2D Vektor műveletek
-                    UniversalOp::AddV2, UniversalOp::SubV2, UniversalOp::ScaleV2, 
-                    UniversalOp::DotV2, UniversalOp::NormV2,
-                    
-                    // 3D Vektor műveletek
-                    UniversalOp::AddV3, UniversalOp::SubV3, UniversalOp::ScaleV3, 
-                    UniversalOp::DotV3, UniversalOp::NormV3, UniversalOp::CrossV3,
-                    
-                    // 2x2 Mátrix műveletek
-                    UniversalOp::MakeMat2, UniversalOp::AddM2, UniversalOp::SubM2, 
-                    UniversalOp::ScaleM2, UniversalOp::MulM2, UniversalOp::MulM2V2, 
-                    UniversalOp::DetM2, UniversalOp::TraceM2, UniversalOp::TransposeM2, 
-                    UniversalOp::InverseM2,
-                    
-                    // 3x3 Mátrix műveletek
-                    UniversalOp::MakeMat3, UniversalOp::AddM3, UniversalOp::SubM3, 
-                    UniversalOp::ScaleM3, UniversalOp::MulM3, UniversalOp::MulM3V3, 
-                    UniversalOp::DetM3, UniversalOp::TraceM3, UniversalOp::TransposeM3, 
-                    UniversalOp::InverseM3,
+                    UniversalOp::AddV2, UniversalOp::SubV2, UniversalOp::ScaleV2, UniversalOp::DotV2, UniversalOp::NormV2,
+                    UniversalOp::AddV3, UniversalOp::SubV3, UniversalOp::ScaleV3, UniversalOp::DotV3, UniversalOp::NormV3, UniversalOp::CrossV3,
+                    UniversalOp::MakeMat2, UniversalOp::AddM2, UniversalOp::SubM2, UniversalOp::ScaleM2, UniversalOp::MulM2, UniversalOp::MulM2V2, 
+                    UniversalOp::DetM2, UniversalOp::TraceM2, UniversalOp::TransposeM2, UniversalOp::InverseM2,
+                    UniversalOp::MakeMat3, UniversalOp::AddM3, UniversalOp::SubM3, UniversalOp::ScaleM3, UniversalOp::MulM3, UniversalOp::MulM3V3, 
+                    UniversalOp::DetM3, UniversalOp::TraceM3, UniversalOp::TransposeM3, UniversalOp::InverseM3,
                 ]),
-                OpModule::Logic => ops.extend_from_slice(&[
-                    UniversalOp::IfElseF
-                ]),
+                OpModule::Logic => ops.extend_from_slice(&[UniversalOp::IfElseF]),
             }
         }
-        ops
+
+        ops.extend(&self.config.custom_ops);
+
+        let mut final_ops = Vec::new();
+        for op in ops {
+            if !self.config.excluded_ops.contains(&op) && !final_ops.contains(&op) {
+                final_ops.push(op);
+            }
+        }
+        final_ops
     }
 }

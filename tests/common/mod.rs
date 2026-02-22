@@ -118,6 +118,6 @@ pub fn get_test_config(modules: Vec<rsr::engine::config::OpModule>) -> rsr::Evol
         stagnation_threshold: 1000, target_mse: 1e-7, min_improvement: 1e-6,
         random_injection_rate: 0.10, min_random_injection: 2, max_tree_size: 32,
         mutation_max_depth: 4, mutation_cycles: 5, verbose: true,
-        allowed_modules: modules,
+        allowed_modules: modules, custom_ops: vec![], excluded_ops: vec![],
     }
 }
