@@ -191,10 +191,10 @@ impl Domain for UniversalDomain {
         ScaleV3 => { arity: 2, weight: 2, ret_type: UniversalType::Vec3, expected: &[UniversalType::Float, UniversalType::Vec3] },
         DotV3 => { arity: 2, weight: 2, ret_type: UniversalType::Float, expected: &[UniversalType::Vec3, UniversalType::Vec3] },
         NormV3 => { arity: 1, weight: 3, ret_type: UniversalType::Float, expected: &[UniversalType::Vec3] },
-        CrossV3 => { arity: 2, weight: 2, ret_type: UniversalType::Vec3, expected: &[UniversalType::Vec3, UniversalType::Vec3] },
+        CrossV3 => { arity: 2, weight: 4, ret_type: UniversalType::Vec3, expected: &[UniversalType::Vec3, UniversalType::Vec3] },
         
         // Mat2
-        MakeMat2 => { arity: 2, weight: 2, ret_type: UniversalType::Mat2, expected: &[UniversalType::Vec2, UniversalType::Vec2] },
+        MakeMat2 => { arity: 2, weight: 3, ret_type: UniversalType::Mat2, expected: &[UniversalType::Vec2, UniversalType::Vec2] },
         AddM2 => { arity: 2, weight: 1, ret_type: UniversalType::Mat2, expected: &[UniversalType::Mat2, UniversalType::Mat2] },
         SubM2 => { arity: 2, weight: 1, ret_type: UniversalType::Mat2, expected: &[UniversalType::Mat2, UniversalType::Mat2] },
         ScaleM2 => { arity: 2, weight: 2, ret_type: UniversalType::Mat2, expected: &[UniversalType::Float, UniversalType::Mat2] },
@@ -206,16 +206,16 @@ impl Domain for UniversalDomain {
         InverseM2 => { arity: 1, weight: 4, ret_type: UniversalType::Mat2, expected: &[UniversalType::Mat2] },
 
         // Mat3
-        MakeMat3 => { arity: 3, weight: 2, ret_type: UniversalType::Mat3, expected: &[UniversalType::Vec3, UniversalType::Vec3, UniversalType::Vec3] },
+        MakeMat3 => { arity: 3, weight: 5, ret_type: UniversalType::Mat3, expected: &[UniversalType::Vec3, UniversalType::Vec3, UniversalType::Vec3] },
         AddM3 => { arity: 2, weight: 1, ret_type: UniversalType::Mat3, expected: &[UniversalType::Mat3, UniversalType::Mat3] },
         SubM3 => { arity: 2, weight: 1, ret_type: UniversalType::Mat3, expected: &[UniversalType::Mat3, UniversalType::Mat3] },
         ScaleM3 => { arity: 2, weight: 2, ret_type: UniversalType::Mat3, expected: &[UniversalType::Float, UniversalType::Mat3] },
-        MulM3 => { arity: 2, weight: 3, ret_type: UniversalType::Mat3, expected: &[UniversalType::Mat3, UniversalType::Mat3] },
+        MulM3 => { arity: 2, weight: 4, ret_type: UniversalType::Mat3, expected: &[UniversalType::Mat3, UniversalType::Mat3] },
         MulM3V3 => { arity: 2, weight: 3, ret_type: UniversalType::Vec3, expected: &[UniversalType::Mat3, UniversalType::Vec3] },
-        DetM3 => { arity: 1, weight: 4, ret_type: UniversalType::Float, expected: &[UniversalType::Mat3] },
+        DetM3 => { arity: 1, weight: 5, ret_type: UniversalType::Float, expected: &[UniversalType::Mat3] },
         TraceM3 => { arity: 1, weight: 3, ret_type: UniversalType::Float, expected: &[UniversalType::Mat3] },
         TransposeM3 => { arity: 1, weight: 3, ret_type: UniversalType::Mat3, expected: &[UniversalType::Mat3] },
-        InverseM3 => { arity: 1, weight: 4, ret_type: UniversalType::Mat3, expected: &[UniversalType::Mat3] },
+        InverseM3 => { arity: 1, weight: 6, ret_type: UniversalType::Mat3, expected: &[UniversalType::Mat3] },
 
         // Logic
         IfElseF => { arity: 3, weight: 4, ret_type: UniversalType::Float, expected: &[UniversalType::Bool, UniversalType::Float, UniversalType::Float] },
@@ -551,5 +551,16 @@ impl Domain for UniversalDomain {
         }
         if !sum_squared_error.is_finite() { return f32::MAX; }
         sum_squared_error / (dataset.num_samples as f32)
+    }
+
+    #[inline(always)]
+    fn type_weight(type_id: &Self::TypeId) -> usize {
+        match type_id {
+            UniversalType::Float | UniversalType::Int | UniversalType::Bool => 1,
+            UniversalType::Vec2 => 2,
+            UniversalType::Vec3 => 3,
+            UniversalType::Mat2 => 4,
+            UniversalType::Mat3 => 9,
+        }
     }
 }

@@ -3,6 +3,7 @@ use rayon::prelude::*;
 use std::collections::HashMap;
 
 use crate::domain::Domain;
+use crate::domain::universal::UniversalScalar;
 use crate::engine::strategy::Strategy;
 use crate::engine::individual::Individual;
 use crate::engine::island::Island;
@@ -31,7 +32,8 @@ impl<S: Strategy, D: Domain> Engine<S, D> {
         Self { islands, global_strategy: strategy, global_hof: HashMap::new() }
     }
 
-    pub fn run_evolution(&mut self, dataset: &SimdDataset) {
+    pub fn run_evolution(&mut self, dataset: &SimdDataset)
+    where D:Domain<ScalarValue = UniversalScalar> {
         let max_generations = self.global_strategy.max_generations();
         let target_mse = self.global_strategy.target_mse();
         let migration_interval = self.global_strategy.migration_interval();

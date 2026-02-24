@@ -2,7 +2,7 @@ use crate::engine::individual::Individual;
 use crate::metrics::dataset::SimdDataset;
 use crate::domain::Domain;
 
-pub fn optimize_individual_constants<D: Domain>(
+pub fn run_nelder_mead<D: Domain>(
     ind: &mut Individual<D>, 
     dataset: &SimdDataset, 
     max_iterations: usize

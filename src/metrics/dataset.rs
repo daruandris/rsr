@@ -164,12 +164,28 @@ impl SimdDataset {
     pub fn get_variable_registry(&self) -> Vec<(UniversalType, u8)> {
         let mut registry = Vec::new();
         let mut current_idx = 0;
+        
         for &t in &self.feature_types {
+            // 1. Regisztráljuk az eredeti, összetett típust (pl. Vec3),
             registry.push((t, current_idx));
-            current_idx += match t {
-                UniversalType::Float => 1, UniversalType::Vec2 => 2, UniversalType::Vec3 => 3,
-                UniversalType::Mat2 => 4, UniversalType::Mat3 => 9, _ => 1,
+
+            let size = match t {
+                UniversalType::Float => 1,
+                UniversalType::Vec2 => 2,
+                UniversalType::Vec3 => 3,
+                UniversalType::Mat2 => 4,
+                UniversalType::Mat3 => 9,
+                _ => 1,
             };
+
+            // 2. SHADOW VARIABLES: Ha a típus összetett (size > 1)
+            if size > 1 {
+                for offset in 0..size {
+                    registry.push((UniversalType::Float, current_idx + offset));
+                }
+            }
+
+            current_idx += size;
         }
         registry
     }

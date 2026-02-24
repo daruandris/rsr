@@ -247,7 +247,7 @@ pub fn try_simplify(op: UniversalOp, const_vals: &[Option<UniversalScalar>], arg
                 let zero = if op == UniversalOp::MulM2V2 { UniversalScalar::Vec2([0.0; 2]) } else { UniversalScalar::Vec3([0.0; 3]) };
                 return SimplifyAction::ReplaceWithConstant(zero);
             }
-        }
+        },
         _ => {}
     }
     SimplifyAction::None
@@ -319,6 +319,17 @@ fn fold_constants(op: UniversalOp, args: &[UniversalScalar]) -> Option<Universal
         (UniversalOp::DetM3, [Mat3(m)]) => Some(Float(
             m[0]*(m[4]*m[8]-m[5]*m[7]) - m[3]*(m[1]*m[8]-m[2]*m[7]) + m[6]*(m[1]*m[5]-m[2]*m[4])
         )),
+        (UniversalOp::InverseM3, [Mat3(m)]) => {
+            let det = m[0]*(m[4]*m[8]-m[5]*m[7]) - m[3]*(m[1]*m[8]-m[2]*m[7]) + m[6]*(m[1]*m[5]-m[2]*m[4]);
+            if det.abs() > 1e-9 {
+                let inv_d = 1.0 / det;
+                Some(Mat3([
+                    (m[4]*m[8] - m[5]*m[7])*inv_d, -(m[1]*m[8] - m[2]*m[7])*inv_d,  (m[1]*m[5] - m[2]*m[4])*inv_d,
+                    -(m[3]*m[8] - m[5]*m[6])*inv_d,  (m[0]*m[8] - m[2]*m[6])*inv_d, -(m[0]*m[5] - m[2]*m[3])*inv_d,
+                    (m[3]*m[7] - m[4]*m[6])*inv_d, -(m[0]*m[7] - m[1]*m[6])*inv_d,  (m[0]*m[4] - m[1]*m[3])*inv_d
+                ]))
+            } else { None }
+        },
         _ => None,
     }
 }

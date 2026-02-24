@@ -1,8 +1,9 @@
 use crate::ast::node::Node;
 use crate::ast::bytecode::CompiledExpr;
 use crate::domain::Domain;
+use crate::domain::universal::UniversalScalar;
 use crate::metrics::dataset::SimdDataset;
-use crate::optimization::nelder_mead::optimize_individual_constants;
+use crate::optimization::optimize_individual_constants;
 use crate::ast::format::format_ast;
 use std::fmt;
 
@@ -66,7 +67,8 @@ impl<D: Domain> Individual<D> {
         self.invalidate();
     }
 
-    pub fn optimize_constants(&mut self, dataset: &SimdDataset, iterations: usize) {
+    pub fn optimize_constants(&mut self, dataset: &SimdDataset, iterations: usize)
+    where D:Domain<ScalarValue = UniversalScalar> {
         optimize_individual_constants(self, dataset, iterations);
         self.compile();
     }

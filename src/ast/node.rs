@@ -26,8 +26,9 @@ impl<D: Domain> Node<D> {
 
     pub fn weight(&self) -> usize {
         match self {
-            Node::Constant(_, _) | Node::Variable(_, _) => 1, // Frissítve [cite: 80, 81]
-            Node::Operator(op) => D::operator_weight(op), // Frissítve [cite: 81]
+            Node::Variable(_, _) => 1, 
+            Node::Constant(_, type_id) => D::type_weight(type_id), // A súly = paraméterek száma!
+            Node::Operator(op) => D::operator_weight(op), 
         }
     }
 

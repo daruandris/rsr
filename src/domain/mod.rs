@@ -49,6 +49,8 @@ pub trait Domain: Clone + Copy + Send + Sync + PartialEq + 'static {
     fn return_type(op: &Self::Operator) -> Self::TypeId;
     fn expected_types(op: &Self::Operator) -> &'static [Self::TypeId];
     fn constant_type() -> Self::TypeId;
+
+    fn type_weight(type_id: &Self::TypeId) -> usize;
 }
 
 pub mod universal;
