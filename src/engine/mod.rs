@@ -2,6 +2,7 @@
 use rayon::prelude::*;
 use std::collections::HashMap;
 
+use crate::UniversalOp;
 use crate::domain::Domain;
 use crate::domain::universal::UniversalScalar;
 use crate::engine::strategy::Strategy;
@@ -33,7 +34,7 @@ impl<S: Strategy, D: Domain> Engine<S, D> {
     }
 
     pub fn run_evolution(&mut self, dataset: &SimdDataset)
-    where D:Domain<ScalarValue = UniversalScalar> {
+    where D:Domain<ScalarValue = UniversalScalar, Operator = UniversalOp> {
         let max_generations = self.global_strategy.max_generations();
         let target_mse = self.global_strategy.target_mse();
         let migration_interval = self.global_strategy.migration_interval();

@@ -1,7 +1,7 @@
 use crate::ast::node::Node;
 use crate::ast::bytecode::CompiledExpr;
 use crate::domain::Domain;
-use crate::domain::universal::UniversalScalar;
+use crate::domain::universal::{UniversalScalar, UniversalOp};
 use crate::metrics::dataset::SimdDataset;
 use crate::optimization::optimize_individual_constants;
 use crate::ast::format::format_ast;
@@ -68,7 +68,7 @@ impl<D: Domain> Individual<D> {
     }
 
     pub fn optimize_constants(&mut self, dataset: &SimdDataset, iterations: usize)
-    where D:Domain<ScalarValue = UniversalScalar> {
+    where D:Domain<ScalarValue = UniversalScalar, Operator = UniversalOp> {
         optimize_individual_constants(self, dataset, iterations);
         let threshold = 0.05;
         let mut constants = self.get_constants();

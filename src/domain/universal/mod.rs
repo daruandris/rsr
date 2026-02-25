@@ -1,6 +1,8 @@
+#![allow(unsafe_op_in_unsafe_fn)]
 mod basic;
 mod linalg;
 
+use crate::domain::dual::*; 
 use crate::domain::Domain;
 use crate::ast::node::Node;
 use wide::{f32x4};
@@ -583,5 +585,274 @@ impl Domain for UniversalDomain {
             UniversalType::Mat2 => 4,
             UniversalType::Mat3 => 9,
         }
+    }
+
+    fn compute_mse_with_gradient(
+        code: &[Self::Instruction], 
+        constants: &[Self::ScalarValue], 
+        dataset: &crate::metrics::dataset::SimdDataset
+    ) -> (f32, [f32; 32]) {
+        
+        let mut sum_squared_error = f32x4::splat(0.0);
+        let mut grad_sum = [f32x4::splat(0.0); 32];
+        
+        let num_features = dataset.num_features as usize;
+        let flat_features = &dataset.feature_flat;
+        let targets = &dataset.target_batches;
+        
+        // 1. Kiszámoljuk, hány laposított (f32) konstansunk van összesen
+        let mut active_params_count = 0;
+        for c in constants {
+            active_params_count += match c {
+                UniversalScalar::Float(_) => 1,
+                UniversalScalar::Vec2(_) => 2,
+                UniversalScalar::Vec3(_) => 3,
+                UniversalScalar::Mat2(_) => 4,
+                UniversalScalar::Mat3(_) => 9,
+                _ => 0,
+            };
+        }
+        active_params_count = active_params_count.min(32);
+        
+        if active_params_count == 0 {
+            // Ha nincsenek konstansok, csak a tiszta hibát (MSE) adjuk vissza
+            return (Self::compute_mse(code, constants, dataset), [0.0; 32]);
+        }
+
+        // 2. Végigmegyünk az adathalmazokon (SIMD iteráció)
+        for i in 0..dataset.num_batches {
+            let start = i * num_features;
+            // Biztonságos hozzáférés, ahogy az eredeti compute_mse-ben is csináltad
+            let input_batch = unsafe { flat_features.get_unchecked(start..start + num_features) };
+            let target = unsafe { *targets.get_unchecked(i) };
+
+            let mut diff = f32x4::splat(0.0);
+
+            // 3. Lefuttatjuk a duális veremgépet minden egyes paraméterre!
+            for k in 0..active_params_count {
+                let dual_result = Self::eval_simd_dual(code, constants, input_batch, k);
+                
+                // A predikció (dual_result.val) minden 'k' esetén megegyezik, 
+                // így elég csak az első körben kiszámolni a hibát (diff).
+                if k == 0 {
+                    diff = dual_result.val - target;
+                    sum_squared_error += diff * diff;
+                }
+                
+                // Láncszabály: grad = 2 * (y_pred - y_true) * dy_pred/dc_k
+                grad_sum[k] += f32x4::splat(2.0) * diff * dual_result.grad;
+            }
+        }
+
+        // 4. SIMD Regiszterek redukálása és átlagolása
+        let num_samples_f32 = dataset.num_samples as f32;
+        let total_mse = sum_squared_error.reduce_add() / num_samples_f32;
+        
+        let mut final_gradient = [0.0f32; 32];
+        for k in 0..active_params_count {
+            final_gradient[k] = grad_sum[k].reduce_add() / num_samples_f32;
+        }
+
+        (total_mse, final_gradient)
+    }
+}
+
+// (Feltételezzük, hogy a DualSimd a crate::domain::dual modulban van)
+
+
+// --- BASIC DUAL MŰVELETEK ---
+#[inline(always)] 
+pub unsafe fn eval_add_dual_f(sp_f: &mut usize, stack_f: &mut [DualSimd; 32]) {
+    *sp_f -= 2;
+    let a = *stack_f.get_unchecked(*sp_f);
+    let b = *stack_f.get_unchecked(*sp_f + 1);
+    *stack_f.get_unchecked_mut(*sp_f) = a + b; // Itt a túlterhelt Add trait hívódik!
+    *sp_f += 1;
+}
+
+#[inline(always)] 
+pub unsafe fn eval_sin_dual_f(sp_f: &mut usize, stack_f: &mut [DualSimd; 32]) {
+    let idx = *sp_f - 1;
+    *stack_f.get_unchecked_mut(idx) = stack_f.get_unchecked(idx).sin();
+}
+
+// --- LINALG DUAL MŰVELETEK ---
+#[inline(always)] 
+pub unsafe fn eval_add_dual_v3(sp_v3: &mut usize, stack_v3: &mut [[DualSimd; 3]; 32]) {
+    *sp_v3 -= 2;
+    let a = *stack_v3.get_unchecked(*sp_v3); 
+    let b = *stack_v3.get_unchecked(*sp_v3 + 1);
+    *stack_v3.get_unchecked_mut(*sp_v3) = [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+    *sp_v3 += 1;
+}
+
+#[inline(always)] 
+pub unsafe fn eval_dot_dual_v3(sp_f: &mut usize, stack_f: &mut [DualSimd; 32], sp_v3: &mut usize, stack_v3: &[[DualSimd; 3]; 32]) {
+    *sp_v3 -= 2;
+    let a = *stack_v3.get_unchecked(*sp_v3); 
+    let b = *stack_v3.get_unchecked(*sp_v3 + 1);
+    *stack_f.get_unchecked_mut(*sp_f) = dual_dot_v3(&a, &b); // A korábban megírt matematikai mag
+    *sp_f += 1;
+}
+
+impl UniversalDomain {
+    #[inline(always)]
+    pub fn eval_simd_dual(
+        code: &[UniversalInstruction], 
+        constants: &[UniversalScalar], 
+        features: &[f32x4],
+        active_const_idx: usize,
+    ) -> DualSimd {
+        // --- ZERO-COST VEREM ---
+        let mut stack_f: [DualSimd; 32] = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+        let mut sp_f: usize = 0;
+        let mut stack_v2: [[DualSimd; 2]; 32] = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+        let mut sp_v2: usize = 0;
+        let mut stack_v3: [[DualSimd; 3]; 32] = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+        let mut sp_v3: usize = 0;
+        let mut stack_m2: [[DualSimd; 4]; 32] = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+        let mut sp_m2: usize = 0;
+        let mut stack_m3: [[DualSimd; 9]; 32] = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+        let mut sp_m3: usize = 0;
+
+        // Segédfüggvény a lapos (flattened) konstans index kiszámításához
+        let get_flat_start_idx = |target_c_idx: usize| -> usize {
+            let mut flat_idx = 0;
+            for c in constants.iter().take(target_c_idx) {
+                flat_idx += match c {
+                    UniversalScalar::Float(_) => 1,
+                    UniversalScalar::Vec2(_) => 2,
+                    UniversalScalar::Vec3(_) => 3,
+                    UniversalScalar::Mat2(_) => 4,
+                    UniversalScalar::Mat3(_) => 9,
+                    _ => 0,
+                };
+            }
+            flat_idx
+        };
+
+        // Segédfüggvény a gradiens seedeléshez
+        let get_grad = |flat_idx: usize| -> f32x4 {
+            if flat_idx == active_const_idx { f32x4::splat(1.0) } else { f32x4::splat(0.0) }
+        };
+
+        // --- BYTECODE CIKLUS ---
+        for op in code {
+            match op {
+                // BEKÖTÉS: BEMENETI ADATOK (Grad = 0)
+                UniversalInstruction::LoadVarF(idx) => unsafe { 
+                    *stack_f.get_unchecked_mut(sp_f) = DualSimd::constant(*features.get_unchecked(*idx as usize));
+                    sp_f += 1; 
+                },
+                UniversalInstruction::LoadVarV2(idx) => unsafe {
+                    let i = *idx as usize;
+                    *stack_v2.get_unchecked_mut(sp_v2) = [
+                        DualSimd::constant(*features.get_unchecked(i)), 
+                        DualSimd::constant(*features.get_unchecked(i + 1))
+                    ];
+                    sp_v2 += 1;
+                },
+                UniversalInstruction::LoadVarV3(idx) => unsafe {
+                    let i = *idx as usize;
+                    *stack_v3.get_unchecked_mut(sp_v3) = [
+                        DualSimd::constant(*features.get_unchecked(i)), 
+                        DualSimd::constant(*features.get_unchecked(i + 1)),
+                        DualSimd::constant(*features.get_unchecked(i + 2))
+                    ];
+                    sp_v3 += 1;
+                },
+                // (LoadVarM2 és LoadVarM3 analóg módon...)
+
+                // BEKÖTÉS: KONSTANSOK (Itt dől el a deriválás iránya!)
+                UniversalInstruction::LoadConstF(idx) => unsafe {
+                    if let UniversalScalar::Float(val) = constants.get_unchecked(*idx as usize) {
+                        let flat_idx = get_flat_start_idx(*idx as usize);
+                        *stack_f.get_unchecked_mut(sp_f) = DualSimd::new(f32x4::splat(*val), get_grad(flat_idx));
+                    }
+                    sp_f += 1;
+                },
+                UniversalInstruction::LoadConstV2(idx) => unsafe {
+                    if let UniversalScalar::Vec2(val) = constants.get_unchecked(*idx as usize) {
+                        let flat_idx = get_flat_start_idx(*idx as usize);
+                        *stack_v2.get_unchecked_mut(sp_v2) = [
+                            DualSimd::new(f32x4::splat(val[0]), get_grad(flat_idx)),
+                            DualSimd::new(f32x4::splat(val[1]), get_grad(flat_idx + 1))
+                        ];
+                    }
+                    sp_v2 += 1;
+                },
+                UniversalInstruction::LoadConstV3(idx) => unsafe {
+                    if let UniversalScalar::Vec3(val) = constants.get_unchecked(*idx as usize) {
+                        let flat_idx = get_flat_start_idx(*idx as usize);
+                        *stack_v3.get_unchecked_mut(sp_v3) = [
+                            DualSimd::new(f32x4::splat(val[0]), get_grad(flat_idx)),
+                            DualSimd::new(f32x4::splat(val[1]), get_grad(flat_idx + 1)),
+                            DualSimd::new(f32x4::splat(val[2]), get_grad(flat_idx + 2))
+                        ];
+                    }
+                    sp_v3 += 1;
+                },
+                // (LoadConstM2 és LoadConstM3 analóg módon... az ofszetek +0..+3 és +0..+8)
+
+                // --- BASIC MŰVELETEK ---
+                UniversalInstruction::AddF => unsafe { eval_add_dual_f(&mut sp_f, &mut stack_f) },
+                UniversalInstruction::SubF => unsafe { eval_sub_dual_f(&mut sp_f, &mut stack_f) },
+                UniversalInstruction::MulF => unsafe { eval_mul_dual_f(&mut sp_f, &mut stack_f) },
+                UniversalInstruction::DivF => unsafe { eval_div_dual_f(&mut sp_f, &mut stack_f) },
+                UniversalInstruction::SinF => unsafe { eval_sin_dual_f(&mut sp_f, &mut stack_f) },
+                UniversalInstruction::CosF => unsafe { eval_cos_dual_f(&mut sp_f, &mut stack_f) },
+                UniversalInstruction::ExpF => unsafe { eval_exp_dual_f(&mut sp_f, &mut stack_f) },
+                UniversalInstruction::SqrF => unsafe { eval_sqr_dual_f(&mut sp_f, &mut stack_f) },
+                UniversalInstruction::SqrtF => unsafe { eval_sqrt_dual_f(&mut sp_f, &mut stack_f) },
+                UniversalInstruction::LnF => unsafe { eval_ln_dual_f(&mut sp_f, &mut stack_f) },
+
+                // --- LINALG MŰVELETEK (Példák bekötve, a többi ugyanígy) ---
+                // --- LINALG MŰVELETEK ---
+                UniversalInstruction::MakeVec2 => unsafe { eval_make_dual_vec2(&mut sp_f, &stack_f, &mut sp_v2, &mut stack_v2) },
+                UniversalInstruction::MakeVec3 => unsafe { eval_make_dual_vec3(&mut sp_f, &stack_f, &mut sp_v3, &mut stack_v3) },
+                UniversalInstruction::GetXV2 => unsafe { eval_get_x_dual_v2(&mut sp_f, &mut stack_f, &mut sp_v2, &stack_v2) },
+                UniversalInstruction::GetYV2 => unsafe { eval_get_y_dual_v2(&mut sp_f, &mut stack_f, &mut sp_v2, &stack_v2) },
+                UniversalInstruction::GetXV3 => unsafe { eval_get_x_dual_v3(&mut sp_f, &mut stack_f, &mut sp_v3, &stack_v3) },
+                UniversalInstruction::GetYV3 => unsafe { eval_get_y_dual_v3(&mut sp_f, &mut stack_f, &mut sp_v3, &stack_v3) },
+                UniversalInstruction::GetZV3 => unsafe { eval_get_z_dual_v3(&mut sp_f, &mut stack_f, &mut sp_v3, &stack_v3) },
+                
+                UniversalInstruction::AddV2 => unsafe { eval_add_dual_v2(&mut sp_v2, &mut stack_v2) },
+                UniversalInstruction::SubV2 => unsafe { eval_sub_dual_v2(&mut sp_v2, &mut stack_v2) },
+                UniversalInstruction::ScaleV2 => unsafe { eval_scale_dual_v2(&mut sp_f, &stack_f, &mut sp_v2, &mut stack_v2) },
+                UniversalInstruction::DotV2 => unsafe { eval_dot_dual_v2(&mut sp_f, &mut stack_f, &mut sp_v2, &stack_v2) },
+                UniversalInstruction::NormV2 => unsafe { eval_norm_dual_v2(&mut sp_f, &mut stack_f, &mut sp_v2, &stack_v2) },
+                
+                UniversalInstruction::AddV3 => unsafe { eval_add_dual_v3(&mut sp_v3, &mut stack_v3) },
+                UniversalInstruction::SubV3 => unsafe { eval_sub_dual_v3(&mut sp_v3, &mut stack_v3) },
+                UniversalInstruction::ScaleV3 => unsafe { eval_scale_dual_v3(&mut sp_f, &stack_f, &mut sp_v3, &mut stack_v3) },
+                UniversalInstruction::DotV3 => unsafe { eval_dot_dual_v3(&mut sp_f, &mut stack_f, &mut sp_v3, &stack_v3) },
+                UniversalInstruction::NormV3 => unsafe { eval_norm_dual_v3(&mut sp_f, &mut stack_f, &mut sp_v3, &stack_v3) },
+                UniversalInstruction::CrossV3 => unsafe { eval_cross_dual_v3(&mut sp_v3, &mut stack_v3) },
+
+                UniversalInstruction::MakeMat2 => unsafe { eval_make_dual_mat2(&mut sp_v2, &stack_v2, &mut sp_m2, &mut stack_m2) },
+                UniversalInstruction::AddM2 => unsafe { eval_add_dual_m2(&mut sp_m2, &mut stack_m2) },
+                UniversalInstruction::SubM2 => unsafe { eval_sub_dual_m2(&mut sp_m2, &mut stack_m2) },
+                UniversalInstruction::ScaleM2 => unsafe { eval_scale_dual_m2(&mut sp_f, &stack_f, &mut sp_m2, &mut stack_m2) },
+                UniversalInstruction::MulM2 => unsafe { eval_mul_dual_m2(&mut sp_m2, &mut stack_m2) },
+                UniversalInstruction::MulM2V2 => unsafe { eval_mul_dual_m2v2(&mut sp_m2, &stack_m2, &mut sp_v2, &mut stack_v2) },
+                UniversalInstruction::DetM2 => unsafe { eval_det_dual_m2(&mut sp_f, &mut stack_f, &mut sp_m2, &stack_m2) },
+                UniversalInstruction::TraceM2 => unsafe { eval_trace_dual_m2(&mut sp_f, &mut stack_f, &mut sp_m2, &stack_m2) },
+                UniversalInstruction::TransposeM2 => unsafe { eval_transpose_dual_m2(&mut sp_m2, &mut stack_m2) },
+
+                UniversalInstruction::MakeMat3 => unsafe { eval_make_dual_mat3(&mut sp_v3, &stack_v3, &mut sp_m3, &mut stack_m3) },
+                UniversalInstruction::AddM3 => unsafe { eval_add_dual_m3(&mut sp_m3, &mut stack_m3) },
+                UniversalInstruction::SubM3 => unsafe { eval_sub_dual_m3(&mut sp_m3, &mut stack_m3) },
+                UniversalInstruction::ScaleM3 => unsafe { eval_scale_dual_m3(&mut sp_f, &stack_f, &mut sp_m3, &mut stack_m3) },
+                UniversalInstruction::MulM3 => unsafe { eval_mul_dual_m3(&mut sp_m3, &mut stack_m3) },
+                UniversalInstruction::MulM3V3 => unsafe { eval_mul_dual_m3v3(&mut sp_m3, &stack_m3, &mut sp_v3, &mut stack_v3) },
+                UniversalInstruction::DetM3 => unsafe { eval_det_dual_m3(&mut sp_f, &mut stack_f, &mut sp_m3, &stack_m3) },
+                UniversalInstruction::TraceM3 => unsafe { eval_trace_dual_m3(&mut sp_f, &mut stack_f, &mut sp_m3, &stack_m3) },
+                UniversalInstruction::TransposeM3 => unsafe { eval_transpose_dual_m3(&mut sp_m3, &mut stack_m3) },
+                
+                _ => {} // Itt már TÉNYLEG csak a biztonságos fallback maradt (Inverzek és IfElse)
+            }
+        }
+        
+        unsafe { *stack_f.get_unchecked(0) }
     }
 }

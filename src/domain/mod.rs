@@ -51,6 +51,12 @@ pub trait Domain: Clone + Copy + Send + Sync + PartialEq + 'static {
     fn constant_type() -> Self::TypeId;
 
     fn type_weight(type_id: &Self::TypeId) -> usize;
+    fn compute_mse_with_gradient(
+        code: &[Self::Instruction], 
+        constants: &[Self::ScalarValue], 
+        dataset: &crate::metrics::dataset::SimdDataset
+    ) -> (f32, [f32; 32]);
 }
 
 pub mod universal;
+pub mod dual;

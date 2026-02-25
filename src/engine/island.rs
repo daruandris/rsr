@@ -5,6 +5,7 @@ use rand::SeedableRng;
 use rand::RngExt;
 use rand_xoshiro::Xoshiro256PlusPlus;
 
+use crate::UniversalOp;
 use crate::domain::Domain;
 use crate::domain::universal::UniversalScalar;
 use crate::engine::strategy::Strategy;
@@ -58,7 +59,7 @@ impl<S: Strategy, D: Domain> Island<S, D> {
     }
 
     pub fn step_generation(&mut self, dataset: &SimdDataset)
-    where D:Domain<ScalarValue = UniversalScalar> {
+    where D:Domain<ScalarValue = UniversalScalar, Operator = UniversalOp> {
         let old_best_fitness = self.best_individual.fitness;
         
         for ind in self.individuals.iter_mut() { ind.age += 1; }
@@ -168,7 +169,7 @@ impl<S: Strategy, D: Domain> Island<S, D> {
     }
 
     fn evaluate_buffer(&mut self, dataset: &SimdDataset)
-    where D: Domain<ScalarValue = UniversalScalar> {
+    where D: Domain<ScalarValue = UniversalScalar, Operator = UniversalOp> {
         for ind in self.next_gen_buffer.iter_mut() {
             if self.rng.random::<f32>() < self.strategy.opt_prob() {
                 ind.optimize_constants(dataset, self.strategy.opt_iterations());
