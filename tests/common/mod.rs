@@ -5,10 +5,11 @@ use serde::{Serialize, Deserialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use fs2::FileExt;
 
+use rsr::prelude::*; // Az új prelude!
+
 const MAX_ENTRIES: usize = 30;
 const TIME_LIMIT: u64 = 43200; // Fél nap
 
-// Lapos struktúra a JS frontend kedvéért
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct BenchmarkEntry {
     pub timestamp: u64,
@@ -32,7 +33,7 @@ pub struct BenchmarkEntry {
 }
 
 pub fn update_history(category: &str, mut mse: f32, time_ms: u64) {
-    if mse == 0.0 {mse = 1e-8;}
+    if mse == 0.0 { mse = 1e-8; }
     let file_path = "benchmark_history.js";
     let prefix = "const benchmarkHistory = ";
     let suffix = ";";
@@ -111,8 +112,8 @@ pub fn update_history(category: &str, mut mse: f32, time_ms: u64) {
     file.unlock().unwrap();
 }
 
-pub fn get_test_config(modules: Vec<rsr::engine::config::OpModule>) -> rsr::EvolutionConfig {
-    rsr::EvolutionConfig {
+pub fn get_test_config(modules: Vec<OpModule>) -> Config {
+    Config {
         num_islands: 24, island_size: 25, max_generations: 3000,   
         crossover_rate: 0.10, tournament_size: 2, migration_interval: 25,
         parsimony_penalty: 0.000005, opt_prob: 0.2, opt_iterations: 100, final_opt_iterations: 5000,

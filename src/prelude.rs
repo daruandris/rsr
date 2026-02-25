@@ -1,0 +1,11 @@
+pub use crate::data::dataset::Dataset;
+pub use crate::eval::op::Op;
+pub use crate::eval::scalar::Scalar;
+pub use crate::eval::types::ValueType;
+pub use crate::expr::node::Node;
+pub use crate::expr::program::Program;
+pub use crate::expr::simplify::simplify_ast;
+pub use crate::search::config::{Config, OpModule};
+pub use crate::search::strategy::{Strategy, StaticStrategy};
+pub use crate::search::individual::Individual;
+pub use crate::search::engine::Engine;

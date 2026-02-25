@@ -1,19 +1,11 @@
-// src/main.rs
-use rsr::EvolutionConfig;
-use rsr::Engine;
-use rsr::SimdDataset;
-use rsr::StaticStrategy;
-use rsr::Strategy;
-use rsr::{UniversalDomain, UniversalType};
+use rsr::prelude::*;
 use rsr::ffi::symengine::simplify_symengine;
-use rsr::engine::config::OpModule;
-use rsr::domain::universal::UniversalOp;
 use rand::RngExt;
 use std::time::Instant;
 use std::f32::consts::TAU;
 
-fn get_config() -> EvolutionConfig {
-    EvolutionConfig {
+fn get_config() -> Config {
+    Config {
         num_islands: 24,
         island_size: 25,
         max_generations: 5000,   
@@ -41,10 +33,10 @@ fn get_config() -> EvolutionConfig {
         custom_ops: vec![], 
         // TELJESEN KIZÁRJUK A CSALÁST: Nincs trigonometria, nincs logaritmus!
         excluded_ops: vec![
-            UniversalOp::SinF, 
-            UniversalOp::CosF, 
-            UniversalOp::ExpF, 
-            UniversalOp::LnF
+            Op::SinF, 
+            Op::CosF, 
+            Op::ExpF, 
+            Op::LnF
         ],
     }
 }
@@ -66,21 +58,21 @@ fn get_random_rotation(rng: &mut impl RngExt) -> [f32; 9] {
     ]
 }
 
-fn run_open_problem_benchmark(name: &str, data_x: Vec<Vec<f32>>, data_y: Vec<f32>, feature_types: Vec<UniversalType>) {
+fn run_open_problem_benchmark(name: &str, data_x: Vec<Vec<f32>>, data_y: Vec<f32>, feature_types: Vec<ValueType>) {
     println!("\n========================================================");
     println!(">>> RUNNING EXACT TENSOR INVARIANT PROBLEM: {} <<<", name);
     println!("Samples: {}", data_x.len());
 
-    let dataset = SimdDataset::new(&data_x, &data_y, feature_types, true);
+    let dataset = Dataset::new(&data_x, &data_y, feature_types, true);
     let config = get_config();
     let strategy = StaticStrategy::new(config);
     let allowed_ops = strategy.get_allowed_operators();
 
     let var_registry = dataset.get_variable_registry();
-    let mut engine = Engine::<StaticStrategy, UniversalDomain>::new(strategy, var_registry, allowed_ops);
+    let mut engine = Engine::new(strategy, var_registry, allowed_ops);
     
     let start_time = Instant::now();
-    engine.run_evolution(&dataset);
+    engine.run(&dataset);
     let duration = start_time.elapsed();
 
     println!("--- RESULT FOR: {} ---", name);
@@ -103,7 +95,6 @@ fn main() {
     let mut rng = rand::rng();
     let num_samples = 400; 
 
-    // 1. Az FCC (Lapcentrált Kockarács) fémek 12 fizikai csúszási rendszere
     let ns = [
         [1.0, 1.0, 1.0], [1.0, 1.0, 1.0], [1.0, 1.0, 1.0],
         [-1.0, 1.0, 1.0], [-1.0, 1.0, 1.0], [-1.0, 1.0, 1.0],
@@ -124,7 +115,6 @@ fn main() {
     for _ in 0..num_grains {
         let rot = get_random_rotation(&mut rng);
         for s in 0..12 {
-            // Szimmetrikus Schmid tenzor (m x n + n x m) / 2
             let mut p_local = [0.0; 9];
             for i in 0..3 {
                 for j in 0..3 {
@@ -132,7 +122,6 @@ fn main() {
                 }
             }
             
-            // Forgatás a globális térbe: R * P * R^T
             let mut p_global = [0.0; 9];
             for i in 0..3 {
                 for j in 0..3 {
@@ -152,10 +141,9 @@ fn main() {
 
     println!("Simulating Macroscopic Yield Dissipation...");
     for _ in 0..num_samples {
-        // Generálunk egy Deviatórikus (nyomtalan) Makroszkopikus Feszültségtenzort (S)
         let s11 = rng.random_range(-1.0..1.0);
         let s22 = rng.random_range(-1.0..1.0);
-        let s33 = -s11 - s22; // Tr(S) = 0
+        let s33 = -s11 - s22;
         let s12 = rng.random_range(-1.0..1.0);
         let s13 = rng.random_range(-1.0..1.0);
         let s23 = rng.random_range(-1.0..1.0);
@@ -166,17 +154,15 @@ fn main() {
             s13, s23, s33
         ];
 
-        // Kiszámoljuk a fizikai disszipációt (Képlékenységi munka)
         let mut macro_yield = 0.0;
         for p in &all_schmid_tensors {
-            let mut tau = 0.0; // Megoldott nyírófeszültség
+            let mut tau = 0.0;
             for i in 0..9 {
                 tau += p[i] * stress_tensor[i];
             }
-            // A disszipáció a nyírófeszültség 6. hatványa
             macro_yield += tau.powi(6);
         }
-        macro_yield /= num_grains as f32; // Átlagolás a polikristályra
+        macro_yield /= num_grains as f32;
 
         let mut row = Vec::with_capacity(9);
         row.extend_from_slice(&stress_tensor);
@@ -185,8 +171,7 @@ fn main() {
         dy.push(macro_yield);
     }
 
-    // A motor csak a makroszkopikus feszültséget (1 db Mat3) kapja meg!
-    let feature_types = vec![UniversalType::Mat3];
+    let feature_types = vec![ValueType::Mat3];
 
     run_open_problem_benchmark(
         "FCC Polycrystal Exact Macroscopic Yield Function", 

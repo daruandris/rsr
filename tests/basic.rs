@@ -1,31 +1,26 @@
 mod common;
 
-use rsr::Engine;
-use rsr::SimdDataset;
-use rsr::StaticStrategy;
-use rsr::Strategy;
-use rsr::{UniversalDomain, UniversalType};
-use rsr::engine::config::OpModule;
+use rsr::prelude::*;
 use rand::RngExt;
 use std::time::Instant;
 
 fn run_test(name: &str, category: &str, data_x: Vec<Vec<f32>>, data_y: Vec<f32>, num_features: u8, normalize: bool) {
     println!(">>> RUNNING {} <<<", name);
-    let feature_types = vec![UniversalType::Float; num_features as usize];
-    let dataset = SimdDataset::new(&data_x, &data_y, feature_types, normalize);
+    let feature_types = vec![ValueType::Float; num_features as usize];
+    let dataset = Dataset::new(&data_x, &data_y, feature_types, normalize);
     let config = common::get_test_config(vec![OpModule::Basic]);
     
     let strategy = StaticStrategy::new(config);
     let allowed_ops = strategy.get_allowed_operators();
     let var_registry = dataset.get_variable_registry();
-    let mut engine = Engine::<StaticStrategy, UniversalDomain>::new(strategy, var_registry, allowed_ops);
+    let mut engine = Engine::new(strategy, var_registry, allowed_ops);
     
     let start_time = Instant::now();
-    engine.run_evolution(&dataset);
+    engine.run(&dataset);
     let time_ms = start_time.elapsed().as_millis() as u64;
 
     let best_ind = engine.get_global_best();
-    let best_mse = best_ind.fitness; // Vagy best_ind.calculate_mse(&dataset) ha a pure hiba kell
+    let best_mse = best_ind.fitness; 
 
     common::update_history(category, best_mse, time_ms);
     println!("Result {}: MSE = {}, Time = {}ms", category, best_mse, time_ms);
