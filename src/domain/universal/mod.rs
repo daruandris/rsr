@@ -15,13 +15,11 @@ pub enum SimplifyAction {
     None,
 }
 
-// --- 1. TÍPUSRENDSZER ---
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum UniversalType {
     Float, Int, Bool, Vec2, Vec3, Mat2, Mat3,
 }
 
-// --- 2. OPERÁTOROK ---
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum UniversalOp {
     AddF, SubF, MulF, DivF, SinF, CosF, ExpF, SqrF, LnF, SqrtF,
@@ -40,7 +38,6 @@ impl UniversalOp {
             UniversalOp::SqrtF => &[UniversalOp::SqrtF, UniversalOp::SqrF],
             UniversalOp::SqrF => &[UniversalOp::SqrF, UniversalOp::SqrtF],
             UniversalOp::LnF => &[UniversalOp::LnF, UniversalOp::ExpF],
-            //linalg
             UniversalOp::TransposeM2 => &[UniversalOp::TransposeM2],
             UniversalOp::TransposeM3 => &[UniversalOp::TransposeM3],
             UniversalOp::InverseM2 => &[UniversalOp::InverseM2],
@@ -52,7 +49,6 @@ impl UniversalOp {
     }
 }
 
-// --- 3. BYTECODE UTASÍTÁSOK ---
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum UniversalInstruction {
     LoadVarF(u8), LoadConstF(u16), LoadVarB(u8), LoadConstB(u16),
@@ -67,7 +63,6 @@ pub enum UniversalInstruction {
     IfElseF,
 }
 
-// --- 4. UNIVERZÁLIS KONSTANSOK ---
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum UniversalScalar {
     Float(f32), Int(i32), Bool(bool),
@@ -131,15 +126,15 @@ impl fmt::Display for UniversalScalar {
             UniversalScalar::Mat2(m) => write!(
                 f, 
                 "[{:.2}, {:.2}; {:.2}, {:.2}]", 
-                m[0], m[2], // 1. sor
-                m[1], m[3]  // 2. sor
+                m[0], m[2],
+                m[1], m[3]
             ),
             UniversalScalar::Mat3(m) => write!(
                 f, 
                 "[{:.2}, {:.2}, {:.2}; {:.2}, {:.2}, {:.2}; {:.2}, {:.2}, {:.2}]", 
-                m[0], m[3], m[6], // 1. sor
-                m[1], m[4], m[7], // 2. sor
-                m[2], m[5], m[8]  // 3. sor
+                m[0], m[3], m[6],
+                m[1], m[4], m[7],
+                m[2], m[5], m[8]
             ),
         }
     }
@@ -148,7 +143,6 @@ impl fmt::Display for UniversalScalar {
 #[derive(Clone, Copy, Debug)]
 struct ExprInfo { start_idx: usize, const_val: Option<UniversalScalar>, }
 
-// --- 5. MAKRO A METAADATOKHOZ ÉS A COMPILE MAPPINGHEZ ---
 macro_rules! generate_domain_metadata {
     (
         $(
@@ -173,7 +167,6 @@ macro_rules! generate_domain_metadata {
     };
 }
 
-// --- 6. A DOMAIN IMPLEMENTÁCIÓJA ---
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct UniversalDomain;
 
@@ -182,7 +175,6 @@ impl Domain for UniversalDomain {
     type SimdValue = f32x4; type ScalarValue = UniversalScalar; type TypeId = UniversalType;
 
     generate_domain_metadata! {
-        // Basic
         AddF => { arity: 2, weight: 1, ret_type: UniversalType::Float, expected: &[UniversalType::Float, UniversalType::Float] },
         SubF => { arity: 2, weight: 1, ret_type: UniversalType::Float, expected: &[UniversalType::Float, UniversalType::Float] },
         MulF => { arity: 2, weight: 1, ret_type: UniversalType::Float, expected: &[UniversalType::Float, UniversalType::Float] },
@@ -194,7 +186,6 @@ impl Domain for UniversalDomain {
         SqrtF => { arity: 1, weight: 2, ret_type: UniversalType::Float, expected: &[UniversalType::Float] },
         LnF => { arity: 1, weight: 4, ret_type: UniversalType::Float, expected: &[UniversalType::Float] },
         
-        // Vec2
         MakeVec2 => { arity: 2, weight: 2, ret_type: UniversalType::Vec2, expected: &[UniversalType::Float, UniversalType::Float] },
         GetXV2 => { arity: 1, weight: 2, ret_type: UniversalType::Float, expected: &[UniversalType::Vec2] },
         GetYV2 => { arity: 1, weight: 2, ret_type: UniversalType::Float, expected: &[UniversalType::Vec2] },
@@ -204,7 +195,6 @@ impl Domain for UniversalDomain {
         DotV2 => { arity: 2, weight: 2, ret_type: UniversalType::Float, expected: &[UniversalType::Vec2, UniversalType::Vec2] },
         NormV2 => { arity: 1, weight: 3, ret_type: UniversalType::Float, expected: &[UniversalType::Vec2] },
         
-        // Vec3
         MakeVec3 => { arity: 3, weight: 2, ret_type: UniversalType::Vec3, expected: &[UniversalType::Float, UniversalType::Float, UniversalType::Float] },
         GetXV3 => { arity: 1, weight: 2, ret_type: UniversalType::Float, expected: &[UniversalType::Vec3] },
         GetYV3 => { arity: 1, weight: 2, ret_type: UniversalType::Float, expected: &[UniversalType::Vec3] },
@@ -216,7 +206,6 @@ impl Domain for UniversalDomain {
         NormV3 => { arity: 1, weight: 3, ret_type: UniversalType::Float, expected: &[UniversalType::Vec3] },
         CrossV3 => { arity: 2, weight: 4, ret_type: UniversalType::Vec3, expected: &[UniversalType::Vec3, UniversalType::Vec3] },
         
-        // Mat2
         MakeMat2 => { arity: 2, weight: 3, ret_type: UniversalType::Mat2, expected: &[UniversalType::Vec2, UniversalType::Vec2] },
         AddM2 => { arity: 2, weight: 1, ret_type: UniversalType::Mat2, expected: &[UniversalType::Mat2, UniversalType::Mat2] },
         SubM2 => { arity: 2, weight: 1, ret_type: UniversalType::Mat2, expected: &[UniversalType::Mat2, UniversalType::Mat2] },
@@ -228,7 +217,6 @@ impl Domain for UniversalDomain {
         TransposeM2 => { arity: 1, weight: 3, ret_type: UniversalType::Mat2, expected: &[UniversalType::Mat2] },
         InverseM2 => { arity: 1, weight: 4, ret_type: UniversalType::Mat2, expected: &[UniversalType::Mat2] },
 
-        // Mat3
         MakeMat3 => { arity: 3, weight: 5, ret_type: UniversalType::Mat3, expected: &[UniversalType::Vec3, UniversalType::Vec3, UniversalType::Vec3] },
         AddM3 => { arity: 2, weight: 1, ret_type: UniversalType::Mat3, expected: &[UniversalType::Mat3, UniversalType::Mat3] },
         SubM3 => { arity: 2, weight: 1, ret_type: UniversalType::Mat3, expected: &[UniversalType::Mat3, UniversalType::Mat3] },
@@ -240,7 +228,6 @@ impl Domain for UniversalDomain {
         TransposeM3 => { arity: 1, weight: 3, ret_type: UniversalType::Mat3, expected: &[UniversalType::Mat3] },
         InverseM3 => { arity: 1, weight: 6, ret_type: UniversalType::Mat3, expected: &[UniversalType::Mat3] },
 
-        // Logic
         IfElseF => { arity: 3, weight: 4, ret_type: UniversalType::Float, expected: &[UniversalType::Bool, UniversalType::Float, UniversalType::Float] },
     }
 
@@ -351,12 +338,10 @@ impl Domain for UniversalDomain {
                         continue;
                     }
 
-                    // 1. Argumentumok leszedése a veremből
                     let mut args = Vec::with_capacity(arity);
                     for _ in 0..arity { args.push(stack.pop().unwrap()); }
                     args.reverse();
 
-                    // 2. Csak akkor nézzük az egyezést, ha 2 paraméter van
                     let mut args_equal = false;
                     if arity == 2 {
                         let a = &args[0]; let b = &args[1];
@@ -367,13 +352,11 @@ impl Domain for UniversalDomain {
 
                     let const_vals: Vec<Option<UniversalScalar>> = args.iter().map(|a| a.const_val).collect();
 
-                    // 3. Megkérjük a modulokat, hogy egyszerűsítsenek, ha tudnak
                     let mut action = linalg::try_simplify(op, &const_vals, args_equal);
                     if let SimplifyAction::None = action {
                         action = basic::try_simplify(op, &const_vals, args_equal);
                     }
 
-                    // 4. Az akció végrehajtása O(1) memóriafoglalással a copy_within (memmove) révén
                     match action {
                         SimplifyAction::ReplaceWithConstant(val) => {
                             output.truncate(args[0].start_idx);
@@ -398,7 +381,6 @@ impl Domain for UniversalDomain {
                             stack.push(kept_info);
                         },
                         SimplifyAction::None => {
-                            // Csekkoljuk a specifikus struktúrákat, pl ln(exp(x)) (megtartva a zero-cost filozófiát)
                             if arity == 1 && output.len() > args[0].start_idx {
                                 if let Node::Operator(child_op) = output[output.len() - 1] {
                                     match (op, child_op) {
@@ -466,7 +448,6 @@ impl Domain for UniversalDomain {
                     sp_m3 += 1;
                 },
 
-                // --- BASIC ---
                 UniversalInstruction::AddF => unsafe { basic::eval_add_f(&mut sp_f, &mut stack_f) },
                 UniversalInstruction::SubF => unsafe { basic::eval_sub_f(&mut sp_f, &mut stack_f) },
                 UniversalInstruction::MulF => unsafe { basic::eval_mul_f(&mut sp_f, &mut stack_f) },
@@ -478,7 +459,6 @@ impl Domain for UniversalDomain {
                 UniversalInstruction::SqrtF => unsafe { basic::eval_sqrt_f(&mut sp_f, &mut stack_f) },
                 UniversalInstruction::LnF => unsafe { basic::eval_ln_f(&mut sp_f, &mut stack_f) },
 
-                // --- LINALG ---
                 UniversalInstruction::MakeVec2 => unsafe { linalg::eval_make_vec2(&mut sp_f, &stack_f, &mut sp_v2, &mut stack_v2) },
                 UniversalInstruction::MakeVec3 => unsafe { linalg::eval_make_vec3(&mut sp_f, &stack_f, &mut sp_v3, &mut stack_v3) },
                 UniversalInstruction::GetXV2 => unsafe { linalg::eval_get_x_v2(&mut sp_f, &mut stack_f, &mut sp_v2, &stack_v2) },
@@ -552,7 +532,7 @@ impl Domain for UniversalDomain {
                     ];
                     sp_m3 += 1;
                 },
-                _ => {} // Logic jöhet
+                _ => {}
             }
         }
         unsafe { *stack_f.get_unchecked(0) }
@@ -600,7 +580,6 @@ impl Domain for UniversalDomain {
         let flat_features = &dataset.feature_flat;
         let targets = &dataset.target_batches;
         
-        // 1. Kiszámoljuk, hány laposított (f32) konstansunk van összesen
         let mut active_params_count = 0;
         for c in constants {
             active_params_count += match c {
@@ -615,42 +594,29 @@ impl Domain for UniversalDomain {
         active_params_count = active_params_count.min(32);
         
         if active_params_count == 0 {
-            // Ha nincsenek konstansok, csak a tiszta hibát (MSE) adjuk vissza
             return (Self::compute_mse(code, constants, dataset), [0.0; 32]);
         }
 
-        // 2. Végigmegyünk az adathalmazokon (SIMD iteráció)
         for i in 0..dataset.num_batches {
             let start = i * num_features;
-            // Biztonságos hozzáférés, ahogy az eredeti compute_mse-ben is csináltad
             let input_batch = unsafe { flat_features.get_unchecked(start..start + num_features) };
             let target = unsafe { *targets.get_unchecked(i) };
 
             let mut diff = f32x4::splat(0.0);
 
-            // 3. Lefuttatjuk a duális veremgépet minden egyes paraméterre!
             for k in 0..active_params_count {
                 let dual_result = Self::eval_simd_dual(code, constants, input_batch, k);
-                
-                // A predikció (dual_result.val) minden 'k' esetén megegyezik, 
-                // így elég csak az első körben kiszámolni a hibát (diff).
                 if k == 0 {
                     diff = dual_result.val - target;
                     sum_squared_error += diff * diff;
                 }
-                
-                // Láncszabály: grad = 2 * (y_pred - y_true) * dy_pred/dc_k
                 grad_sum[k] += f32x4::splat(2.0) * diff * dual_result.grad;
             }
         }
-
-        // 4. SIMD Regiszterek redukálása és átlagolása
         let num_samples_f32 = dataset.num_samples as f32;
         let total_mse = sum_squared_error.reduce_add() / num_samples_f32;
         
         if !total_mse.is_finite() {
-            // Ha NaN vagy Inf az MSE, az optimalizáló (L-BFGS) kapjon halálos büntetést
-            // és nulla gradienst, hogy ne tudjon merre indulni[cite: 1511].
             return (f32::MAX, [0.0; 32]);
         }
 
@@ -663,16 +629,12 @@ impl Domain for UniversalDomain {
     }
 }
 
-// (Feltételezzük, hogy a DualSimd a crate::domain::dual modulban van)
-
-
-// --- BASIC DUAL MŰVELETEK ---
 #[inline(always)] 
 pub unsafe fn eval_add_dual_f(sp_f: &mut usize, stack_f: &mut [DualSimd; 32]) {
     *sp_f -= 2;
     let a = *stack_f.get_unchecked(*sp_f);
     let b = *stack_f.get_unchecked(*sp_f + 1);
-    *stack_f.get_unchecked_mut(*sp_f) = a + b; // Itt a túlterhelt Add trait hívódik!
+    *stack_f.get_unchecked_mut(*sp_f) = a + b;
     *sp_f += 1;
 }
 
@@ -682,7 +644,6 @@ pub unsafe fn eval_sin_dual_f(sp_f: &mut usize, stack_f: &mut [DualSimd; 32]) {
     *stack_f.get_unchecked_mut(idx) = stack_f.get_unchecked(idx).sin();
 }
 
-// --- LINALG DUAL MŰVELETEK ---
 #[inline(always)] 
 pub unsafe fn eval_add_dual_v3(sp_v3: &mut usize, stack_v3: &mut [[DualSimd; 3]; 32]) {
     *sp_v3 -= 2;
@@ -697,7 +658,7 @@ pub unsafe fn eval_dot_dual_v3(sp_f: &mut usize, stack_f: &mut [DualSimd; 32], s
     *sp_v3 -= 2;
     let a = *stack_v3.get_unchecked(*sp_v3); 
     let b = *stack_v3.get_unchecked(*sp_v3 + 1);
-    *stack_f.get_unchecked_mut(*sp_f) = dual_dot_v3(&a, &b); // A korábban megírt matematikai mag
+    *stack_f.get_unchecked_mut(*sp_f) = dual_dot_v3(&a, &b);
     *sp_f += 1;
 }
 
@@ -709,7 +670,6 @@ impl UniversalDomain {
         features: &[f32x4],
         active_const_idx: usize,
     ) -> DualSimd {
-        // --- ZERO-COST VEREM ---
         let mut stack_f: [DualSimd; 32] = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
         let mut sp_f: usize = 0;
         let mut stack_v2: [[DualSimd; 2]; 32] = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
@@ -721,7 +681,6 @@ impl UniversalDomain {
         let mut stack_m3: [[DualSimd; 9]; 32] = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
         let mut sp_m3: usize = 0;
 
-        // Segédfüggvény a lapos (flattened) konstans index kiszámításához
         let get_flat_start_idx = |target_c_idx: usize| -> usize {
             let mut flat_idx = 0;
             for c in constants.iter().take(target_c_idx) {
@@ -737,15 +696,12 @@ impl UniversalDomain {
             flat_idx
         };
 
-        // Segédfüggvény a gradiens seedeléshez
         let get_grad = |flat_idx: usize| -> f32x4 {
             if flat_idx == active_const_idx { f32x4::splat(1.0) } else { f32x4::splat(0.0) }
         };
 
-        // --- BYTECODE CIKLUS ---
         for op in code {
             match op {
-                // BEKÖTÉS: BEMENETI ADATOK (Grad = 0)
                 UniversalInstruction::LoadVarF(idx) => unsafe { 
                     *stack_f.get_unchecked_mut(sp_f) = DualSimd::constant(*features.get_unchecked(*idx as usize));
                     sp_f += 1; 
@@ -767,9 +723,6 @@ impl UniversalDomain {
                     ];
                     sp_v3 += 1;
                 },
-                // (LoadVarM2 és LoadVarM3 analóg módon...)
-
-                // BEKÖTÉS: KONSTANSOK (Itt dől el a deriválás iránya!)
                 UniversalInstruction::LoadConstF(idx) => unsafe {
                     if let UniversalScalar::Float(val) = constants.get_unchecked(*idx as usize) {
                         let flat_idx = get_flat_start_idx(*idx as usize);
@@ -798,9 +751,6 @@ impl UniversalDomain {
                     }
                     sp_v3 += 1;
                 },
-                // (LoadConstM2 és LoadConstM3 analóg módon... az ofszetek +0..+3 és +0..+8)
-
-                // --- BASIC MŰVELETEK ---
                 UniversalInstruction::AddF => unsafe { eval_add_dual_f(&mut sp_f, &mut stack_f) },
                 UniversalInstruction::SubF => unsafe { eval_sub_dual_f(&mut sp_f, &mut stack_f) },
                 UniversalInstruction::MulF => unsafe { eval_mul_dual_f(&mut sp_f, &mut stack_f) },
@@ -812,8 +762,6 @@ impl UniversalDomain {
                 UniversalInstruction::SqrtF => unsafe { eval_sqrt_dual_f(&mut sp_f, &mut stack_f) },
                 UniversalInstruction::LnF => unsafe { eval_ln_dual_f(&mut sp_f, &mut stack_f) },
 
-                // --- LINALG MŰVELETEK (Példák bekötve, a többi ugyanígy) ---
-                // --- LINALG MŰVELETEK ---
                 UniversalInstruction::MakeVec2 => unsafe { eval_make_dual_vec2(&mut sp_f, &stack_f, &mut sp_v2, &mut stack_v2) },
                 UniversalInstruction::MakeVec3 => unsafe { eval_make_dual_vec3(&mut sp_f, &stack_f, &mut sp_v3, &mut stack_v3) },
                 UniversalInstruction::GetXV2 => unsafe { eval_get_x_dual_v2(&mut sp_f, &mut stack_f, &mut sp_v2, &stack_v2) },
@@ -855,7 +803,7 @@ impl UniversalDomain {
                 UniversalInstruction::TraceM3 => unsafe { eval_trace_dual_m3(&mut sp_f, &mut stack_f, &mut sp_m3, &stack_m3) },
                 UniversalInstruction::TransposeM3 => unsafe { eval_transpose_dual_m3(&mut sp_m3, &mut stack_m3) },
                 
-                _ => {} // Itt már TÉNYLEG csak a biztonságos fallback maradt (Inverzek és IfElse)
+                _ => {}
             }
         }
         

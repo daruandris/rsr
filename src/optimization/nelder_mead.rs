@@ -2,7 +2,7 @@ use crate::engine::individual::Individual;
 use crate::metrics::dataset::SimdDataset;
 use crate::domain::Domain;
 
-const L1_REG_LAMBDA: f32 = 0.01; // <-- ÚJ: L1 büntetés ereje (Finomhangolható, lehet 0.005 is)
+const L1_REG_LAMBDA: f32 = 0.01;
 
 pub fn run_nelder_mead<D: Domain>(
     ind: &mut Individual<D>, 
@@ -11,8 +11,6 @@ pub fn run_nelder_mead<D: Domain>(
 ) {
     if ind.program.is_none() { ind.compile(); }
     let program = match &mut ind.program { Some(p) => p, None => return, };
-
-    // 1. Kigyűjtjük CSAK a Float konstansokat (ZERO HEAP)
     let mut start_consts = [0.0; 32];
     let mut opt_indices = [0usize; 32];
     let mut n = 0;
@@ -30,19 +28,12 @@ pub fn run_nelder_mead<D: Domain>(
     if n == 0 { return; } 
 
     const ALPHA: f32 = 1.0; const GAMMA: f32 = 2.0; const RHO: f32 = 0.5; const SIGMA: f32 = 0.5;
-    
-    // --- TUPLE VÁLTOZÁS: (Fitness, Tiszta MSE, Konstansok) ---
-    // A Nelder-Mead a Fitness (0. elem) alapján fog szortírozni!
     let mut simplex = [(0.0f32, 0.0f32, [0.0f32; 32]); 33];
-    
-    // Zero-cost belső mutáló lambdánk
     let update_constants = |prog_consts: &mut Vec<D::ScalarValue>, vals: &[f32; 32]| {
         for j in 0..n {
             prog_consts[opt_indices[j]] = D::scalar_from_f32(vals[j]);
         }
     };
-
-    // Zero-cost Fitness kalkulátor
     let evaluate = |prog_consts: &mut Vec<D::ScalarValue>, vals: &[f32; 32]| -> (f32, f32) {
         update_constants(prog_consts, vals);
         let mse = D::compute_mse(&program.code, prog_consts, dataset);
@@ -54,7 +45,6 @@ pub fn run_nelder_mead<D: Domain>(
     let (start_fit, start_mse) = evaluate(&mut program.constants, &start_consts);
     simplex[0] = (start_fit, start_mse, start_consts);
 
-    // Kezdeti Simplex pontok generálása
     for i in 0..n {
         let mut new_point = start_consts;
         let val = new_point[i];
@@ -68,26 +58,23 @@ pub fn run_nelder_mead<D: Domain>(
     let mut expanded = [0.0; 32]; let mut contracted = [0.0; 32];
 
     for _ in 0..max_iterations {
-        // Rendezzük a Simplex-et a FITNESS (0. elem) alapján!
         simplex[0..=n].sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
         
         let best_fit = simplex[0].0;
         let best_mse = simplex[0].1;
         let worst_fit = simplex[n].0;
 
-        // Korai kilépés, ha nagyon pici a Fitness szórás, VAGY a tiszta MSE kiváló
         if (worst_fit - best_fit).abs() < 1e-7 || best_mse < 1e-8 { break; }
         
         centroid.fill(0.0);
         for i in 0..n {
-            for j in 0..n { centroid[j] += simplex[i].2[j]; } // 2. elem a konstans tömb
+            for j in 0..n { centroid[j] += simplex[i].2[j]; }
         }
         for j in 0..n { centroid[j] /= n as f32; }
 
         let worst_point = simplex[n].2;
         let second_worst_fit = simplex[n - 1].0;
 
-        // --- REFLECTION ---
         for j in 0..n { reflected[j] = centroid[j] + ALPHA * (centroid[j] - worst_point[j]); }
         let (reflected_fit, reflected_mse) = evaluate(&mut program.constants, &reflected);
 
@@ -96,7 +83,6 @@ pub fn run_nelder_mead<D: Domain>(
             continue;
         }
 
-        // --- EXPANSION ---
         if reflected_fit < best_fit {
             for j in 0..n { expanded[j] = centroid[j] + GAMMA * (reflected[j] - centroid[j]); }
             let (expanded_fit, expanded_mse) = evaluate(&mut program.constants, &expanded);
@@ -109,7 +95,6 @@ pub fn run_nelder_mead<D: Domain>(
             continue;
         }
         
-        // --- CONTRACTION ---
         let limit_fit = if reflected_fit < worst_fit {
             for j in 0..n { contracted[j] = centroid[j] + RHO * (reflected[j] - centroid[j]); }
             reflected_fit
@@ -125,7 +110,6 @@ pub fn run_nelder_mead<D: Domain>(
             continue;
         }
 
-        // --- SHRINK ---
         let best_point = simplex[0].2;
         for i in 1..=n {
             for j in 0..n { simplex[i].2[j] = best_point[j] + SIGMA * (simplex[i].2[j] - best_point[j]); }
@@ -135,11 +119,9 @@ pub fn run_nelder_mead<D: Domain>(
         }
     }
 
-    // Végső sorrendbe állítás
     simplex[0..=n].sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
     update_constants(&mut program.constants, &simplex[0].2);
     
-    // Szinkronizálás a fa-reprezentációval (ugyanaz marad)
     let best_consts = &program.constants;
     let mut const_idx = 0;
     
@@ -151,7 +133,5 @@ pub fn run_nelder_mead<D: Domain>(
             }
         }
     }
-    
-    // Az egyed MSE fitneszét elmentjük (ne a regularizáltat, mert az becsaphatja az evolúciós szelekciót, ha már nullára ment a hiba!)
     ind.fitness = simplex[0].1;
 }

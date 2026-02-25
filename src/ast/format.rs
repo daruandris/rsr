@@ -9,26 +9,20 @@ pub fn format_ast<D: Domain>(nodes: &[Node<D>]) -> String {
 
     for node in nodes {
         match node {
-            // A D::ScalarValue-ra kikötöttük a traitben, hogy implementálja a Display-t
             Node::Constant(c,_) => stack.push(format!("{:.3}", c)),
             Node::Variable(v, type_id) => stack.push(format!("X{}_{:?}", v, type_id)),
             Node::Operator(op) => {
                 let arity = D::operator_arity(op);
                 let mut args = Vec::with_capacity(arity);
-                
-                // Mivel a stack-ről fordított sorrendben jönnek le a dolgok (LIFO),
-                // először kivesszük őket...
+
                 for _ in 0..arity {
                     if let Some(arg) = stack.pop() {
                         args.push(arg);
                     } else {
-                        args.push("?".to_string()); // Biztonsági tartalék érvénytelen fákra
+                        args.push("?".to_string());
                     }
                 }
-                // ...majd megfordítjuk, hogy a bal argumentum legyen az args[0]
                 args.reverse();
-                
-                // Rábízzuk a Domain-re a string összerakását
                 stack.push(D::format_operator(op, &args));
             }
         }

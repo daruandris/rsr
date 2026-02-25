@@ -11,7 +11,6 @@ pub fn generate_random_ast<D: Domain>(
 ) -> Vec<Node<D>> {
     let cap = 1 << (max_depth.min(6));
     let mut nodes = Vec::with_capacity(cap);
-    // Induláskor nincs szülő (None)
     build_ast_recursive::<D>(&mut nodes, target_type, 0, max_depth, rng, variables, allowed_ops, None);
     nodes
 }
@@ -66,12 +65,10 @@ fn add_operator_node<D: Domain>(
     allowed_ops: &[D::Operator],
     parent_op: Option<D::Operator>
 ) {
-    // Átadjuk a szülőt a sorsolónak!
     if let Some(chosen_op) = D::random_operator(target_type, allowed_ops, parent_op, rng) {
         let expected_children_types = D::expected_types(&chosen_op);
         
         for &child_type in expected_children_types {
-            // A rekurzióban a most kisorsolt operátor (chosen_op) lesz az új szülő!
             build_ast_recursive::<D>(nodes, child_type, current_depth + 1, max_depth, rng, variables, allowed_ops, Some(chosen_op));
         }
         

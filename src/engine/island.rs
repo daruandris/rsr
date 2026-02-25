@@ -1,4 +1,3 @@
-// src/engine/island.rs
 use std::mem;
 use std::collections::HashMap;
 use rand::SeedableRng;
@@ -12,7 +11,6 @@ use crate::engine::strategy::Strategy;
 use crate::engine::individual::Individual;
 use crate::metrics::dataset::SimdDataset;
 
-// Az operátorok is generikusak lesznek: `<D: Domain>`
 use crate::operators::crossover::crossover;
 use crate::operators::generator::generate_random_ast;
 use crate::operators::mutation::{constant_perturbation, point_mutation, subtree_mutation};

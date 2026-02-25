@@ -1,4 +1,3 @@
-// src/engine/mod.rs
 use rayon::prelude::*;
 use std::collections::HashMap;
 
@@ -74,7 +73,6 @@ impl<S: Strategy, D: Domain> Engine<S, D> {
         let mut final_best = self.get_global_best().clone();
         final_best.optimize_constants(dataset, final_opt_iters);
         
-        // Csatold ide a végső printelést (a dataset real-world skálázásával)
     }
 
     fn migrate_individuals(&mut self) {

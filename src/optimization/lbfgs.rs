@@ -4,7 +4,7 @@ use crate::domain::Domain;
 use crate::domain::universal::UniversalScalar;
 
 const MAX_PARAMS: usize = 32;
-const M: usize = 6; // Az L-BFGS memória mérete (5-10 között ideális)
+const M: usize = 6;
 
 pub fn run_lbfgs<D: Domain<ScalarValue = UniversalScalar>>(
     ind: &mut Individual<D>, 
@@ -16,11 +16,9 @@ pub fn run_lbfgs<D: Domain<ScalarValue = UniversalScalar>>(
     }
     let program = match ind.program.as_mut() { Some(p) => p, None => return, };
 
-    // 1. KIGYŰJTÉS (Ugyanúgy, mint a Nelder-Meadnél vagy CMA-ES-nél)
     let mut x = [0.0f32; MAX_PARAMS];
     let mut n = 0;
     
-    // Először megszámoljuk a laposított (f32) konstansok számát
     for c in &program.constants {
         n += match c {
             UniversalScalar::Float(_) => 1,
@@ -34,7 +32,6 @@ pub fn run_lbfgs<D: Domain<ScalarValue = UniversalScalar>>(
     n = n.min(MAX_PARAMS);
     if n == 0 { return; }
 
-    // Feltöltjük az X vektort
     let mut ptr = 0;
     for c in &program.constants {
         match c {
@@ -47,7 +44,6 @@ pub fn run_lbfgs<D: Domain<ScalarValue = UniversalScalar>>(
         }
     }
 
-    // Visszacsomagoló closure
     let update_constants = |prog_consts: &mut Vec<UniversalScalar>, flat_vals: &[f32; MAX_PARAMS]| {
         let mut p = 0;
         for c in prog_consts.iter_mut() {
@@ -62,7 +58,6 @@ pub fn run_lbfgs<D: Domain<ScalarValue = UniversalScalar>>(
         }
     };
 
-    // --- L-BFGS WORKSPACE (STACK ALLOCATED) ---
     let mut s = [[0.0f32; MAX_PARAMS]; M];
     let mut y = [[0.0f32; MAX_PARAMS]; M];
     let mut rho = [0.0f32; M];
@@ -70,19 +65,16 @@ pub fn run_lbfgs<D: Domain<ScalarValue = UniversalScalar>>(
     
     let mut q = [0.0f32; MAX_PARAMS];
     
-    // Kezdeti MSE és Gradiens számítás (Itt hívjuk meg a frissen írt duális motorunkat!)
     let (mut current_mse, mut current_grad) = D::compute_mse_with_gradient(&program.code, &program.constants, dataset);
     
     let mut history_size = 0;
-    let mut head = 0; // Ring buffer index
+    let mut head = 0;
 
     for _iter in 0..max_iterations {
-        // Ellenőrizzük a gradiens normáját (konvergencia feltétel)
         let mut grad_norm_sq: f32 = 0.0;
         for i in 0..n { grad_norm_sq += current_grad[i] * current_grad[i]; }
         if grad_norm_sq.sqrt() < 1e-5 { break; }
 
-        // 1. KÉTHUROK-REKURZIÓ (Keresési irány: p)
         for i in 0..n { q[i] = current_grad[i]; }
         
         let mut curr_idx = head;
@@ -126,14 +118,12 @@ pub fn run_lbfgs<D: Domain<ScalarValue = UniversalScalar>>(
             dir_dot_grad += p[j] * current_grad[j];
         }
 
-        // Biztonsági reset: ha az irány nem süllyedő, visszatérünk a negatív gradienshez
         if dir_dot_grad > -1e-8 {
             for j in 0..n { p[j] = -current_grad[j]; }
             dir_dot_grad = -grad_norm_sq;
-            history_size = 0; // Töröljük a memóriát
+            history_size = 0;
         }
 
-        // 2. BACKTRACKING LINE SEARCH (Armijo-feltétel)
         let mut step_size = 1.0f32;
         let c1 = 1e-4;
         let mut next_x = [0.0f32; MAX_PARAMS];
@@ -146,14 +136,13 @@ pub fn run_lbfgs<D: Domain<ScalarValue = UniversalScalar>>(
             let mse = D::compute_mse(&program.code, &program.constants, dataset);
             
             if mse <= current_mse + c1 * step_size * dir_dot_grad || ls_iters > 10 {
-                break mse; // Itt adjuk vissza a két változót!
+                break mse;
             }
-            step_size *= 0.5; // Visszalépés (Backtracking)
+            step_size *= 0.5;
             ls_iters += 1;
         };
         let (_, next_grad) = D::compute_mse_with_gradient(&program.code, &program.constants, dataset);
 
-        // 3. L-BFGS MEMÓRIA FRISSÍTÉSE
         let mut s_new = [0.0f32; MAX_PARAMS];
         let mut y_new = [0.0f32; MAX_PARAMS];
         let mut dot_sy = 0.0;
@@ -175,17 +164,14 @@ pub fn run_lbfgs<D: Domain<ScalarValue = UniversalScalar>>(
             if history_size < M { history_size += 1; }
         }
 
-        // Átállás a következő iterációra
         for j in 0..n { x[j] = next_x[j]; }
         current_mse = next_mse;
         current_grad = next_grad;
     }
 
-    // --- VÉGLEGESÍTÉS ---
     update_constants(&mut program.constants, &x);
     ind.fitness = current_mse;
     
-    // Szinkronizálás a fa-reprezentációval
     let mut const_idx = 0;
     for node in ind.nodes.iter_mut() {
         if let crate::ast::node::Node::Constant(val, _) = node {

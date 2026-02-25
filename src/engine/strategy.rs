@@ -2,11 +2,9 @@ use crate::engine::config::{EvolutionConfig, OpModule};
 use crate::domain::universal::{UniversalOp};
 
 pub trait Strategy: Clone + Send + Sync {
-    // Architektúrális paraméterek
     fn num_islands(&self) -> usize;
     fn island_size(&self) -> usize;
     
-    // Evolúciós paraméterek
     fn max_generations(&self) -> usize;
     fn target_mse(&self) -> f32;
     fn crossover_rate(&self) -> f32;
@@ -14,27 +12,22 @@ pub trait Strategy: Clone + Send + Sync {
     fn migration_interval(&self) -> usize;
     fn parsimony_penalty(&self) -> f32;
     
-    // Mutációs és generálási paraméterek
     fn random_injection_rate(&self) -> f32;
     fn min_random_injection(&self) -> usize;
     fn max_tree_size(&self) -> usize;
     fn mutation_max_depth(&self) -> usize;
     fn mutation_cycles(&self) -> usize;
     
-    // Optimalizációs paraméterek
     fn opt_prob(&self) -> f32;
     fn opt_iterations(&self) -> usize;
     fn final_opt_iterations(&self) -> usize;
     
-    // Stagnálás paraméterek
     fn stagnation_threshold(&self) -> usize;
     fn min_improvement(&self) -> f32;
     
-    // Egyéb
     fn verbose(&self) -> bool;
     fn get_allowed_operators(&self) -> Vec<UniversalOp>;
 
-    // --- ESEMÉNYEK (Hooks) a későbbi dinamikus tanuláshoz ---
     fn on_generation_end(&mut self, _best_mse: f32, _stagnation_counter: usize) {}
     fn on_nuke(&mut self) {}
 }

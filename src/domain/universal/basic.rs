@@ -2,7 +2,6 @@
 
 use wide::{f32x4};
 use crate::domain::universal::{UniversalOp, UniversalScalar, SimplifyAction};
-// --- SIMD KIÉRTÉKELÉS ---
 
 #[inline(always)] pub unsafe fn eval_add_f(sp_f: &mut usize, stack_f: &mut [f32x4; 32]) {
     *sp_f -= 2; *stack_f.get_unchecked_mut(*sp_f) = *stack_f.get_unchecked(*sp_f) + *stack_f.get_unchecked(*sp_f + 1); *sp_f += 1;
@@ -17,7 +16,6 @@ use crate::domain::universal::{UniversalOp, UniversalScalar, SimplifyAction};
     *sp_f -= 2; 
     let a = *stack_f.get_unchecked(*sp_f); 
     let b = *stack_f.get_unchecked(*sp_f + 1);
-    // Nincs több biztonsági blend, nyers IEEE 754 osztás (0 esetén Infinity vagy NaN lesz)
     *stack_f.get_unchecked_mut(*sp_f) = a / b; 
     *sp_f += 1;
 }
@@ -35,16 +33,12 @@ use crate::domain::universal::{UniversalOp, UniversalScalar, SimplifyAction};
 }
 #[inline(always)] pub unsafe fn eval_sqrt_f(sp_f: &mut usize, stack_f: &mut [f32x4; 32]) {
     let idx = *sp_f - 1; 
-    // Nincs .abs() hívás. Ha a regiszter negatívot kap, a kimenet NaN lesz!
     *stack_f.get_unchecked_mut(idx) = stack_f.get_unchecked(idx).sqrt();
 }
 #[inline(always)] pub unsafe fn eval_ln_f(sp_f: &mut usize, stack_f: &mut [f32x4; 32]) {
     let idx = *sp_f - 1; 
-    // Nincs .abs() és + 1e-9! Negatív esetén NaN, 0 esetén -Infinity.
     *stack_f.get_unchecked_mut(idx) = stack_f.get_unchecked(idx).ln();
 }
-
-// --- FORMÁZÁS ---
 
 pub fn format_op(op: UniversalOp, args: &[String]) -> Option<String> {
     match op {
@@ -62,9 +56,7 @@ pub fn format_op(op: UniversalOp, args: &[String]) -> Option<String> {
     }
 }
 
-// --- BASIC ALGEBRAIC SIMPLIFICATION ---
 pub fn try_simplify(op: UniversalOp, const_vals: &[Option<UniversalScalar>], args_equal: bool) -> SimplifyAction {
-    // 1. Teljes konstans kiértékelés (Folding)
     let all_const = const_vals.iter().all(|c| c.is_some());
     if all_const {
         let vals: Vec<UniversalScalar> = const_vals.iter().map(|c| c.unwrap()).collect();
@@ -75,7 +67,6 @@ pub fn try_simplify(op: UniversalOp, const_vals: &[Option<UniversalScalar>], arg
         }
     }
 
-    // 2. Szabály alapú egyszerűsítések (Algebrai identitások)
     if const_vals.len() == 2 {
         let a_is_zero = const_vals[0].as_ref().map_or(false, |c| c.is_zero());
         let b_is_zero = const_vals[1].as_ref().map_or(false, |c| c.is_zero());

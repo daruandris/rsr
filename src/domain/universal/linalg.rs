@@ -2,7 +2,7 @@
 
 use wide::{f32x4, CmpLt};
 use crate::domain::universal::{UniversalOp, UniversalScalar, SimplifyAction};
-// --- VEKTOR KONSTRUKTOROK ÉS GETTEREK ---
+
 #[inline(always)] pub unsafe fn eval_make_vec2(sp_f: &mut usize, stack_f: &[f32x4; 32], sp_v2: &mut usize, stack_v2: &mut [[f32x4; 2]; 32]) {
     *sp_f -= 2; *stack_v2.get_unchecked_mut(*sp_v2) = [*stack_f.get_unchecked(*sp_f), *stack_f.get_unchecked(*sp_f + 1)]; *sp_v2 += 1;
 }
@@ -25,7 +25,6 @@ use crate::domain::universal::{UniversalOp, UniversalScalar, SimplifyAction};
     *sp_v3 -= 1; *stack_f.get_unchecked_mut(*sp_f) = stack_v3.get_unchecked(*sp_v3)[2]; *sp_f += 1;
 }
 
-// --- 2D VEKTOR MATEMATIKA ---
 #[inline(always)] pub unsafe fn eval_add_v2(sp_v2: &mut usize, stack_v2: &mut [[f32x4; 2]; 32]) {
     *sp_v2 -= 2; let a = *stack_v2.get_unchecked(*sp_v2); let b = *stack_v2.get_unchecked(*sp_v2 + 1); *stack_v2.get_unchecked_mut(*sp_v2) = [a[0]+b[0], a[1]+b[1]]; *sp_v2 += 1;
 }
@@ -42,7 +41,6 @@ use crate::domain::universal::{UniversalOp, UniversalScalar, SimplifyAction};
     let idx = *sp_v2 - 1; let v = *stack_v2.get_unchecked(idx); *stack_f.get_unchecked_mut(*sp_f) = ((v[0]*v[0]) + (v[1]*v[1])).sqrt(); *sp_f += 1; *sp_v2 -= 1;
 }
 
-// --- 3D VEKTOR MATEMATIKA ---
 #[inline(always)] pub unsafe fn eval_add_v3(sp_v3: &mut usize, stack_v3: &mut [[f32x4; 3]; 32]) {
     *sp_v3 -= 2; let a = *stack_v3.get_unchecked(*sp_v3); let b = *stack_v3.get_unchecked(*sp_v3 + 1); *stack_v3.get_unchecked_mut(*sp_v3) = [a[0]+b[0], a[1]+b[1], a[2]+b[2]]; *sp_v3 += 1;
 }
@@ -63,7 +61,6 @@ use crate::domain::universal::{UniversalOp, UniversalScalar, SimplifyAction};
     *stack_v3.get_unchecked_mut(*sp_v3) = [a[1]*b[2] - a[2]*b[1], a[2]*b[0] - a[0]*b[2], a[0]*b[1] - a[1]*b[0]]; *sp_v3 += 1;
 }
 
-// --- 2x2 MÁTRIX MŰVELETEK ---
 #[inline(always)] pub unsafe fn eval_make_mat2(sp_v2: &mut usize, stack_v2: &[[f32x4; 2]; 32], sp_m2: &mut usize, stack_m2: &mut [[f32x4; 4]; 32]) {
     *sp_v2 -= 2; let c0 = *stack_v2.get_unchecked(*sp_v2); let c1 = *stack_v2.get_unchecked(*sp_v2 + 1); *stack_m2.get_unchecked_mut(*sp_m2) = [c0[0], c0[1], c1[0], c1[1]]; *sp_m2 += 1;
 }
@@ -103,7 +100,6 @@ use crate::domain::universal::{UniversalOp, UniversalScalar, SimplifyAction};
     ];
 }
 
-// --- 3x3 MÁTRIX MŰVELETEK ---
 #[inline(always)] pub unsafe fn eval_make_mat3(sp_v3: &mut usize, stack_v3: &[[f32x4; 3]; 32], sp_m3: &mut usize, stack_m3: &mut [[f32x4; 9]; 32]) {
     *sp_v3 -= 3; let c0 = *stack_v3.get_unchecked(*sp_v3); let c1 = *stack_v3.get_unchecked(*sp_v3 + 1); let c2 = *stack_v3.get_unchecked(*sp_v3 + 2);
     *stack_m3.get_unchecked_mut(*sp_m3) = [c0[0], c0[1], c0[2], c1[0], c1[1], c1[2], c2[0], c2[1], c2[2]]; *sp_m3 += 1;
@@ -160,8 +156,6 @@ use crate::domain::universal::{UniversalOp, UniversalScalar, SimplifyAction};
     ];
 }
 
-// --- FORMÁZÁS ---
-
 pub fn format_op(op: UniversalOp, args: &[String]) -> Option<String> {
     match op {
         UniversalOp::MakeVec2 => Some(format!("({}, {})", args[0], args[1])),
@@ -184,7 +178,6 @@ pub fn format_op(op: UniversalOp, args: &[String]) -> Option<String> {
     }
 }
 
-// --- LINALG ALGEBRAIC SIMPLIFICATION ---
 pub fn try_simplify(op: UniversalOp, const_vals: &[Option<UniversalScalar>], args_equal: bool) -> SimplifyAction {
     let all_const = const_vals.iter().all(|c| c.is_some());
     if all_const {
@@ -253,7 +246,6 @@ pub fn try_simplify(op: UniversalOp, const_vals: &[Option<UniversalScalar>], arg
     SimplifyAction::None
 }
 
-// MASSZÍV PATTERN MATCHING A LINALG KONSTANSOK ÖSSZEHAJTÁSÁRA
 fn fold_constants(op: UniversalOp, args: &[UniversalScalar]) -> Option<UniversalScalar> {
     use UniversalScalar::*;
     match (op, args) {

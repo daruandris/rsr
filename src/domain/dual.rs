@@ -4,8 +4,8 @@ use wide::{f32x4, CmpLt};
 
 #[derive(Clone, Copy, Debug)]
 pub struct DualSimd {
-    pub val: f32x4,   // Primal érték
-    pub grad: f32x4,  // Tangent (derivált) érték
+    pub val: f32x4,
+    pub grad: f32x4, 
 }
 
 impl DualSimd {
@@ -16,12 +16,8 @@ impl DualSimd {
 
     #[inline(always)]
     pub fn constant(val: f32x4) -> Self {
-        // A konstansok (és bemeneti adatok) deriváltja alapértelmezetten 0
         Self { val, grad: f32x4::splat(0.0) }
     }
-
-    // --- Egyváltozós matematikai függvények (Láncszabály alkalmazása) ---
-
     #[inline(always)]
     pub fn sin(self) -> Self {
         Self {
@@ -73,8 +69,6 @@ impl DualSimd {
     }
 }
 
-// --- Operátor túlterhelések (Operator Overloading) ---
-
 impl Add for DualSimd {
     type Output = Self;
     #[inline(always)]
@@ -122,9 +116,7 @@ impl Div for DualSimd {
 
 #[inline(always)]
 pub fn dual_dot_v3(a: &[DualSimd; 3], b: &[DualSimd; 3]) -> DualSimd {
-    // U_p * V_p
     let val = (a[0].val * b[0].val) + (a[1].val * b[1].val) + (a[2].val * b[2].val);
-    // U_p * V_d + U_d * V_p
     let grad = (a[0].val * b[0].grad + a[0].grad * b[0].val) +
                (a[1].val * b[1].grad + a[1].grad * b[1].val) +
                (a[2].val * b[2].grad + a[2].grad * b[2].val);
@@ -136,10 +128,7 @@ pub fn dual_norm_v3(v: &[DualSimd; 3]) -> DualSimd {
     let dot_p = (v[0].val * v[0].val) + (v[1].val * v[1].val) + (v[2].val * v[2].val);
     let norm_p = dot_p.sqrt();
     
-    // Védelem a nullával osztás ellen
     let safe_norm = norm_p.simd_lt(f32x4::splat(1e-9)).blend(f32x4::splat(1.0), norm_p);
-    
-    // (V_p * V_d) / ||V_p||
     let dot_pd = (v[0].val * v[0].grad) + (v[1].val * v[1].grad) + (v[2].val * v[2].grad);
     let grad = dot_pd / safe_norm;
     
@@ -164,21 +153,13 @@ pub fn dual_cross_v3(a: &[DualSimd; 3], b: &[DualSimd; 3]) -> [DualSimd; 3] {
     ]
 }
 
-// --- 2x2 MÁTRIX MŰVELETEK ---
-
 #[inline(always)]
 pub fn dual_mul_m2(a: &[DualSimd; 4], b: &[DualSimd; 4]) -> [DualSimd; 4] {
-    // Mátrixszorzás szabálya: AB = A_p*B_p + (A_p*B_d + A_d*B_p)e
     let mut out = [DualSimd::constant(f32x4::splat(0.0)); 4];
-    
-    // Indexek: 0: 00, 1: 01, 2: 10, 3: 11
-    // Primal (A_p * B_p)
     out[0].val = a[0].val * b[0].val + a[2].val * b[1].val;
     out[1].val = a[1].val * b[0].val + a[3].val * b[1].val;
     out[2].val = a[0].val * b[2].val + a[2].val * b[3].val;
     out[3].val = a[1].val * b[2].val + a[3].val * b[3].val;
-
-    // Tangent (A_p * B_d + A_d * B_p)
     out[0].grad = (a[0].val * b[0].grad + a[2].val * b[1].grad) + (a[0].grad * b[0].val + a[2].grad * b[1].val);
     out[1].grad = (a[1].val * b[0].grad + a[3].val * b[1].grad) + (a[1].grad * b[0].val + a[3].grad * b[1].val);
     out[2].grad = (a[0].val * b[2].grad + a[2].val * b[3].grad) + (a[0].grad * b[2].val + a[2].grad * b[3].val);
@@ -189,7 +170,6 @@ pub fn dual_mul_m2(a: &[DualSimd; 4], b: &[DualSimd; 4]) -> [DualSimd; 4] {
 
 #[inline(always)]
 pub fn dual_inverse_m2(m: &[DualSimd; 4]) -> [DualSimd; 4] {
-    // 1. Kiszámoljuk az A_p inverzét
     let det_p = (m[0].val * m[3].val) - (m[1].val * m[2].val);
     let is_singular = det_p.abs().simd_lt(f32x4::splat(1e-9));
     let safe_det = is_singular.blend(f32x4::splat(1.0), det_p);
@@ -201,15 +181,12 @@ pub fn dual_inverse_m2(m: &[DualSimd; 4]) -> [DualSimd; 4] {
     inv_p[2] = is_singular.blend(f32x4::splat(0.0), -m[2].val * inv_d);
     inv_p[3] = is_singular.blend(f32x4::splat(1.0), m[0].val * inv_d);
 
-    // 2. Kiszámoljuk a tangenst: - A_p^{-1} * A_d * A_p^{-1}
-    // Először: Temp = A_p^{-1} * A_d
     let mut temp = [f32x4::splat(0.0); 4];
     temp[0] = inv_p[0] * m[0].grad + inv_p[2] * m[1].grad;
     temp[1] = inv_p[1] * m[0].grad + inv_p[3] * m[1].grad;
     temp[2] = inv_p[0] * m[2].grad + inv_p[2] * m[3].grad;
     temp[3] = inv_p[1] * m[2].grad + inv_p[3] * m[3].grad;
 
-    // Majd: Grad = - Temp * A_p^{-1}
     let mut out = [DualSimd::constant(f32x4::splat(0.0)); 4];
     out[0].val = inv_p[0];
     out[1].val = inv_p[1];
@@ -289,7 +266,6 @@ pub fn dual_inverse_m2(m: &[DualSimd; 4]) -> [DualSimd; 4] {
     let idx = *sp_f - 1; *stack_f.get_unchecked_mut(idx) = stack_f.get_unchecked(idx).ln();
 }
 
-// --- LINALG DUAL MŰVELETEK (V2, V3, M2, M3) ---
 #[inline(always)] pub unsafe fn eval_get_x_dual_v2(sp_f: &mut usize, stack_f: &mut [DualSimd; 32], sp_v2: &mut usize, stack_v2: &[[DualSimd; 2]; 32]) { *sp_v2 -= 1; *stack_f.get_unchecked_mut(*sp_f) = stack_v2.get_unchecked(*sp_v2)[0]; *sp_f += 1; }
 #[inline(always)] pub unsafe fn eval_get_y_dual_v2(sp_f: &mut usize, stack_f: &mut [DualSimd; 32], sp_v2: &mut usize, stack_v2: &[[DualSimd; 2]; 32]) { *sp_v2 -= 1; *stack_f.get_unchecked_mut(*sp_f) = stack_v2.get_unchecked(*sp_v2)[1]; *sp_f += 1; }
 #[inline(always)] pub unsafe fn eval_get_x_dual_v3(sp_f: &mut usize, stack_f: &mut [DualSimd; 32], sp_v3: &mut usize, stack_v3: &[[DualSimd; 3]; 32]) { *sp_v3 -= 1; *stack_f.get_unchecked_mut(*sp_f) = stack_v3.get_unchecked(*sp_v3)[0]; *sp_f += 1; }

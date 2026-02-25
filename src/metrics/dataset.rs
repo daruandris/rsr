@@ -15,12 +15,9 @@ pub struct SimdDataset {
     
     pub is_normalized: bool,
     pub feature_types: Vec<UniversalType>,
-    // ÚJ (Előkészület): Később itt tárolhatjuk, hogy melyik oszlop milyen típusú
-    // pub feature_types: Vec<UniversalType>, 
 }
 
 impl SimdDataset {
-    // ÚJ: Hozzáadtuk a `normalize` paramétert!
     pub fn new(data_x: &[Vec<f32>], data_y: &[f32], feature_types: Vec<UniversalType>, normalize: bool) -> Self {
         let num_samples = data_x.len();
         let mut num_features_usize = 0;
@@ -41,7 +38,6 @@ impl SimdDataset {
         let mut target_mean = 0.0;
         let mut target_std_dev = 1.0;
 
-        // Csak akkor számolunk átlagot és szórást, ha kérték a normálást!
         if normalize {
             for f_idx in 0..num_features_usize {
                 let sum: f32 = data_x.iter().map(|row| row[f_idx]).sum();
@@ -74,8 +70,6 @@ impl SimdDataset {
         let mut feature_flat = Vec::with_capacity(num_batches * num_features_usize);
         let mut target_batches = Vec::with_capacity(num_batches);
 
-        // A Z-score formula matematikailag transzparens marad: ha normalize == false, 
-        // akkor (val - 0.0) / 1.0 = val, tehát nem torzít!
         let get_norm_sample = |idx: usize, f_idx: usize| -> f32 {
             if idx < num_samples {
                 let val = data_x[idx][f_idx];
@@ -94,7 +88,6 @@ impl SimdDataset {
             }
         };
 
-        // Adatok bepakolása a SIMD regiszterekbe (Ugyanúgy, mint eddig)
         for i in 0..num_batches {
             let start_idx = i * simd_width;
             
@@ -166,7 +159,6 @@ impl SimdDataset {
         let mut current_idx = 0;
         
         for &t in &self.feature_types {
-            // 1. Regisztráljuk az eredeti, összetett típust (pl. Vec3),
             registry.push((t, current_idx));
 
             let size = match t {
@@ -178,7 +170,6 @@ impl SimdDataset {
                 _ => 1,
             };
 
-            // 2. SHADOW VARIABLES: Ha a típus összetett (size > 1)
             if size > 1 {
                 for offset in 0..size {
                     registry.push((UniversalType::Float, current_idx + offset));

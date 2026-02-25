@@ -1,17 +1,12 @@
 use crate::{domain::Domain, engine::individual::Individual};
 use rand::RngExt;
 use std::cmp::Ordering;
-use rand::seq::SliceRandom;
 
 fn dominates<D: Domain>(a: &Individual<D>, b: &Individual<D>) -> bool {
     let better_eq_fit = a.fitness <= b.fitness;
     let better_fit = a.fitness < b.fitness;
-
-    // Kor (Age): A fiatalabb a jobb!
     let better_eq_age = a.age <= b.age;
     let better_age = a.age < b.age;
-
-    // Pareto dominancia szabálya
     (better_eq_fit && better_eq_age) && (better_fit || better_age)
 }
 
@@ -35,7 +30,7 @@ pub fn tournament_selection_pareto<'a, D:Domain>(
 
 pub fn nsga2_compare<D: Domain>(a: &Individual<D>, b: &Individual<D>) -> Ordering {
     match a.rank.cmp(&b.rank) {
-        Ordering::Less => Ordering::Less, // 'a' jobb rangú
+        Ordering::Less => Ordering::Less,
         Ordering::Greater => Ordering::Greater,
         Ordering::Equal => {
             b.crowding_distance.partial_cmp(&a.crowding_distance).unwrap_or(Ordering::Equal)
@@ -44,7 +39,6 @@ pub fn nsga2_compare<D: Domain>(a: &Individual<D>, b: &Individual<D>) -> Orderin
 }
 
 pub fn assign_rank_and_crowding_distance<D: Domain>(pop: &mut [Individual<D>]) {
-    // 1. Fast Non-Dominated Sort (egyszerűsített, O(N^2))
     let n = pop.len();
     let mut domination_count = vec![0; n];
     let mut dominated_individuals = vec![Vec::new(); n];
@@ -83,7 +77,6 @@ pub fn assign_rank_and_crowding_distance<D: Domain>(pop: &mut [Individual<D>]) {
         i += 1;
     }
 
-    // 2. Crowding Distance Calculation (frontonként)
     for front in fronts {
         if front.is_empty() { continue; }
         
@@ -96,8 +89,6 @@ pub fn assign_rank_and_crowding_distance<D: Domain>(pop: &mut [Individual<D>]) {
             continue;
         }
 
-        // Számolás minden objektívumra (MSE, Complexity)
-        // A) MSE szerinti távolság
         let mut sorted_front = front.clone();
         sorted_front.sort_by(|&a, &b| pop[a].fitness.partial_cmp(&pop[b].fitness).unwrap());
         
@@ -114,7 +105,6 @@ pub fn assign_rank_and_crowding_distance<D: Domain>(pop: &mut [Individual<D>]) {
             }
         }
 
-        // B) Kor (Age) szerinti távolság
         sorted_front.sort_by_key(|&a| pop[a].age);
         pop[sorted_front[0]].crowding_distance = f32::MAX;
         pop[*sorted_front.last().unwrap()].crowding_distance = f32::MAX;

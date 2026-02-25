@@ -41,7 +41,6 @@ impl<D: Domain> Individual<D> {
         }
 
         if let Some(prog) = &self.program {
-            // Javítás: Átadjuk a code és constants slice-okat
             D::compute_mse(&prog.code, &prog.constants, dataset)
         } else {
             f32::MAX
