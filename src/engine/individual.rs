@@ -70,6 +70,13 @@ impl<D: Domain> Individual<D> {
     pub fn optimize_constants(&mut self, dataset: &SimdDataset, iterations: usize)
     where D:Domain<ScalarValue = UniversalScalar> {
         optimize_individual_constants(self, dataset, iterations);
+        let threshold = 0.05;
+        let mut constants = self.get_constants();
+        for c in constants.iter_mut() {
+            c.apply_threshold(threshold);
+        }
+        self.set_constants(&constants);
+        self.simplify();
         self.compile();
     }
 

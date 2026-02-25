@@ -95,6 +95,27 @@ impl UniversalScalar {
             _ => false,
         }
     }
+
+    pub fn apply_threshold(&mut self, threshold: f32) {
+        match self {
+            Self::Float(f) => { 
+                if f.abs() < threshold { *f = 0.0; } 
+            },
+            Self::Vec2(v) => { 
+                for x in v.iter_mut() { if x.abs() < threshold { *x = 0.0; } } 
+            },
+            Self::Vec3(v) => { 
+                for x in v.iter_mut() { if x.abs() < threshold { *x = 0.0; } } 
+            },
+            Self::Mat2(m) => { 
+                for x in m.iter_mut() { if x.abs() < threshold { *x = 0.0; } } 
+            },
+            Self::Mat3(m) => { 
+                for x in m.iter_mut() { if x.abs() < threshold { *x = 0.0; } } 
+            },
+            _ => {}
+        }
+    }
 }
 
 impl fmt::Display for UniversalScalar {

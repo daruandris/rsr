@@ -6,7 +6,8 @@ use rand::RngExt;
 
 const MAX_PARAMS: usize = 32;
 const LAMBDA: usize = 16;  // Populáció méret (CMA-ES szabvány)
-const MU: usize = LAMBDA / 2; // Kiválasztott szülők száma
+const MU: usize = LAMBDA / 2;
+const L1_REG_LAMBDA: f32 = 0.01; // Kiválasztott szülők száma
 
 // Box-Muller transzformáció (zero-dependency normál eloszlás generáláshoz)
 fn rand_normal(rng: &mut impl RngExt) -> f32 {
@@ -77,37 +78,53 @@ pub fn run_cma_es<D: Domain<ScalarValue = UniversalScalar>>(
     let c_cov = (1.0 / mu_eff) * (2.0 / ((n as f32) + 1.414).powi(2)) 
               + (1.0 - 1.0 / mu_eff) * ((2.0 * mu_eff - 1.0) / (((n as f32) + 2.0).powi(2) + mu_eff));
 
+    let initial_mse = D::compute_mse(&program.code, &program.constants, dataset);
+
+    let mut initial_l1 = 0.0f32;
+    for j in 0..n {
+        initial_l1 += mean[j].abs();
+    }
+
     let mut best_overall_point = mean;
-    let mut best_overall_mse = D::compute_mse(&program.code, &program.constants, dataset);
+    let mut best_overall_mse = initial_mse;
+    let mut best_overall_fitness = initial_mse + L1_REG_LAMBDA * initial_l1;
 
     let mut rng = rand::rng();
     let mut population = [[0.0f32; MAX_PARAMS]; LAMBDA];
     let mut step_vectors = [[0.0f32; MAX_PARAMS]; LAMBDA];
-    let mut pop_fitness = [(0.0f32, 0usize); LAMBDA];
+    let mut pop_fitness = [(0.0f32, 0.0f32, 0usize); LAMBDA];
 
     // --- OPTIMALIZÁCIÓS CIKLUS ---
     for _ in 0..max_iterations {
         // A. Minta vételezés a normál eloszlásból (SIMD kiértékeléssel)
         for i in 0..LAMBDA {
+            let mut l1_norm = 0.0f32;
             for j in 0..n {
                 let step = rand_normal(&mut rng) * c_diag[j].sqrt();
                 step_vectors[i][j] = step;
-                population[i][j] = mean[j] + sigma * step;
+                let val = mean[j] + sigma * step;
+                population[i][j] = val;
+                l1_norm += val.abs();
             }
             
             // SIMD-gyorsított MSE kalkuláció a módosított konstansokkal
             update_constants(&mut program.constants, &population[i]);
             let mse = D::compute_mse(&program.code, &program.constants, dataset);
-            pop_fitness[i] = (mse, i);
+            let fitness = mse + L1_REG_LAMBDA * l1_norm;
+            pop_fitness[i] = (fitness, mse, i);
         }
 
         // B. Szortírozás Fitness (MSE) szerint
         pop_fitness.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 
-        let current_best_mse = pop_fitness[0].0;
-        if current_best_mse < best_overall_mse {
+        let current_best_fitness = pop_fitness[0].0;
+        let current_best_mse = pop_fitness[0].1;
+        let best_idx = pop_fitness[0].2;
+
+        if current_best_fitness < best_overall_fitness {
+            best_overall_fitness = current_best_fitness;
             best_overall_mse = current_best_mse;
-            best_overall_point = population[pop_fitness[0].1];
+            best_overall_point = population[best_idx];
         }
 
         if best_overall_mse < 1e-8 { break; } // Korai kilépés
@@ -116,7 +133,7 @@ pub fn run_cma_es<D: Domain<ScalarValue = UniversalScalar>>(
         let mut step_mean = [0.0f32; MAX_PARAMS];
         let old_mean = mean;
         for i in 0..MU {
-            let idx = pop_fitness[i].1;
+            let idx = pop_fitness[i].2;
             for j in 0..n {
                 step_mean[j] += weights[i] * step_vectors[idx][j];
                 mean[j] += weights[i] * (population[idx][j] - old_mean[j]);
@@ -129,7 +146,7 @@ pub fn run_cma_es<D: Domain<ScalarValue = UniversalScalar>>(
             
             let mut cov_update = 0.0;
             for i in 0..MU {
-                let idx = pop_fitness[i].1;
+                let idx = pop_fitness[i].2;
                 cov_update += weights[i] * (step_vectors[idx][j] * step_vectors[idx][j]);
             }
             

@@ -2,6 +2,8 @@ use crate::engine::individual::Individual;
 use crate::metrics::dataset::SimdDataset;
 use crate::domain::Domain;
 
+const L1_REG_LAMBDA: f32 = 0.01; // <-- ÚJ: L1 büntetés ereje (Finomhangolható, lehet 0.005 is)
+
 pub fn run_nelder_mead<D: Domain>(
     ind: &mut Individual<D>, 
     dataset: &SimdDataset, 
@@ -10,7 +12,7 @@ pub fn run_nelder_mead<D: Domain>(
     if ind.program.is_none() { ind.compile(); }
     let program = match &mut ind.program { Some(p) => p, None => return, };
 
-    // 1. Kigyűjtjük CSAK a Float konstansokat fix méretű, stack-en tárolt tömbökbe (ZERO HEAP!)
+    // 1. Kigyűjtjük CSAK a Float konstansokat (ZERO HEAP)
     let mut start_consts = [0.0; 32];
     let mut opt_indices = [0usize; 32];
     let mut n = 0;
@@ -25,12 +27,13 @@ pub fn run_nelder_mead<D: Domain>(
         }
     }
     
-    if n == 0 { return; } // Nincs mit optimalizálni
+    if n == 0 { return; } 
 
     const ALPHA: f32 = 1.0; const GAMMA: f32 = 2.0; const RHO: f32 = 0.5; const SIGMA: f32 = 0.5;
     
-    // A Simplex pontok is fix tömbben, memóriafoglalás nélkül!
-    let mut simplex = [(0.0f32, [0.0f32; 32]); 33];
+    // --- TUPLE VÁLTOZÁS: (Fitness, Tiszta MSE, Konstansok) ---
+    // A Nelder-Mead a Fitness (0. elem) alapján fog szortírozni!
+    let mut simplex = [(0.0f32, 0.0f32, [0.0f32; 32]); 33];
     
     // Zero-cost belső mutáló lambdánk
     let update_constants = |prog_consts: &mut Vec<D::ScalarValue>, vals: &[f32; 32]| {
@@ -39,90 +42,104 @@ pub fn run_nelder_mead<D: Domain>(
         }
     };
 
-    let start_mse = D::compute_mse(&program.code, &program.constants, dataset);
-    simplex[0] = (start_mse, start_consts);
+    // Zero-cost Fitness kalkulátor
+    let evaluate = |prog_consts: &mut Vec<D::ScalarValue>, vals: &[f32; 32]| -> (f32, f32) {
+        update_constants(prog_consts, vals);
+        let mse = D::compute_mse(&program.code, prog_consts, dataset);
+        let mut l1 = 0.0;
+        for j in 0..n { l1 += vals[j].abs(); }
+        (mse + L1_REG_LAMBDA * l1, mse)
+    };
 
+    let (start_fit, start_mse) = evaluate(&mut program.constants, &start_consts);
+    simplex[0] = (start_fit, start_mse, start_consts);
+
+    // Kezdeti Simplex pontok generálása
     for i in 0..n {
         let mut new_point = start_consts;
         let val = new_point[i];
         new_point[i] += if val.abs() < 1e-4 { 0.01 } else { val * 0.10 };
         
-        update_constants(&mut program.constants, &new_point);
-        let mse = D::compute_mse(&program.code, &program.constants, dataset);
-        simplex[i + 1] = (mse, new_point);
+        let (fit, mse) = evaluate(&mut program.constants, &new_point);
+        simplex[i + 1] = (fit, mse, new_point);
     }
 
     let mut centroid = [0.0; 32]; let mut reflected = [0.0; 32];
     let mut expanded = [0.0; 32]; let mut contracted = [0.0; 32];
 
     for _ in 0..max_iterations {
-        // Csak a használt (n+1) elemet rendezzük
+        // Rendezzük a Simplex-et a FITNESS (0. elem) alapján!
         simplex[0..=n].sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
         
-        let best_mse = simplex[0].0;
-        let worst_mse = simplex[n].0;
+        let best_fit = simplex[0].0;
+        let best_mse = simplex[0].1;
+        let worst_fit = simplex[n].0;
 
-        if (worst_mse - best_mse).abs() < 1e-7 || best_mse < 1e-8 { break; }
+        // Korai kilépés, ha nagyon pici a Fitness szórás, VAGY a tiszta MSE kiváló
+        if (worst_fit - best_fit).abs() < 1e-7 || best_mse < 1e-8 { break; }
         
         centroid.fill(0.0);
         for i in 0..n {
-            for j in 0..n { centroid[j] += simplex[i].1[j]; }
+            for j in 0..n { centroid[j] += simplex[i].2[j]; } // 2. elem a konstans tömb
         }
         for j in 0..n { centroid[j] /= n as f32; }
 
-        let worst_point = simplex[n].1;
-        let second_worst_mse = simplex[n - 1].0;
+        let worst_point = simplex[n].2;
+        let second_worst_fit = simplex[n - 1].0;
 
         // --- REFLECTION ---
         for j in 0..n { reflected[j] = centroid[j] + ALPHA * (centroid[j] - worst_point[j]); }
-        update_constants(&mut program.constants, &reflected);
-        let reflected_mse = D::compute_mse(&program.code, &program.constants, dataset);
+        let (reflected_fit, reflected_mse) = evaluate(&mut program.constants, &reflected);
 
-        if reflected_mse >= best_mse && reflected_mse < second_worst_mse {
-            simplex[n] = (reflected_mse, reflected);
+        if reflected_fit >= best_fit && reflected_fit < second_worst_fit {
+            simplex[n] = (reflected_fit, reflected_mse, reflected);
             continue;
         }
 
         // --- EXPANSION ---
-        if reflected_mse < best_mse {
+        if reflected_fit < best_fit {
             for j in 0..n { expanded[j] = centroid[j] + GAMMA * (reflected[j] - centroid[j]); }
-            update_constants(&mut program.constants, &expanded);
-            let expanded_mse = D::compute_mse(&program.code, &program.constants, dataset);
+            let (expanded_fit, expanded_mse) = evaluate(&mut program.constants, &expanded);
             
-            if expanded_mse < reflected_mse { simplex[n] = (expanded_mse, expanded); } 
-            else { simplex[n] = (reflected_mse, reflected); }
+            if expanded_fit < reflected_fit { 
+                simplex[n] = (expanded_fit, expanded_mse, expanded); 
+            } else { 
+                simplex[n] = (reflected_fit, reflected_mse, reflected); 
+            }
             continue;
         }
         
         // --- CONTRACTION ---
-        let limit_mse = if reflected_mse < worst_mse {
+        let limit_fit = if reflected_fit < worst_fit {
             for j in 0..n { contracted[j] = centroid[j] + RHO * (reflected[j] - centroid[j]); }
-            reflected_mse
+            reflected_fit
         } else {
             for j in 0..n { contracted[j] = centroid[j] + RHO * (worst_point[j] - centroid[j]); }
-            worst_mse
+            worst_fit
         };
 
-        update_constants(&mut program.constants, &contracted);
-        let contracted_mse = D::compute_mse(&program.code, &program.constants, dataset);
+        let (contracted_fit, contracted_mse) = evaluate(&mut program.constants, &contracted);
 
-        if contracted_mse < limit_mse {
-            simplex[n] = (contracted_mse, contracted);
+        if contracted_fit < limit_fit {
+            simplex[n] = (contracted_fit, contracted_mse, contracted);
             continue;
         }
 
         // --- SHRINK ---
-        let best_point = simplex[0].1;
+        let best_point = simplex[0].2;
         for i in 1..=n {
-            for j in 0..n { simplex[i].1[j] = best_point[j] + SIGMA * (simplex[i].1[j] - best_point[j]); }
-            update_constants(&mut program.constants, &simplex[i].1);
-            simplex[i].0 = D::compute_mse(&program.code, &program.constants, dataset);
+            for j in 0..n { simplex[i].2[j] = best_point[j] + SIGMA * (simplex[i].2[j] - best_point[j]); }
+            let (fit, mse) = evaluate(&mut program.constants, &simplex[i].2);
+            simplex[i].0 = fit;
+            simplex[i].1 = mse;
         }
     }
 
+    // Végső sorrendbe állítás
     simplex[0..=n].sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-    update_constants(&mut program.constants, &simplex[0].1);
+    update_constants(&mut program.constants, &simplex[0].2);
     
+    // Szinkronizálás a fa-reprezentációval (ugyanaz marad)
     let best_consts = &program.constants;
     let mut const_idx = 0;
     
@@ -135,5 +152,6 @@ pub fn run_nelder_mead<D: Domain>(
         }
     }
     
-    ind.fitness = simplex[0].0;
+    // Az egyed MSE fitneszét elmentjük (ne a regularizáltat, mert az becsaphatja az evolúciós szelekciót, ha már nullára ment a hiba!)
+    ind.fitness = simplex[0].1;
 }

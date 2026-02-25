@@ -1,5 +1,5 @@
 (Zaj-kiszűrése, fontos num_features kiválasztása, L1/L2 regularizációt a konstansokra, hogy a motor automatikusan kiszűrje a felesleges (nullához közeli) együtthatókat,
-cma-es konnstans-opt linalg-hoz, csv/json bemenet)
+, csv/json bemenet)
 
 Harder math, Linalg, Analysys, Num theory, (Complex analysis, Complex linalg)
 
