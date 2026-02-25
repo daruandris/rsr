@@ -10,6 +10,7 @@ use rsr::engine::config::OpModule;
 use rsr::domain::universal::UniversalOp;
 use rand::RngExt;
 use std::time::Instant;
+use std::f32::consts::TAU;
 
 fn get_config() -> EvolutionConfig {
     EvolutionConfig {
@@ -32,13 +33,13 @@ fn get_config() -> EvolutionConfig {
         random_injection_rate: 0.10,
         min_random_injection: 2,
         max_tree_size: 32,
-        mutation_max_depth: 4,
+        mutation_max_depth: 7,
         mutation_cycles: 5,
         verbose: true,
        
         allowed_modules: vec![OpModule::Basic, OpModule::Linalg],
         custom_ops: vec![], 
-        // Kivettük a periodikus/exponenciális dolgokat a kérésed szerint!
+        // TELJESEN KIZÁRJUK A CSALÁST: Nincs trigonometria, nincs logaritmus!
         excluded_ops: vec![
             UniversalOp::SinF, 
             UniversalOp::CosF, 
@@ -48,65 +49,26 @@ fn get_config() -> EvolutionConfig {
     }
 }
 
-// -----------------------------------------------------------------------------
-// VIRTUAL WIND TUNNEL: Turbulence Subgrid-Scale Simulation
-// Nincs ismert zárt egyenlet, amely a grad_u-t (Mat3) tökéletesen leképezi a kimenetre.
-// -----------------------------------------------------------------------------
-fn simulate_micro_turbulence(grad_u: &[f32; 9]) -> f32 {
-    // 3 pici virtuális folyadék-örvény sebességvektora
-    let mut eddies = [[0.1, 0.0, -0.1], [-0.1, 0.1, 0.0], [0.0, -0.1, 0.1]];
-    let dt = 0.02;
-    let mut total_k = 0.0;
+// Segédfüggvény: Véletlenszerű, egyenletes 3D térbeli forgatás (Haar-mérték)
+fn get_random_rotation(rng: &mut impl RngExt) -> [f32; 9] {
+    let u1: f32 = rng.random_range(0.0..1.0);
+    let u2: f32 = rng.random_range(0.0..1.0);
+    let u3: f32 = rng.random_range(0.0..1.0);
+    let w = (1.0 - u1).sqrt() * (TAU * u2).sin();
+    let x = (1.0 - u1).sqrt() * (TAU * u2).cos();
+    let y = u1.sqrt() * (TAU * u3).sin();
+    let z = u1.sqrt() * (TAU * u3).cos();
     
-    for step in 0..500 {
-        let mut next_eddies = [[0.0; 3]; 3];
-        for i in 0..3 {
-            // 1. Makroszkopikus áramlás ereje (Mátrix * Vektor)
-            let fx = grad_u[0]*eddies[i][0] + grad_u[1]*eddies[i][1] + grad_u[2]*eddies[i][2];
-            let fy = grad_u[3]*eddies[i][0] + grad_u[4]*eddies[i][1] + grad_u[5]*eddies[i][2];
-            let fz = grad_u[6]*eddies[i][0] + grad_u[7]*eddies[i][1] + grad_u[8]*eddies[i][2];
-            
-            // 2. Nem-lineáris turbulens "kaszkád" (örvények egymásra hatása vektoriális szorzattal)
-            let prev = if i == 0 { 2 } else { i - 1 };
-            let next = if i == 2 { 0 } else { i + 1 };
-            let cx = eddies[prev][1] * eddies[next][2] - eddies[prev][2] * eddies[next][1];
-            let cy = eddies[prev][2] * eddies[next][0] - eddies[prev][0] * eddies[next][2];
-            let cz = eddies[prev][0] * eddies[next][1] - eddies[prev][1] * eddies[next][0];
-            
-            // 3. Súrlódási veszteség
-            let decay = 0.1;
-            
-            next_eddies[i][0] = eddies[i][0] + (fx + cx * 0.5 - decay * eddies[i][0]) * dt;
-            next_eddies[i][1] = eddies[i][1] + (fy + cy * 0.5 - decay * eddies[i][1]) * dt;
-            next_eddies[i][2] = eddies[i][2] + (fz + cz * 0.5 - decay * eddies[i][2]) * dt;
-        }
-        
-        // Stabilitási limit (hogy a szimuláció ne szálljon el a végtelenbe)
-        for i in 0..3 {
-            let e = next_eddies[i][0].powi(2) + next_eddies[i][1].powi(2) + next_eddies[i][2].powi(2);
-            if e > 5.0 {
-                let scale = (5.0 / e).sqrt();
-                next_eddies[i][0] *= scale;
-                next_eddies[i][1] *= scale;
-                next_eddies[i][2] *= scale;
-            }
-        }
-        eddies = next_eddies;
-        
-        // Csak a szimuláció végén (amikor már "beállt" a turbulencia) mérjük az energiát
-        if step >= 300 {
-            for i in 0..3 {
-                total_k += eddies[i][0].powi(2) + eddies[i][1].powi(2) + eddies[i][2].powi(2);
-            }
-        }
-    }
-    // Visszatérünk a stabilizálódott Átlagos Turbulens Kinetikus Energiával
-    total_k / 200.0 
+    [
+        1.0 - 2.0*y*y - 2.0*z*z, 2.0*x*y - 2.0*z*w,     2.0*x*z + 2.0*y*w,
+        2.0*x*y + 2.0*z*w,       1.0 - 2.0*x*x - 2.0*z*z, 2.0*y*z - 2.0*x*w,
+        2.0*x*z - 2.0*y*w,       2.0*y*z + 2.0*x*w,     1.0 - 2.0*x*x - 2.0*y*y
+    ]
 }
 
 fn run_open_problem_benchmark(name: &str, data_x: Vec<Vec<f32>>, data_y: Vec<f32>, feature_types: Vec<UniversalType>) {
     println!("\n========================================================");
-    println!(">>> RUNNING OPEN PROBLEM: {} <<<", name);
+    println!(">>> RUNNING EXACT TENSOR INVARIANT PROBLEM: {} <<<", name);
     println!("Samples: {}", data_x.len());
 
     let dataset = SimdDataset::new(&data_x, &data_y, feature_types, true);
@@ -139,35 +101,95 @@ fn run_open_problem_benchmark(name: &str, data_x: Vec<Vec<f32>>, data_y: Vec<f32
 
 fn main() {
     let mut rng = rand::rng();
-    let n = 400; 
+    let num_samples = 400; 
 
-    let mut dx = Vec::with_capacity(n);
-    let mut dy = Vec::with_capacity(n);
+    // 1. Az FCC (Lapcentrált Kockarács) fémek 12 fizikai csúszási rendszere
+    let ns = [
+        [1.0, 1.0, 1.0], [1.0, 1.0, 1.0], [1.0, 1.0, 1.0],
+        [-1.0, 1.0, 1.0], [-1.0, 1.0, 1.0], [-1.0, 1.0, 1.0],
+        [1.0, -1.0, 1.0], [1.0, -1.0, 1.0], [1.0, -1.0, 1.0],
+        [1.0, 1.0, -1.0], [1.0, 1.0, -1.0], [1.0, 1.0, -1.0],
+    ];
+    let ms = [
+        [0.0, 1.0, -1.0], [-1.0, 0.0, 1.0], [1.0, -1.0, 0.0],
+        [0.0, 1.0, -1.0], [1.0, 0.0, 1.0], [1.0, 1.0, 0.0],
+        [0.0, 1.0, 1.0], [-1.0, 0.0, 1.0], [1.0, 1.0, 0.0],
+        [0.0, 1.0, 1.0], [1.0, 0.0, 1.0], [1.0, -1.0, 0.0],
+    ];
 
-    println!("Running Virtual Wind Tunnel (Turbulence cascade)...");
-    for _ in 0..n {
-        // Generálunk egy véletlenszerű Makroszkopikus Sebesség Gradiens Mátrixot (3x3)
-        let mut grad_u = [0.0; 9];
-        for i in 0..9 {
-            grad_u[i] = rng.random_range(-2.0..2.0);
+    println!("Precomputing 1000 random crystal orientations (Microstructure)...");
+    let num_grains = 1000;
+    let mut all_schmid_tensors = Vec::with_capacity(num_grains * 12);
+
+    for _ in 0..num_grains {
+        let rot = get_random_rotation(&mut rng);
+        for s in 0..12 {
+            // Szimmetrikus Schmid tenzor (m x n + n x m) / 2
+            let mut p_local = [0.0; 9];
+            for i in 0..3 {
+                for j in 0..3 {
+                    p_local[i*3 + j] = (ms[s][i] * ns[s][j] + ns[s][i] * ms[s][j]) / (2.0 * 6.0f32.sqrt());
+                }
+            }
+            
+            // Forgatás a globális térbe: R * P * R^T
+            let mut p_global = [0.0; 9];
+            for i in 0..3 {
+                for j in 0..3 {
+                    for k in 0..3 {
+                        for l in 0..3 {
+                            p_global[i*3 + j] += rot[i*3 + k] * p_local[k*3 + l] * rot[j*3 + l];
+                        }
+                    }
+                }
+            }
+            all_schmid_tensors.push(p_global);
         }
-
-        // Lefuttatjuk a feketedoboz szimulátort
-        let turbulent_energy = simulate_micro_turbulence(&grad_u);
-
-        // Bemenet: Az 1 darab 3x3-as mátrix
-        let mut row = Vec::with_capacity(9);
-        row.extend_from_slice(&grad_u);
-        
-        dx.push(row);
-        dy.push(turbulent_energy);
     }
 
-    // Elmondjuk a motornak, hogy a bemenet egyetlen Mat3!
+    let mut dx = Vec::with_capacity(num_samples);
+    let mut dy = Vec::with_capacity(num_samples);
+
+    println!("Simulating Macroscopic Yield Dissipation...");
+    for _ in 0..num_samples {
+        // Generálunk egy Deviatórikus (nyomtalan) Makroszkopikus Feszültségtenzort (S)
+        let s11 = rng.random_range(-1.0..1.0);
+        let s22 = rng.random_range(-1.0..1.0);
+        let s33 = -s11 - s22; // Tr(S) = 0
+        let s12 = rng.random_range(-1.0..1.0);
+        let s13 = rng.random_range(-1.0..1.0);
+        let s23 = rng.random_range(-1.0..1.0);
+        
+        let stress_tensor = [
+            s11, s12, s13,
+            s12, s22, s23,
+            s13, s23, s33
+        ];
+
+        // Kiszámoljuk a fizikai disszipációt (Képlékenységi munka)
+        let mut macro_yield = 0.0;
+        for p in &all_schmid_tensors {
+            let mut tau = 0.0; // Megoldott nyírófeszültség
+            for i in 0..9 {
+                tau += p[i] * stress_tensor[i];
+            }
+            // A disszipáció a nyírófeszültség 6. hatványa
+            macro_yield += tau.powi(6);
+        }
+        macro_yield /= num_grains as f32; // Átlagolás a polikristályra
+
+        let mut row = Vec::with_capacity(9);
+        row.extend_from_slice(&stress_tensor);
+        
+        dx.push(row);
+        dy.push(macro_yield);
+    }
+
+    // A motor csak a makroszkopikus feszültséget (1 db Mat3) kapja meg!
     let feature_types = vec![UniversalType::Mat3];
 
     run_open_problem_benchmark(
-        "Navier-Stokes Algebraic Reynolds Stress Closure", 
+        "FCC Polycrystal Exact Macroscopic Yield Function", 
         dx, 
         dy, 
         feature_types
