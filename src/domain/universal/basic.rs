@@ -1,6 +1,6 @@
 #![allow(unsafe_op_in_unsafe_fn)]
 
-use wide::{f32x4, CmpLt};
+use wide::{f32x4};
 use crate::domain::universal::{UniversalOp, UniversalScalar, SimplifyAction};
 // --- SIMD KIÉRTÉKELÉS ---
 
@@ -14,9 +14,12 @@ use crate::domain::universal::{UniversalOp, UniversalScalar, SimplifyAction};
     *sp_f -= 2; *stack_f.get_unchecked_mut(*sp_f) = *stack_f.get_unchecked(*sp_f) * *stack_f.get_unchecked(*sp_f + 1); *sp_f += 1;
 }
 #[inline(always)] pub unsafe fn eval_div_f(sp_f: &mut usize, stack_f: &mut [f32x4; 32]) {
-    *sp_f -= 2; let a = *stack_f.get_unchecked(*sp_f); let b = *stack_f.get_unchecked(*sp_f + 1);
-    let safe_b = b.abs().simd_lt(f32x4::splat(1e-9)).blend(f32x4::splat(1.0), b);
-    *stack_f.get_unchecked_mut(*sp_f) = a / safe_b; *sp_f += 1;
+    *sp_f -= 2; 
+    let a = *stack_f.get_unchecked(*sp_f); 
+    let b = *stack_f.get_unchecked(*sp_f + 1);
+    // Nincs több biztonsági blend, nyers IEEE 754 osztás (0 esetén Infinity vagy NaN lesz)
+    *stack_f.get_unchecked_mut(*sp_f) = a / b; 
+    *sp_f += 1;
 }
 #[inline(always)] pub unsafe fn eval_sin_f(sp_f: &mut usize, stack_f: &mut [f32x4; 32]) {
     let idx = *sp_f - 1; *stack_f.get_unchecked_mut(idx) = stack_f.get_unchecked(idx).sin();
@@ -31,10 +34,14 @@ use crate::domain::universal::{UniversalOp, UniversalScalar, SimplifyAction};
     let idx = *sp_f - 1; let a = *stack_f.get_unchecked(idx); *stack_f.get_unchecked_mut(idx) = a * a;
 }
 #[inline(always)] pub unsafe fn eval_sqrt_f(sp_f: &mut usize, stack_f: &mut [f32x4; 32]) {
-    let idx = *sp_f - 1; *stack_f.get_unchecked_mut(idx) = stack_f.get_unchecked(idx).abs().sqrt();
+    let idx = *sp_f - 1; 
+    // Nincs .abs() hívás. Ha a regiszter negatívot kap, a kimenet NaN lesz!
+    *stack_f.get_unchecked_mut(idx) = stack_f.get_unchecked(idx).sqrt();
 }
 #[inline(always)] pub unsafe fn eval_ln_f(sp_f: &mut usize, stack_f: &mut [f32x4; 32]) {
-    let idx = *sp_f - 1; *stack_f.get_unchecked_mut(idx) = (stack_f.get_unchecked(idx).abs() + f32x4::splat(1e-9)).ln();
+    let idx = *sp_f - 1; 
+    // Nincs .abs() és + 1e-9! Negatív esetén NaN, 0 esetén -Infinity.
+    *stack_f.get_unchecked_mut(idx) = stack_f.get_unchecked(idx).ln();
 }
 
 // --- FORMÁZÁS ---
@@ -49,8 +56,8 @@ pub fn format_op(op: UniversalOp, args: &[String]) -> Option<String> {
         UniversalOp::CosF => Some(format!("cos({})", args[0])),
         UniversalOp::ExpF => Some(format!("exp({})", args[0])),
         UniversalOp::SqrF => Some(format!("({})^2", args[0])),
-        UniversalOp::SqrtF => Some(format!("sqrt(|{}|)", args[0])),
-        UniversalOp::LnF => Some(format!("ln(|{}|)", args[0])),
+        UniversalOp::SqrtF => Some(format!("sqrt({})", args[0])),
+        UniversalOp::LnF => Some(format!("ln({})", args[0])),
         _ => None,
     }
 }
@@ -107,12 +114,12 @@ fn fold_constants(op: UniversalOp, args: &[UniversalScalar]) -> Option<Universal
         (UniversalOp::CosF, [Float(a)]) => Some(Float(a.cos())),
         (UniversalOp::ExpF, [Float(a)]) => Some(Float(a.exp())),
         (UniversalOp::SqrF, [Float(a)]) => Some(Float(a * a)),
-        (UniversalOp::SqrtF, [Float(a)]) => Some(Float(a.abs().sqrt())),
-        (UniversalOp::LnF, [Float(a)]) => Some(Float((a.abs() + 1e-9).ln())),
+        (UniversalOp::SqrtF, [Float(a)]) => Some(Float(a.sqrt())),
+        (UniversalOp::LnF, [Float(a)]) => Some(Float(a.ln())),
         (UniversalOp::AddF, [Float(a), Float(b)]) => Some(Float(a + b)),
         (UniversalOp::SubF, [Float(a), Float(b)]) => Some(Float(a - b)),
         (UniversalOp::MulF, [Float(a), Float(b)]) => Some(Float(a * b)),
-        (UniversalOp::DivF, [Float(a), Float(b)]) => if b.abs() > 1e-9 { Some(Float(a / b)) } else { None },
+        (UniversalOp::DivF, [Float(a), Float(b)]) => Some(Float(a / b)),
         _ => None,
     }
 }

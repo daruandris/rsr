@@ -648,6 +648,12 @@ impl Domain for UniversalDomain {
         let num_samples_f32 = dataset.num_samples as f32;
         let total_mse = sum_squared_error.reduce_add() / num_samples_f32;
         
+        if !total_mse.is_finite() {
+            // Ha NaN vagy Inf az MSE, az optimalizáló (L-BFGS) kapjon halálos büntetést
+            // és nulla gradienst, hogy ne tudjon merre indulni[cite: 1511].
+            return (f32::MAX, [0.0; 32]);
+        }
+
         let mut final_gradient = [0.0f32; 32];
         for k in 0..active_params_count {
             final_gradient[k] = grad_sum[k].reduce_add() / num_samples_f32;

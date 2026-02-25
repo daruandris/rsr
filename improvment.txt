@@ -1,4 +1,8 @@
-(Zaj-kiszűrése, fontos num_features kiválasztása, bynari ffi egyszerűsítés, safe operátorok kivétele, csv/json bemenet)
+bynari ffi egyszerűsítés,
+szemantikus operátorok: Mivel nálad pontos típusok vannak (Float, Mat3, Bool, stb.), a "szemantikai távolság" típusonként gyönyörűen definiálható.
+Részfák Gyorsítótárazása,
+ϵ-Lexicase Szelekció
+(Zaj-kiszűrése, fontos num_features kiválasztása, csv/json bemenet)
 
 Harder math, Linalg, Analysys, Num theory, (Complex analysis, Complex linalg)
 

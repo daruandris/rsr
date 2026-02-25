@@ -1,17 +1,18 @@
 use crate::{domain::Domain, engine::individual::Individual};
 use rand::RngExt;
 use std::cmp::Ordering;
+use rand::seq::SliceRandom;
 
 fn dominates<D: Domain>(a: &Individual<D>, b: &Individual<D>) -> bool {
-    let a_compl = a.complexity() as f32;
-    let b_compl = b.complexity() as f32;
+    let better_eq_fit = a.fitness <= b.fitness;
+    let better_fit = a.fitness < b.fitness;
 
-    let better_eq_mse = a.fitness <= b.fitness;
-    let better_eq_len = a_compl <= b_compl;
-    let better_mse = a.fitness < b.fitness;
-    let better_len = a_compl < b_compl;
+    // Kor (Age): A fiatalabb a jobb!
+    let better_eq_age = a.age <= b.age;
+    let better_age = a.age < b.age;
 
-    (better_eq_mse && better_eq_len) && (better_mse || better_len)
+    // Pareto dominancia szabálya
+    (better_eq_fit && better_eq_age) && (better_fit || better_age)
 }
 
 pub fn tournament_selection_pareto<'a, D:Domain>(
@@ -113,22 +114,21 @@ pub fn assign_rank_and_crowding_distance<D: Domain>(pop: &mut [Individual<D>]) {
             }
         }
 
-        // B) Complexity szerinti távolság
-        sorted_front.sort_by_key(|&a| pop[a].complexity());
-        
+        // B) Kor (Age) szerinti távolság
+        sorted_front.sort_by_key(|&a| pop[a].age);
         pop[sorted_front[0]].crowding_distance = f32::MAX;
         pop[*sorted_front.last().unwrap()].crowding_distance = f32::MAX;
 
-        let compl_min = pop[sorted_front[0]].complexity() as f32;
-        let compl_max = pop[*sorted_front.last().unwrap()].complexity() as f32;
-        let compl_range = compl_max - compl_min;
+        let age_min = pop[sorted_front[0]].age as f32;
+        let age_max = pop[*sorted_front.last().unwrap()].age as f32;
+        let age_range = age_max - age_min;
 
-        if compl_range > 1e-9 {
+        if age_range > 1e-9 {
              for k in 1..sorted_front.len()-1 {
-                let c_next = pop[sorted_front[k+1]].complexity() as f32;
-                let c_prev = pop[sorted_front[k-1]].complexity() as f32;
-                let dist = (c_next - c_prev) / compl_range;
-                 if pop[sorted_front[k]].crowding_distance != f32::MAX {
+                let a_next = pop[sorted_front[k+1]].age as f32;
+                let a_prev = pop[sorted_front[k-1]].age as f32;
+                let dist = (a_next - a_prev) / age_range;
+                if pop[sorted_front[k]].crowding_distance != f32::MAX {
                     pop[sorted_front[k]].crowding_distance += dist;
                 }
             }

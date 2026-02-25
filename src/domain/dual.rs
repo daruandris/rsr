@@ -57,26 +57,18 @@ impl DualSimd {
 
     #[inline(always)]
     pub fn sqrt(self) -> Self {
-        // Biztonsági védelem a negatív gyökvonás ellen
-        let safe_val = self.val.abs();
-        let s = safe_val.sqrt();
-        
-        // Elkerüljük a nullával osztást a deriváltban
-        let safe_s = s.simd_lt(f32x4::splat(1e-9)).blend(f32x4::splat(1.0), s);
-        
+        let s = self.val.sqrt();
         Self {
             val: s,
-            grad: self.grad / (f32x4::splat(2.0) * safe_s),
+            grad: self.grad / (f32x4::splat(2.0) * s),
         }
     }
 
     #[inline(always)]
     pub fn ln(self) -> Self {
-        // Biztonsági védelem, ahogy a korábbi kódban is csináltad
-        let safe_val = self.val.abs() + f32x4::splat(1e-9);
         Self {
-            val: safe_val.ln(),
-            grad: self.grad / safe_val,
+            val: self.val.ln(),
+            grad: self.grad / self.val,
         }
     }
 }
@@ -120,11 +112,9 @@ impl Div for DualSimd {
     type Output = Self;
     #[inline(always)]
     fn div(self, rhs: Self) -> Self {
-        // Zero-div védelem a hányadosszabálynál
-        let safe_b = rhs.val.abs().simd_lt(f32x4::splat(1e-9)).blend(f32x4::splat(1.0), rhs.val);
         Self {
-            val: self.val / safe_b,
-            grad: ((self.grad * rhs.val) - (self.val * rhs.grad)) / (safe_b * safe_b),
+            val: self.val / rhs.val,
+            grad: ((self.grad * rhs.val) - (self.val * rhs.grad)) / (rhs.val * rhs.val),
         }
     }
 }

@@ -103,7 +103,7 @@ impl<S: Strategy, D: Domain> Island<S, D> {
         }
 
         while self.next_gen_buffer.len() < pop_size {
-            let p: f32 = self.rng.random();
+            let p: f32 = self.rng.random();            
             let tourn_size = self.strategy.tournament_size();
             
             if p < self.strategy.crossover_rate() {
