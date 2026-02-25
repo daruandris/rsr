@@ -1,8 +1,9 @@
 use crate::ast::node::Node;
 use crate::ast::bytecode::CompiledExpr;
 use crate::domain::Domain;
+use crate::domain::universal::UniversalScalar;
 use crate::metrics::dataset::SimdDataset;
-use crate::optimization::nelder_mead::optimize_individual_constants;
+use crate::optimization::optimize_individual_constants;
 use crate::ast::format::format_ast;
 use std::fmt;
 
@@ -49,14 +50,14 @@ impl<D: Domain> Individual<D> {
 
     pub fn get_constants(&self) -> Vec<D::ScalarValue> {
         self.nodes.iter().filter_map(|node| {
-            if let Node::Constant(c) = node { Some(*c) } else { None }
+            if let Node::Constant(c,_) = node { Some(*c) } else { None }
         }).collect()
     }
 
     pub fn set_constants(&mut self, new_constants: &[D::ScalarValue]) {
         let mut const_idx = 0;
         for node in self.nodes.iter_mut() {
-            if let Node::Constant(c) = node {
+            if let Node::Constant(c,_) = node {
                 if const_idx < new_constants.len() {
                     *c = new_constants[const_idx];
                     const_idx += 1;
@@ -66,8 +67,16 @@ impl<D: Domain> Individual<D> {
         self.invalidate();
     }
 
-    pub fn optimize_constants(&mut self, dataset: &SimdDataset, iterations: usize) {
+    pub fn optimize_constants(&mut self, dataset: &SimdDataset, iterations: usize)
+    where D:Domain<ScalarValue = UniversalScalar> {
         optimize_individual_constants(self, dataset, iterations);
+        let threshold = 0.05;
+        let mut constants = self.get_constants();
+        for c in constants.iter_mut() {
+            c.apply_threshold(threshold);
+        }
+        self.set_constants(&constants);
+        self.simplify();
         self.compile();
     }
 

@@ -1,4 +1,7 @@
-(Zaj-kiszűrése, fontos num_features kiválasztása) 
+(Zaj-kiszűrése, fontos num_features kiválasztása, L1/L2 regularizációt a konstansokra, hogy a motor automatikusan kiszűrje a felesleges (nullához közeli) együtthatókat,
+, csv/json bemenet)
+
+Harder math, Linalg, Analysys, Num theory, (Complex analysis, Complex linalg)
 
 Fázis 2: Az Önszabályozó Meta-Motor (Dinamikus Stratégia)
 

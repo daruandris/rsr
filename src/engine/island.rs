@@ -6,6 +6,7 @@ use rand::RngExt;
 use rand_xoshiro::Xoshiro256PlusPlus;
 
 use crate::domain::Domain;
+use crate::domain::universal::UniversalScalar;
 use crate::engine::strategy::Strategy;
 use crate::engine::individual::Individual;
 use crate::metrics::dataset::SimdDataset;
@@ -24,15 +25,18 @@ pub struct Island<S: Strategy, D: Domain> {
     pub stagnation_counter: usize,
     pub local_hof: HashMap<usize, (f32, Individual<D>)>,
     pub strategy: S,
+    pub allowed_ops: Vec<D::Operator>,
+    pub variable_registry: Vec<(D::TypeId, u8)>,
 }
 
 impl<S: Strategy, D: Domain> Island<S, D> {
-    pub fn new(seed: u64, num_features: u8, strategy: S) -> Self {
+    pub fn new(seed: u64, variable_registry: Vec<(D::TypeId, u8)>, strategy: S, allowed_ops: Vec<D::Operator>) -> Self {
         let size = strategy.island_size();
         let mut rng = Xoshiro256PlusPlus::seed_from_u64(seed);
         let mut individuals = Vec::with_capacity(size);
+
         for _ in 0..size {
-            let ast = generate_random_ast::<D>(5, &mut rng, num_features);
+            let ast = generate_random_ast::<D>(D::constant_type(), 5, &mut rng, &variable_registry, &allowed_ops);
             let mut ind = Individual::new(ast);
             ind.simplify();
             individuals.push(ind);
@@ -42,23 +46,25 @@ impl<S: Strategy, D: Domain> Island<S, D> {
 
         Self {
             individuals,
-            next_gen_buffer : Vec::with_capacity(size),
+            next_gen_buffer: Vec::with_capacity(size),
             best_individual,
             rng,
             stagnation_counter: 0,
             local_hof: HashMap::new(),
             strategy,
+            allowed_ops,
+            variable_registry,
         }
     }
 
-    pub fn step_generation(&mut self, dataset: &SimdDataset) {
-        let num_features = dataset.num_features;
+    pub fn step_generation(&mut self, dataset: &SimdDataset)
+    where D:Domain<ScalarValue = UniversalScalar> {
         let old_best_fitness = self.best_individual.fitness;
         
         for ind in self.individuals.iter_mut() { ind.age += 1; }
         assign_rank_and_crowding_distance(&mut self.individuals);
 
-        self.fill_next_generation(dataset, num_features);
+        self.fill_next_generation(dataset);
         self.evaluate_buffer(dataset);
 
         mem::swap(&mut self.individuals, &mut self.next_gen_buffer);
@@ -78,7 +84,7 @@ impl<S: Strategy, D: Domain> Island<S, D> {
         }
     }
 
-    fn fill_next_generation(&mut self, dataset: &SimdDataset, num_features: u8) {
+    fn fill_next_generation(&mut self, dataset: &SimdDataset) {
         self.next_gen_buffer.clear();
         let pop_size = self.individuals.capacity();
 
@@ -89,7 +95,7 @@ impl<S: Strategy, D: Domain> Island<S, D> {
 
         for _ in 0..num_randoms {
             if self.next_gen_buffer.len() >= pop_size { break; }
-            let ast = generate_random_ast::<D>(5, &mut self.rng, num_features);
+            let ast = generate_random_ast::<D>(D::constant_type(), 5, &mut self.rng, &self.variable_registry, &self.allowed_ops);
             let mut ind = Individual::new(ast);
             ind.simplify();
             self.next_gen_buffer.push(ind);
@@ -118,9 +124,15 @@ impl<S: Strategy, D: Domain> Island<S, D> {
                     let mut mutated_candidate = candidate.clone();
                     
                     match self.rng.random_range(0..3) {
-                        0 => point_mutation::<D>(&mut mutated_candidate, &mut self.rng, num_features),
+                        0 => point_mutation::<D>(&mut mutated_candidate, &mut self.rng, &self.variable_registry, &self.allowed_ops),
                         1 => constant_perturbation::<D>(&mut mutated_candidate, &mut self.rng),
-                        _ => subtree_mutation::<D>(&mut mutated_candidate, &mut self.rng, num_features, self.strategy.max_tree_size(), self.strategy.mutation_max_depth()),
+                        _ => subtree_mutation::<D>(
+                            &mut mutated_candidate, 
+                            &mut self.rng, 
+                            &self.variable_registry, 
+                            self.strategy.max_tree_size(), 
+                            self.strategy.mutation_max_depth(),
+                            &self.allowed_ops),
                     }
                     mutated_candidate.simplify();
                     let new_mse = mutated_candidate.calculate_mse(dataset);
@@ -137,14 +149,13 @@ impl<S: Strategy, D: Domain> Island<S, D> {
     }
 
     pub fn nuke(&mut self, dataset: &SimdDataset) {
-        let num_features = dataset.num_features;
         let pop_size = self.individuals.capacity();
 
         self.individuals.clear();
         self.individuals.push(self.best_individual.clone());
 
         for _ in 1..pop_size {
-            let ast = generate_random_ast::<D>(5, &mut self.rng, num_features);
+            let ast = generate_random_ast::<D>(D::constant_type(), 5, &mut self.rng, &self.variable_registry, &self.allowed_ops);
             let mut new_ind = Individual::new(ast);
             new_ind.simplify();
             
@@ -156,7 +167,8 @@ impl<S: Strategy, D: Domain> Island<S, D> {
         self.stagnation_counter = 0;
     }
 
-    fn evaluate_buffer(&mut self, dataset: &SimdDataset) {
+    fn evaluate_buffer(&mut self, dataset: &SimdDataset)
+    where D: Domain<ScalarValue = UniversalScalar> {
         for ind in self.next_gen_buffer.iter_mut() {
             if self.rng.random::<f32>() < self.strategy.opt_prob() {
                 ind.optimize_constants(dataset, self.strategy.opt_iterations());

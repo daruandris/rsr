@@ -2,48 +2,41 @@ use crate::domain::Domain;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Op {
+    // Ezt majd a BasicDomain-nel együtt kivezetjük, 
+    // mert az operátorokat a D::Operator fogja kezelni,
+    // de amíg él a régi kód, meghagyhatod.
     Add, Sub, Mul, Div, Sin, Cos, Exp, Sqr
 }
-
-impl Op {
-    pub fn weight(&self) -> usize {
-        match self {
-            Op::Add | Op::Sub | Op::Mul => 1,
-            Op::Sqr => 2,
-            Op::Div => 3,
-            Op::Cos | Op::Sin => 4,
-            Op::Exp => 3,
-        }
-    }
-
-    pub fn forbidden_children(&self) -> &'static [Op] {
-        match self {
-            Op::Add | Op::Sub | Op::Mul | Op::Div | Op::Sqr => &[],
-            Op::Sin | Op::Cos => &[Op::Sin, Op::Cos, Op::Exp],
-            Op::Exp => &[Op::Exp, Op::Sin, Op::Cos, Op::Sqr],
-        }
-    }
-}
+// ... (A régi Op impl maradhat, amíg nem töröljük a BasicDomain-t)
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Node<D: Domain> {
     Operator(D::Operator),
-    Variable(u8),
-    Constant(D::ScalarValue),
+    Variable(u8, D::TypeId),
+    Constant(D::ScalarValue, D::TypeId),
 }
 
 impl<D: Domain> Node<D> {
     pub fn arity(&self) -> usize {
         match self {
-            Node::Constant(_) | Node::Variable(_) => 0,
-            Node::Operator(op) => D::operator_arity(op),
+            Node::Constant(_, _) | Node::Variable(_, _) => 0, // Frissítve [cite: 79, 80]
+            Node::Operator(op) => D::operator_arity(op), // Frissítve [cite: 80]
         }
     }
 
     pub fn weight(&self) -> usize {
         match self {
-            Node::Constant(_) | Node::Variable(_) => 1,
-            Node::Operator(op) => D::operator_weight(op),
+            Node::Variable(_, _) => 1, 
+            Node::Constant(_, type_id) => D::type_weight(type_id), // A súly = paraméterek száma!
+            Node::Operator(op) => D::operator_weight(op), 
+        }
+    }
+
+    pub fn get_type(&self) -> D::TypeId {
+        match self {
+            Node::Operator(op) => D::return_type(op),
+            Node::Variable(_, type_id) => *type_id, // Frissítve
+            Node::Constant(_, type_id) => *type_id, // Frissítve
         }
     }
 }

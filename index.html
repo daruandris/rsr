@@ -1,16 +1,23 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hu">
 <head>
     <meta charset="UTF-8">
-    <title>RSR performance</title>
+    <title>RSR Performance Benchmarkok</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: sans-serif; padding: 20px; }
-        .chart-container { margin-bottom: 30px; border: 1px solid #ddd; padding: 10px; }
+        body { font-family: sans-serif; padding: 20px; background-color: #f8f9fa; }
+        .chart-container { 
+            margin-bottom: 30px; 
+            border: 1px solid #ddd; 
+            padding: 15px; 
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
     </style>
 </head>
 <body>
-    <h1>Benchmark results</h1>
+    <h1>RSR Evolúciós Motor Teljesítmény</h1>
 
     <div class="chart-container">
         <canvas id="mseChart"></canvas>
@@ -22,49 +29,107 @@
     <script src="benchmark_history.js"></script>
 
     <script>
-        if (typeof benchmarkHistory === 'undefined') {
-            document.body.innerHTML += "<h2 style='color:red'>Nincs adat! Futtasd le a benchmarkot először!</h2>";
+        if (typeof benchmarkHistory === 'undefined' || benchmarkHistory.length === 0) {
+            document.body.innerHTML += "<h2 style='color:red'>Nincs adat! Futtasd le a benchmarkot (cargo test) először!</h2>";
         } else {
             const data = benchmarkHistory;
             const labels = data.map((entry, index) => {
                 const shortHash = entry.commit_hash
                     ? entry.commit_hash.substring(0, 7)
                     : "unknown";
-                return `Run ${index + 1}\n${shortHash}`;
+                
+                // Dátum formázása a timestamp-ből
+                const date = new Date(entry.timestamp * 1000);
+                const timeString = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                
+                return `Run ${index + 1}\n${shortHash}\n${timeString}`;
             });
 
-            const bioMse = data.map(d => d.biology_mse || null);
-            const physMse = data.map(d => d.physics_mse || null);
-            const statMse = data.map(d => d.stats_mse || null);
+            // Kategóriák definiálása színekkel
+            const categories = [
+                // --- Basic Modul Tesztek (Kékes/Zöldes/Hideg színek) ---
+                { key: 'basic1', label: 'Basic 1 (Sqr)', color: '#1f77b4' },
+                { key: 'basic2', label: 'Basic 2 (Cos)', color: '#aec7e8' },
+                { key: 'basic3', label: 'Basic 3 (Exp)', color: '#2ca02c' },
+                { key: 'basic4', label: 'Basic 4 (Osc)', color: '#98df8a' },
+                { key: 'basic5', label: 'Basic 5 (Lin3D)', color: '#17becf' },
+                { key: 'basic6', label: 'Basic 6 (Cplx3D)', color: '#9edae5' },
+                { key: 'basic7', label: 'Basic 7 (Noisy)', color: '#7f7f7f' },
+                { key: 'basic8', label: 'Basic 8 (HidDim)', color: '#c7c7c7' },
+                { key: 'basic9', label: 'Basic 9 (Div)', color: '#bcbd22' },
+                { key: 'basic10', label: 'Basic 10 (All)', color: '#dbdb8d' },
 
-            const bioTime = data.map(d => d.biology_time_ms || null);
-            const physTime = data.map(d => d.physics_time_ms || null);
-            const statTime = data.map(d => d.stats_time_ms || null);
+                // --- Linalg Modul Tesztek (Pirosas/Narancsos/Meleg színek) ---
+                { key: 'linalg1', label: 'Linalg 1', color: '#d62728' },
+                { key: 'linalg2', label: 'Linalg 2', color: '#ff9896' },
+                { key: 'linalg3', label: 'Linalg 3', color: '#ff7f0e' },
+                { key: 'linalg4', label: 'Linalg 4', color: '#ffbb78' }
+            ];
 
-            // MSE Grafikon
+            // Dinamikusan legeneráljuk az MSE adatsorokat
+            const mseDatasets = categories.map(cat => ({
+                label: cat.label + ' MSE',
+                data: data.map(d => d[`${cat.key}_mse`] || null),
+                borderColor: cat.color,
+                backgroundColor: cat.color,
+                tension: 0.1,
+                fill: false,
+                spanGaps: true // Áthidalja a null/hiányzó értékeket
+            }));
+
+            // Dinamikusan legeneráljuk az Idő (Time) adatsorokat
+            const timeDatasets = categories.map(cat => ({
+                label: cat.label + ' Time (ms)',
+                data: data.map(d => d[`${cat.key}_time_ms`] || null),
+                borderColor: cat.color,
+                backgroundColor: cat.color,
+                borderDash: [5, 5], // Szaggatott vonal az időnek
+                tension: 0.1,
+                fill: false,
+                spanGaps: true
+            }));
+
+            // 1. MSE Grafikon (Logaritmikus Y tengely)
             new Chart(document.getElementById('mseChart'), {
                 type: 'line',
                 data: {
                     labels: labels,
-                    datasets: [
-                        { label: 'Biológia MSE', data: bioMse, borderColor: 'green', tension: 0.1 },
-                        { label: 'Fizika MSE', data: physMse, borderColor: 'blue', tension: 0.1 },
-                        { label: 'Statisztika MSE', data: statMse, borderColor: 'red', tension: 0.1 }
-                    ]
+                    datasets: mseDatasets
                 },
-                options: { scales: { y: { type: 'logarithmic' } } }
+                options: { 
+                    responsive: true,
+                    plugins: {
+                        title: { display: true, text: 'Mean Squared Error (Alacsonyabb a jobb)' },
+                        legend: { position: 'right' }
+                    },
+                    scales: { 
+                        y: { 
+                            type: 'logarithmic',
+                            title: { display: true, text: 'MSE (log scale)' }
+                        } 
+                    } 
+                }
             });
 
-            // Idő Grafikon
+            // 2. Idő Grafikon (Lineáris Y tengely)
             new Chart(document.getElementById('timeChart'), {
                 type: 'line',
                 data: {
                     labels: labels,
-                    datasets: [
-                        { label: 'Bio Idő', data: bioTime, borderColor: 'lightgreen', borderDash: [5, 5] },
-                        { label: 'Fizika Idő', data: physTime, borderColor: 'lightblue', borderDash: [5, 5] },
-                        { label: 'Stat Idő', data: statTime, borderColor: 'pink', borderDash: [5, 5] }
-                    ]
+                    datasets: timeDatasets
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: { display: true, text: 'Futási idő milliszekundumban (Alacsonyabb a jobb)' },
+                        legend: { position: 'right' }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Idő (ms)' }
+                        }
+                    }
                 }
             });
         }

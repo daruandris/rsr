@@ -1,22 +1,26 @@
+// src/main.rs
 use rsr::EvolutionConfig;
 use rsr::Engine;
 use rsr::SimdDataset;
 use rsr::StaticStrategy;
-use rsr::BasicDomain;
-// Ha a symengine import máshogy van nálad, igazítsd a sajátodhoz:
-use rsr::ffi::symengine::simplify_symengine; 
+use rsr::Strategy;
+use rsr::{UniversalDomain, UniversalType};
+use rsr::ffi::symengine::simplify_symengine;
+use rsr::engine::config::OpModule;
+use rsr::domain::universal::UniversalOp;
 use rand::RngExt;
 use std::time::Instant;
+use std::f32::consts::TAU;
 
 fn get_config() -> EvolutionConfig {
     EvolutionConfig {
         num_islands: 24,
         island_size: 25,
-        max_generations: 10000,   
+        max_generations: 5000,   
         crossover_rate: 0.10,
         tournament_size: 2,
         migration_interval: 25,
-        parsimony_penalty: 0.0,
+        parsimony_penalty: 0.000005,
 
         opt_prob: 0.2,
         opt_iterations: 100,
@@ -29,34 +33,51 @@ fn get_config() -> EvolutionConfig {
         random_injection_rate: 0.10,
         min_random_injection: 2,
         max_tree_size: 32,
-        mutation_max_depth: 4,
+        mutation_max_depth: 7,
         mutation_cycles: 5,
         verbose: true,
+       
+        allowed_modules: vec![OpModule::Basic, OpModule::Linalg],
+        custom_ops: vec![], 
+        // TELJESEN KIZÁRJUK A CSALÁST: Nincs trigonometria, nincs logaritmus!
+        excluded_ops: vec![
+            UniversalOp::SinF, 
+            UniversalOp::CosF, 
+            UniversalOp::ExpF, 
+            UniversalOp::LnF
+        ],
     }
 }
 
-fn run_benchmark(
-    name: &str, 
-    data_x: Vec<Vec<f32>>, 
-    data_y: Vec<f32>, 
-    num_features: u8,
-    expected_noise_mse: Option<f32>
-) {
+// Segédfüggvény: Véletlenszerű, egyenletes 3D térbeli forgatás (Haar-mérték)
+fn get_random_rotation(rng: &mut impl RngExt) -> [f32; 9] {
+    let u1: f32 = rng.random_range(0.0..1.0);
+    let u2: f32 = rng.random_range(0.0..1.0);
+    let u3: f32 = rng.random_range(0.0..1.0);
+    let w = (1.0 - u1).sqrt() * (TAU * u2).sin();
+    let x = (1.0 - u1).sqrt() * (TAU * u2).cos();
+    let y = u1.sqrt() * (TAU * u3).sin();
+    let z = u1.sqrt() * (TAU * u3).cos();
+    
+    [
+        1.0 - 2.0*y*y - 2.0*z*z, 2.0*x*y - 2.0*z*w,     2.0*x*z + 2.0*y*w,
+        2.0*x*y + 2.0*z*w,       1.0 - 2.0*x*x - 2.0*z*z, 2.0*y*z - 2.0*x*w,
+        2.0*x*z - 2.0*y*w,       2.0*y*z + 2.0*x*w,     1.0 - 2.0*x*x - 2.0*y*y
+    ]
+}
+
+fn run_open_problem_benchmark(name: &str, data_x: Vec<Vec<f32>>, data_y: Vec<f32>, feature_types: Vec<UniversalType>) {
     println!("\n========================================================");
-    println!(">>> RUNNING BENCHMARK: {} <<<", name);
-    println!("Features: {}, Samples: {}", num_features, data_x.len());
-    
-    let dataset = SimdDataset::new(&data_x, &data_y, num_features);
-    let mut config = get_config();
-    
-    if let Some(noise_mse) = expected_noise_mse {
-        config.target_mse = noise_mse;
-        println!("Note: Noisy data detected. Adjusted Target MSE to {:.6}", noise_mse);
-    }
+    println!(">>> RUNNING EXACT TENSOR INVARIANT PROBLEM: {} <<<", name);
+    println!("Samples: {}", data_x.len());
 
+    let dataset = SimdDataset::new(&data_x, &data_y, feature_types, true);
+    let config = get_config();
     let strategy = StaticStrategy::new(config);
+    let allowed_ops = strategy.get_allowed_operators();
 
-    let mut engine = Engine::<StaticStrategy, BasicDomain>::new(strategy, num_features);
+    let var_registry = dataset.get_variable_registry();
+    let mut engine = Engine::<StaticStrategy, UniversalDomain>::new(strategy, var_registry, allowed_ops);
     
     let start_time = Instant::now();
     engine.run_evolution(&dataset);
@@ -66,7 +87,7 @@ fn run_benchmark(
     println!("Time taken: {:?}", duration);
     
     let pareto_front = engine.get_pareto_front();
-    println!("{:<6} | {:<15} | {}", "Compl", "MSE", "Simplified Expression");
+    println!("{:<6} | {:<15} | {}", "Compl", "MSE", "Discovered Equation");
     println!("--------------------------------------------------------");
     
     let display_count = pareto_front.len().min(10);
@@ -80,121 +101,97 @@ fn run_benchmark(
 
 fn main() {
     let mut rng = rand::rng();
-    let n = 400; // Minták száma
+    let num_samples = 400; 
 
-    // ----------------------------------------------------------------------
-    // 1. Egyszerű Négyzetes: y = 2.5 * x^2 - 1.2
-    let mut dx1 = Vec::new(); let mut dy1 = Vec::new();
-    for _ in 0..n {
-        let x = rng.random_range(-5.0..5.0);
-        dx1.push(vec![x]);
-        dy1.push(2.5 * x * x - 1.2);
-    }
-    run_benchmark("1. Simple Square (Sqr)", dx1, dy1, 1, None);
+    // 1. Az FCC (Lapcentrált Kockarács) fémek 12 fizikai csúszási rendszere
+    let ns = [
+        [1.0, 1.0, 1.0], [1.0, 1.0, 1.0], [1.0, 1.0, 1.0],
+        [-1.0, 1.0, 1.0], [-1.0, 1.0, 1.0], [-1.0, 1.0, 1.0],
+        [1.0, -1.0, 1.0], [1.0, -1.0, 1.0], [1.0, -1.0, 1.0],
+        [1.0, 1.0, -1.0], [1.0, 1.0, -1.0], [1.0, 1.0, -1.0],
+    ];
+    let ms = [
+        [0.0, 1.0, -1.0], [-1.0, 0.0, 1.0], [1.0, -1.0, 0.0],
+        [0.0, 1.0, -1.0], [1.0, 0.0, 1.0], [1.0, 1.0, 0.0],
+        [0.0, 1.0, 1.0], [-1.0, 0.0, 1.0], [1.0, 1.0, 0.0],
+        [0.0, 1.0, 1.0], [1.0, 0.0, 1.0], [1.0, -1.0, 0.0],
+    ];
 
-    // ----------------------------------------------------------------------
-    // 2. Egyszerű Trigonometria: y = 3.0 * cos(2.0 * x) + 1.0
-    let mut dx2 = Vec::new(); let mut dy2 = Vec::new();
-    for _ in 0..n {
-        let x: f32 = rng.random_range(-3.14..3.14);
-        dx2.push(vec![x]);
-        dy2.push(3.0 * (2.0 * x).cos() + 1.0);
-    }
-    run_benchmark("2. Simple Trigonometry (Cos)", dx2, dy2, 1, None);
+    println!("Precomputing 1000 random crystal orientations (Microstructure)...");
+    let num_grains = 1000;
+    let mut all_schmid_tensors = Vec::with_capacity(num_grains * 12);
 
-    // ----------------------------------------------------------------------
-    // 3. Egyszerű Exponenciális: y = 1.5 * exp(0.5 * x)
-    let mut dx3 = Vec::new(); let mut dy3 = Vec::new();
-    for _ in 0..n {
-        let x: f32 = rng.random_range(-2.0..4.0);
-        dx3.push(vec![x]);
-        dy3.push(1.5 * (0.5 * x).exp());
+    for _ in 0..num_grains {
+        let rot = get_random_rotation(&mut rng);
+        for s in 0..12 {
+            // Szimmetrikus Schmid tenzor (m x n + n x m) / 2
+            let mut p_local = [0.0; 9];
+            for i in 0..3 {
+                for j in 0..3 {
+                    p_local[i*3 + j] = (ms[s][i] * ns[s][j] + ns[s][i] * ms[s][j]) / (2.0 * 6.0f32.sqrt());
+                }
+            }
+            
+            // Forgatás a globális térbe: R * P * R^T
+            let mut p_global = [0.0; 9];
+            for i in 0..3 {
+                for j in 0..3 {
+                    for k in 0..3 {
+                        for l in 0..3 {
+                            p_global[i*3 + j] += rot[i*3 + k] * p_local[k*3 + l] * rot[j*3 + l];
+                        }
+                    }
+                }
+            }
+            all_schmid_tensors.push(p_global);
+        }
     }
-    run_benchmark("3. Simple Exponential (Exp)", dx3, dy3, 1, None);
 
-    // ----------------------------------------------------------------------
-    // 4. Bonyolult Egyváltozós: y = exp(-0.5 * x) * cos(3.0 * x)
-    let mut dx4 = Vec::new(); let mut dy4 = Vec::new();
-    for _ in 0..n {
-        let x: f32 = rng.random_range(0.0..10.0);
-        dx4.push(vec![x]);
-        dy4.push((-0.5 * x).exp() * (3.0 * x).cos());
-    }
-    run_benchmark("4. Complex 1D (Damped Osc.)", dx4, dy4, 1, None);
+    let mut dx = Vec::with_capacity(num_samples);
+    let mut dy = Vec::with_capacity(num_samples);
 
-    // ----------------------------------------------------------------------
-    // 5. Egyszerű Többváltozós: y = 2.0*x0 - 3.5*x1 + 1.2*x2
-    let mut dx5 = Vec::new(); let mut dy5 = Vec::new();
-    for _ in 0..n {
-        let x0 = rng.random_range(-5.0..5.0);
-        let x1 = rng.random_range(-5.0..5.0);
-        let x2 = rng.random_range(-5.0..5.0);
-        dx5.push(vec![x0, x1, x2]);
-        dy5.push(2.0 * x0 - 3.5 * x1 + 1.2 * x2);
-    }
-    run_benchmark("5. Simple Multivariable (Linear)", dx5, dy5, 3, None);
+    println!("Simulating Macroscopic Yield Dissipation...");
+    for _ in 0..num_samples {
+        // Generálunk egy Deviatórikus (nyomtalan) Makroszkopikus Feszültségtenzort (S)
+        let s11 = rng.random_range(-1.0..1.0);
+        let s22 = rng.random_range(-1.0..1.0);
+        let s33 = -s11 - s22; // Tr(S) = 0
+        let s12 = rng.random_range(-1.0..1.0);
+        let s13 = rng.random_range(-1.0..1.0);
+        let s23 = rng.random_range(-1.0..1.0);
+        
+        let stress_tensor = [
+            s11, s12, s13,
+            s12, s22, s23,
+            s13, s23, s33
+        ];
 
-    // ----------------------------------------------------------------------
-    // 6. Bonyolult Többváltozós: y = x0^2 + sin(x1) - x2
-    let mut dx6 = Vec::new(); let mut dy6 = Vec::new();
-    for _ in 0..n {
-        let x0 = rng.random_range(-3.0..3.0);
-        let x1: f32 = rng.random_range(-3.14..3.14);
-        let x2 = rng.random_range(-5.0..5.0);
-        dx6.push(vec![x0, x1, x2]);
-        dy6.push(x0 * x0 + x1.sin() - x2);
-    }
-    run_benchmark("6. Complex Multivariable", dx6, dy6, 3, None);
+        // Kiszámoljuk a fizikai disszipációt (Képlékenységi munka)
+        let mut macro_yield = 0.0;
+        for p in &all_schmid_tensors {
+            let mut tau = 0.0; // Megoldott nyírófeszültség
+            for i in 0..9 {
+                tau += p[i] * stress_tensor[i];
+            }
+            // A disszipáció a nyírófeszültség 6. hatványa
+            macro_yield += tau.powi(6);
+        }
+        macro_yield /= num_grains as f32; // Átlagolás a polikristályra
 
-    // ----------------------------------------------------------------------
-    // 7. Zajos Adat: y = 2.5 * x^2 + noise(-0.5..0.5)
-    let mut dx7 = Vec::new(); let mut dy7 = Vec::new();
-    for _ in 0..n {
-        let x = rng.random_range(-5.0..5.0);
-        let noise = rng.random_range(-0.5..0.5);
-        dx7.push(vec![x]);
-        dy7.push(2.5 * x * x + noise);
+        let mut row = Vec::with_capacity(9);
+        row.extend_from_slice(&stress_tensor);
+        
+        dx.push(row);
+        dy.push(macro_yield);
     }
-    // Noise range 1.0 -> Variance (Expected MSE) = 1.0^2 / 12 = 0.0833
-    // Mivel az adataid Z-score normalizálva lesznek belül, az elvárt MSE is skálázódik, 
-    // de hagyjuk None-on, és nézzük meg, hol áll meg.
-    run_benchmark("7. Noisy Data (Robustness)", dx7, dy7, 1, None); 
 
-    // ----------------------------------------------------------------------
-    // 8. Rejtett Dimenziók: 5 bemenet, de csak 2 számít (y = x0 * x3)
-    let mut dx8 = Vec::new(); let mut dy8 = Vec::new();
-    for _ in 0..n {
-        let x0 = rng.random_range(-5.0..5.0);
-        let x1 = rng.random_range(-5.0..5.0);
-        let x2 = rng.random_range(-5.0..5.0);
-        let x3 = rng.random_range(-5.0..5.0);
-        let x4 = rng.random_range(-5.0..5.0); 
-        dx8.push(vec![x0, x1, x2, x3, x4]);
-        dy8.push(x0 * x3);
-    }
-    run_benchmark("8. Hidden Dimensions (Feature Select)", dx8, dy8, 5, None);
+    // A motor csak a makroszkopikus feszültséget (1 db Mat3) kapja meg!
+    let feature_types = vec![UniversalType::Mat3];
 
-    // ----------------------------------------------------------------------
-    // 9. Racionális Törtfüggvény: y = (x0 + 1.5) / (x0^2 + 2.0)
-    let mut dx9 = Vec::new(); let mut dy9 = Vec::new();
-    for _ in 0..n {
-        let x = rng.random_range(-5.0..5.0);
-        dx9.push(vec![x]);
-        dy9.push((x + 1.5) / (x * x + 2.0));
-    }
-    run_benchmark("9. Rational Function (Div)", dx9, dy9, 1, None);
-
-    // ----------------------------------------------------------------------
-    // 10. "Minden Egyben": y = exp(-x0) + cos(x1) - (x2^2 / (x3 + 1.1))
-    // Csel: az adathatárt úgy állítjuk, hogy a nevező ne lehessen 0.
-    let mut dx10 = Vec::new(); let mut dy10 = Vec::new();
-    for _ in 0..n {
-        let x0: f32 = rng.random_range(0.0..3.0);
-        let x1: f32 = rng.random_range(-3.14..3.14);
-        let x2 = rng.random_range(-3.0..3.0);
-        let x3 = rng.random_range(0.0..5.0);
-        dx10.push(vec![x0, x1, x2, x3]);
-        dy10.push((-x0).exp() + x1.cos() - ((x2 * x2) / (x3 + 1.1)));
-    }
-    run_benchmark("10. Ultimate Multivariable All-Ops", dx10, dy10, 4, None);
+    run_open_problem_benchmark(
+        "FCC Polycrystal Exact Macroscopic Yield Function", 
+        dx, 
+        dy, 
+        feature_types
+    );
 }

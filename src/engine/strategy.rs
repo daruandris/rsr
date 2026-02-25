@@ -1,4 +1,5 @@
-use crate::engine::config::EvolutionConfig;
+use crate::engine::config::{EvolutionConfig, OpModule};
+use crate::domain::universal::{UniversalOp};
 
 pub trait Strategy: Clone + Send + Sync {
     // Architektúrális paraméterek
@@ -31,6 +32,7 @@ pub trait Strategy: Clone + Send + Sync {
     
     // Egyéb
     fn verbose(&self) -> bool;
+    fn get_allowed_operators(&self) -> Vec<UniversalOp>;
 
     // --- ESEMÉNYEK (Hooks) a későbbi dinamikus tanuláshoz ---
     fn on_generation_end(&mut self, _best_mse: f32, _stagnation_counter: usize) {}
@@ -68,4 +70,39 @@ impl Strategy for StaticStrategy {
     #[inline(always)] fn stagnation_threshold(&self) -> usize { self.config.stagnation_threshold }
     #[inline(always)] fn min_improvement(&self) -> f32 { self.config.min_improvement }
     #[inline(always)] fn verbose(&self) -> bool { self.config.verbose }
+
+    fn get_allowed_operators(&self) -> Vec<UniversalOp> {
+        let mut ops = Vec::new();
+
+        for module in &self.config.allowed_modules {
+            match module {
+                OpModule::Basic => ops.extend_from_slice(&[
+                    UniversalOp::AddF, UniversalOp::SubF, UniversalOp::MulF, UniversalOp::DivF, 
+                    UniversalOp::SinF, UniversalOp::CosF, UniversalOp::ExpF, UniversalOp::SqrF,
+                    UniversalOp::LnF, UniversalOp::SqrtF
+                ]),
+                OpModule::Linalg => ops.extend_from_slice(&[
+                    UniversalOp::MakeVec2, UniversalOp::MakeVec3, UniversalOp::GetXV2, UniversalOp::GetYV2,
+                    UniversalOp::GetXV3, UniversalOp::GetYV3, UniversalOp::GetZV3,
+                    UniversalOp::AddV2, UniversalOp::SubV2, UniversalOp::ScaleV2, UniversalOp::DotV2, UniversalOp::NormV2,
+                    UniversalOp::AddV3, UniversalOp::SubV3, UniversalOp::ScaleV3, UniversalOp::DotV3, UniversalOp::NormV3, UniversalOp::CrossV3,
+                    UniversalOp::MakeMat2, UniversalOp::AddM2, UniversalOp::SubM2, UniversalOp::ScaleM2, UniversalOp::MulM2, UniversalOp::MulM2V2, 
+                    UniversalOp::DetM2, UniversalOp::TraceM2, UniversalOp::TransposeM2, UniversalOp::InverseM2,
+                    UniversalOp::MakeMat3, UniversalOp::AddM3, UniversalOp::SubM3, UniversalOp::ScaleM3, UniversalOp::MulM3, UniversalOp::MulM3V3, 
+                    UniversalOp::DetM3, UniversalOp::TraceM3, UniversalOp::TransposeM3, UniversalOp::InverseM3,
+                ]),
+                OpModule::Logic => ops.extend_from_slice(&[UniversalOp::IfElseF]),
+            }
+        }
+
+        ops.extend(&self.config.custom_ops);
+
+        let mut final_ops = Vec::new();
+        for op in ops {
+            if !self.config.excluded_ops.contains(&op) && !final_ops.contains(&op) {
+                final_ops.push(op);
+            }
+        }
+        final_ops
+    }
 }

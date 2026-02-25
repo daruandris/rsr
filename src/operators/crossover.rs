@@ -2,13 +2,28 @@ use crate::engine::individual::Individual;
 use crate::domain::Domain;
 use rand::RngExt;
 
-pub fn crossover<D: Domain>(parent_a: &Individual<D>, parent_b: &Individual<D>, rng: &mut impl RngExt, max_size: usize) -> Individual<D> {
+pub fn crossover<D: Domain>(
+    parent_a: &Individual<D>, 
+    parent_b: &Individual<D>, 
+    rng: &mut impl RngExt, 
+    max_size: usize
+) -> Individual<D> {
     if parent_a.nodes.is_empty() || parent_b.nodes.is_empty() {
         return parent_a.clone();
     }
 
-    let root_a = select_node_index::<D>(parent_a, rng);
-    let root_b = select_node_index::<D>(parent_b, rng);
+    let root_a = match select_node_index::<D>(parent_a, rng, None) {
+        Some(idx) => idx,
+        None => return parent_a.clone(),
+    };
+    let target_type = parent_a.nodes[root_a].get_type();
+
+    let root_b_opt = select_node_index::<D>(parent_b, rng, Some(target_type));
+
+    let root_b = match root_b_opt {
+        Some(idx) => idx,
+        None => return parent_a.clone(),
+    };
 
     let (start_a, end_a) = parent_a.get_subtree_bounds(root_a);
     let (start_b, end_b) = parent_b.get_subtree_bounds(root_b);
@@ -25,18 +40,37 @@ pub fn crossover<D: Domain>(parent_a: &Individual<D>, parent_b: &Individual<D>, 
     Individual::new(child_nodes)
 }
 
-fn select_node_index<D: Domain>(ind: &Individual<D>, rng: &mut impl RngExt) -> usize {
+fn select_node_index<D: Domain>(
+    ind: &Individual<D>, 
+    rng: &mut impl RngExt, 
+    required_type: Option<D::TypeId>
+) -> Option<usize> {
     let len = ind.nodes.len();
-    if len < 2 { return 0; }
+    if len == 0 { return None; }
 
-    let internal_indices: Vec<usize> = ind.nodes.iter().enumerate()
-        .filter_map(|(i, n)| if n.arity() > 0 { Some(i) } else { None })
-        .collect();
+    let mut internal_indices: Vec<usize> = Vec::new();
+    let mut all_valid_indices: Vec<usize> = Vec::new();
+
+    for (i, node) in ind.nodes.iter().enumerate() {
+        let is_type_match = required_type.map_or(true, |t| node.get_type() == t);
+        
+        if is_type_match {
+            all_valid_indices.push(i);
+            if node.arity() > 0 {
+                internal_indices.push(i);
+            }
+        }
+    }
+
+    if all_valid_indices.is_empty() {
+        return None;
+    }
 
     if !internal_indices.is_empty() && rng.random::<f32>() < 0.9 {
         let idx = rng.random_range(0..internal_indices.len());
-        internal_indices[idx]
+        Some(internal_indices[idx])
     } else {
-        rng.random_range(0..len)
+        let idx = rng.random_range(0..all_valid_indices.len());
+        Some(all_valid_indices[idx])
     }
 }
