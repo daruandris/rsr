@@ -105,11 +105,7 @@ impl fmt::Display for Scalar {
             Scalar::Bool(val) => write!(f, "{}", val),
             Scalar::Vec2(arr) => write!(f, "[{:.2}, {:.2}]", arr[0], arr[1]),
             Scalar::Vec3(arr) => write!(f, "[{:.2}, {:.2}, {:.2}]", arr[0], arr[1], arr[2]),
-            Scalar::Mat2(m) => write!(
-                f,
-                "[{:.2}, {:.2}; {:.2}, {:.2}]",
-                m[0], m[2], m[1], m[3]
-            ),
+            Scalar::Mat2(m) => write!(f, "[{:.2}, {:.2}; {:.2}, {:.2}]", m[0], m[2], m[1], m[3]),
             Scalar::Mat3(m) => write!(
                 f,
                 "[{:.2}, {:.2}, {:.2}; {:.2}, {:.2}, {:.2}; {:.2}, {:.2}, {:.2}]",

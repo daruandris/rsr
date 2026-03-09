@@ -1,18 +1,20 @@
-use std::mem;
-use std::collections::HashMap;
-use rand::SeedableRng;
 use rand::RngExt;
+use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256PlusPlus;
+use std::collections::HashMap;
+use std::mem;
 
+use crate::data::dataset::Dataset;
 use crate::eval::op::Op;
 use crate::eval::types::ValueType;
-use crate::data::dataset::Dataset;
 use crate::search::individual::Individual;
-use crate::search::strategy::Strategy;
 use crate::search::operators::crossover::crossover;
 use crate::search::operators::generator::generate_random_ast;
 use crate::search::operators::mutation::{constant_perturbation, point_mutation, subtree_mutation};
-use crate::search::operators::selection::{assign_rank_and_crowding_distance, tournament_selection_pareto};
+use crate::search::operators::selection::{
+    assign_rank_and_crowding_distance, tournament_selection_pareto,
+};
+use crate::search::strategy::Strategy;
 
 pub struct Island<S: Strategy> {
     pub individuals: Vec<Individual>,
@@ -27,13 +29,24 @@ pub struct Island<S: Strategy> {
 }
 
 impl<S: Strategy> Island<S> {
-    pub fn new(seed: u64, variable_registry: Vec<(ValueType, u8)>, strategy: S, allowed_ops: Vec<Op>) -> Self {
+    pub fn new(
+        seed: u64,
+        variable_registry: Vec<(ValueType, u8)>,
+        strategy: S,
+        allowed_ops: Vec<Op>,
+    ) -> Self {
         let size = strategy.island_size();
         let mut rng = Xoshiro256PlusPlus::seed_from_u64(seed);
         let mut individuals = Vec::with_capacity(size);
-        
+
         for _ in 0..size {
-            let ast = generate_random_ast(ValueType::Float, 5, &mut rng, &variable_registry, &allowed_ops);
+            let ast = generate_random_ast(
+                ValueType::Float,
+                5,
+                &mut rng,
+                &variable_registry,
+                &allowed_ops,
+            );
             let mut ind = Individual::new(ast);
             ind.simplify();
             individuals.push(ind);
@@ -55,13 +68,15 @@ impl<S: Strategy> Island<S> {
 
     pub fn step_generation(&mut self, dataset: &Dataset) {
         let old_best_fitness = self.best_individual.fitness;
-        for ind in self.individuals.iter_mut() { ind.age += 1; }
+        for ind in self.individuals.iter_mut() {
+            ind.age += 1;
+        }
         assign_rank_and_crowding_distance(&mut self.individuals);
 
         self.fill_next_generation(dataset);
         self.evaluate_buffer(dataset);
         mem::swap(&mut self.individuals, &mut self.next_gen_buffer);
-        
+
         let improvement = old_best_fitness - self.best_individual.fitness;
         if improvement > self.strategy.min_improvement() {
             self.stagnation_counter = 0;
@@ -69,10 +84,11 @@ impl<S: Strategy> Island<S> {
             self.stagnation_counter += 1;
         }
 
-        self.strategy.on_generation_end(self.best_individual.fitness, self.stagnation_counter);
-        if self.stagnation_counter >= self.strategy.stagnation_threshold() * 4 { 
+        self.strategy
+            .on_generation_end(self.best_individual.fitness, self.stagnation_counter);
+        if self.stagnation_counter >= self.strategy.stagnation_threshold() * 4 {
             self.nuke(dataset);
-            self.strategy.on_nuke(); 
+            self.strategy.on_nuke();
         }
     }
 
@@ -84,10 +100,18 @@ impl<S: Strategy> Island<S> {
 
         let num_randoms = (pop_size as f32 * self.strategy.random_injection_rate())
             .max(self.strategy.min_random_injection() as f32) as usize;
-            
+
         for _ in 0..num_randoms {
-            if self.next_gen_buffer.len() >= pop_size { break; }
-            let ast = generate_random_ast(ValueType::Float, 5, &mut self.rng, &self.variable_registry, &self.allowed_ops);
+            if self.next_gen_buffer.len() >= pop_size {
+                break;
+            }
+            let ast = generate_random_ast(
+                ValueType::Float,
+                5,
+                &mut self.rng,
+                &self.variable_registry,
+                &self.allowed_ops,
+            );
             let mut ind = Individual::new(ast);
             ind.simplify();
             self.next_gen_buffer.push(ind);
@@ -96,37 +120,54 @@ impl<S: Strategy> Island<S> {
         while self.next_gen_buffer.len() < pop_size {
             let p: f32 = self.rng.random();
             let tourn_size = self.strategy.tournament_size();
-            
-            if p < self.strategy.crossover_rate() {
-                let parent1 = tournament_selection_pareto(&self.individuals, tourn_size, &mut self.rng);
-                let parent2 = tournament_selection_pareto(&self.individuals, tourn_size, &mut self.rng);
 
-                let mut child = crossover(parent1, parent2, &mut self.rng, self.strategy.max_tree_size());
+            if p < self.strategy.crossover_rate() {
+                let parent1 =
+                    tournament_selection_pareto(&self.individuals, tourn_size, &mut self.rng);
+                let parent2 =
+                    tournament_selection_pareto(&self.individuals, tourn_size, &mut self.rng);
+
+                let mut child = crossover(
+                    parent1,
+                    parent2,
+                    &mut self.rng,
+                    self.strategy.max_tree_size(),
+                );
                 child.age = parent1.age.max(parent2.age);
                 child.simplify();
                 child.invalidate();
                 self.next_gen_buffer.push(child);
             } else {
-                let mut candidate = tournament_selection_pareto(&self.individuals, tourn_size, &mut self.rng).clone();
-                if candidate.fitness == f32::MAX { candidate.fitness = candidate.calculate_mse(dataset); }
+                let mut candidate =
+                    tournament_selection_pareto(&self.individuals, tourn_size, &mut self.rng)
+                        .clone();
+                if candidate.fitness == f32::MAX {
+                    candidate.fitness = candidate.calculate_mse(dataset);
+                }
                 let mut current_fitness = candidate.fitness;
-                
+
                 for _ in 0..self.strategy.mutation_cycles() {
                     let mut mutated_candidate = candidate.clone();
                     match self.rng.random_range(0..3) {
-                        0 => point_mutation(&mut mutated_candidate, &mut self.rng, &self.variable_registry, &self.allowed_ops),
+                        0 => point_mutation(
+                            &mut mutated_candidate,
+                            &mut self.rng,
+                            &self.variable_registry,
+                            &self.allowed_ops,
+                        ),
                         1 => constant_perturbation(&mut mutated_candidate, &mut self.rng),
                         _ => subtree_mutation(
-                            &mut mutated_candidate, 
-                            &mut self.rng, 
-                            &self.variable_registry, 
-                            self.strategy.max_tree_size(), 
+                            &mut mutated_candidate,
+                            &mut self.rng,
+                            &self.variable_registry,
+                            self.strategy.max_tree_size(),
                             self.strategy.mutation_max_depth(),
-                            &self.allowed_ops),
+                            &self.allowed_ops,
+                        ),
                     }
                     mutated_candidate.simplify();
                     let new_mse = mutated_candidate.calculate_mse(dataset);
-                    
+
                     if new_mse < current_fitness {
                         candidate = mutated_candidate;
                         current_fitness = new_mse;
@@ -144,13 +185,21 @@ impl<S: Strategy> Island<S> {
         self.individuals.push(self.best_individual.clone());
 
         for _ in 1..pop_size {
-            let ast = generate_random_ast(ValueType::Float, 5, &mut self.rng, &self.variable_registry, &self.allowed_ops);
+            let ast = generate_random_ast(
+                ValueType::Float,
+                5,
+                &mut self.rng,
+                &self.variable_registry,
+                &self.allowed_ops,
+            );
             let mut new_ind = Individual::new(ast);
             new_ind.simplify();
-            
+
             let mse = new_ind.calculate_mse(dataset);
             let penalty = (new_ind.complexity() as f32) * self.strategy.parsimony_penalty();
-            if mse.is_finite() { new_ind.fitness = mse + penalty; }
+            if mse.is_finite() {
+                new_ind.fitness = mse + penalty;
+            }
             self.individuals.push(new_ind);
         }
         self.stagnation_counter = 0;
@@ -160,7 +209,9 @@ impl<S: Strategy> Island<S> {
         for ind in self.next_gen_buffer.iter_mut() {
             if self.rng.random::<f32>() < self.strategy.opt_prob() {
                 ind.optimize_constants(dataset, self.strategy.opt_iterations());
-                if ind.program.is_none() { ind.compile(); } 
+                if ind.program.is_none() {
+                    ind.compile();
+                }
             }
 
             let mse = ind.calculate_mse(dataset);

@@ -1,4 +1,3 @@
-use std::fmt;
 use crate::data::dataset::Dataset;
 use crate::eval::evaluator;
 use crate::eval::scalar::Scalar;
@@ -7,6 +6,7 @@ use crate::expr::node::Node;
 use crate::expr::program::Program;
 use crate::expr::simplify::simplify_ast;
 use crate::optimize::optimize_individual_constants;
+use std::fmt;
 
 #[derive(Clone)]
 pub struct Individual {

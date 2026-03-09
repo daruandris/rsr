@@ -6,19 +6,26 @@ use crate::search::individual::Individual;
 use crate::search::operators::generator::{generate_random_ast, random_constant, random_operator};
 use rand::RngExt;
 
-pub fn point_mutation(ind: &mut Individual, rng: &mut impl RngExt, variables: &[(ValueType, u8)], allowed_ops: &[Op]) {
-    if ind.nodes.is_empty() { return; }
+pub fn point_mutation(
+    ind: &mut Individual,
+    rng: &mut impl RngExt,
+    variables: &[(ValueType, u8)],
+    allowed_ops: &[Op],
+) {
+    if ind.nodes.is_empty() {
+        return;
+    }
     let idx = rng.random_range(0..ind.nodes.len());
-    
+
     let target_node = ind.nodes[idx];
     let target_arity = target_node.arity();
     let target_type = target_node.get_type();
-    
+
     if target_arity == 0 {
         let valid_vars: Vec<_> = variables.iter().filter(|v| v.0 == target_type).collect();
         let is_var_valid = !valid_vars.is_empty();
         let maybe_const = random_constant(target_type, rng);
-        
+
         match (is_var_valid, maybe_const) {
             (true, Some(c)) => {
                 if rng.random::<bool>() {
@@ -27,14 +34,14 @@ pub fn point_mutation(ind: &mut Individual, rng: &mut impl RngExt, variables: &[
                 } else {
                     ind.nodes[idx] = Node::Constant(c, target_type);
                 }
-            },
+            }
             (true, None) => {
                 let chosen = valid_vars[rng.random_range(0..valid_vars.len())];
                 ind.nodes[idx] = Node::Variable(chosen.1, target_type);
-            },
+            }
             (false, Some(c)) => {
                 ind.nodes[idx] = Node::Constant(c, target_type);
-            },
+            }
             (false, None) => {}
         }
     } else {
@@ -74,27 +81,49 @@ fn perturb_constant(val: &mut Scalar, rng: &mut impl RngExt) {
     let r = rng.random::<f32>();
     match val {
         Scalar::Float(f) => {
-            if r < 0.8 { *f *= rng.random_range(0.9..1.1); } 
-            else if r < 0.9 { *f += rng.random_range(-0.1..0.1); } 
-            else { *f = rng.random_range(-5.0..5.0); }
-        },
-        Scalar::Vec2(v) => { for i in 0..2 { v[i] += rng.random_range(-0.5..0.5); } },
-        Scalar::Vec3(v) => { for i in 0..3 { v[i] += rng.random_range(-0.5..0.5); } },
-        Scalar::Mat2(m) => { for i in 0..4 { m[i] += rng.random_range(-0.5..0.5); } },
-        Scalar::Mat3(m) => { for i in 0..9 { m[i] += rng.random_range(-0.5..0.5); } },
-        _ => {} 
+            if r < 0.8 {
+                *f *= rng.random_range(0.9..1.1);
+            } else if r < 0.9 {
+                *f += rng.random_range(-0.1..0.1);
+            } else {
+                *f = rng.random_range(-5.0..5.0);
+            }
+        }
+        Scalar::Vec2(v) => {
+            for i in 0..2 {
+                v[i] += rng.random_range(-0.5..0.5);
+            }
+        }
+        Scalar::Vec3(v) => {
+            for i in 0..3 {
+                v[i] += rng.random_range(-0.5..0.5);
+            }
+        }
+        Scalar::Mat2(m) => {
+            for i in 0..4 {
+                m[i] += rng.random_range(-0.5..0.5);
+            }
+        }
+        Scalar::Mat3(m) => {
+            for i in 0..9 {
+                m[i] += rng.random_range(-0.5..0.5);
+            }
+        }
+        _ => {}
     }
 }
 
 pub fn subtree_mutation(
-    ind: &mut Individual, 
-    rng: &mut impl RngExt, 
+    ind: &mut Individual,
+    rng: &mut impl RngExt,
     variables: &[(ValueType, u8)],
     max_size: usize,
     mutation_max_depth: usize,
     allowed_ops: &[Op],
 ) {
-    if ind.nodes.is_empty() { return; }
+    if ind.nodes.is_empty() {
+        return;
+    }
     let mutation_point = rng.random_range(0..ind.nodes.len());
     let (start, end) = ind.get_subtree_bounds(mutation_point);
 
@@ -102,11 +131,21 @@ pub fn subtree_mutation(
     let removed_len = end - start + 1;
     let current_len = ind.nodes.len();
     let allowed_new_len = max_size.saturating_sub(current_len - removed_len);
-    
-    if allowed_new_len == 0 { return; }
 
-    let new_subtree = generate_random_ast(required_type, mutation_max_depth, rng, variables, allowed_ops);
-    if new_subtree.len() > allowed_new_len { return; }
+    if allowed_new_len == 0 {
+        return;
+    }
+
+    let new_subtree = generate_random_ast(
+        required_type,
+        mutation_max_depth,
+        rng,
+        variables,
+        allowed_ops,
+    );
+    if new_subtree.len() > allowed_new_len {
+        return;
+    }
 
     ind.nodes.splice(start..=end, new_subtree);
     ind.invalidate();

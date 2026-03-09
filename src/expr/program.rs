@@ -1,7 +1,7 @@
+use super::node::Node;
 use crate::eval::instruction::Instruction;
 use crate::eval::scalar::Scalar;
 use crate::eval::types::ValueType;
-use super::node::Node;
 
 #[derive(Clone, Debug)]
 pub struct Program {

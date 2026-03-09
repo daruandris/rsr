@@ -13,7 +13,7 @@ fn dominates(a: &Individual, b: &Individual) -> bool {
 pub fn tournament_selection_pareto<'a>(
     population: &'a [Individual],
     k: usize,
-    rng: &mut impl RngExt
+    rng: &mut impl RngExt,
 ) -> &'a Individual {
     let mut best_idx = rng.random_range(0..population.len());
     for _ in 1..k {
@@ -29,9 +29,10 @@ pub fn nsga2_compare(a: &Individual, b: &Individual) -> Ordering {
     match a.rank.cmp(&b.rank) {
         Ordering::Less => Ordering::Less,
         Ordering::Greater => Ordering::Greater,
-        Ordering::Equal => {
-            b.crowding_distance.partial_cmp(&a.crowding_distance).unwrap_or(Ordering::Equal)
-        }
+        Ordering::Equal => b
+            .crowding_distance
+            .partial_cmp(&a.crowding_distance)
+            .unwrap_or(Ordering::Equal),
     }
 }
 
@@ -41,10 +42,12 @@ pub fn assign_rank_and_crowding_distance(pop: &mut [Individual]) {
     let mut dominated_individuals = vec![Vec::new(); n];
     let mut fronts: Vec<Vec<usize>> = Vec::new();
     fronts.push(Vec::new());
-    
+
     for i in 0..n {
         for j in 0..n {
-            if i == j { continue; }
+            if i == j {
+                continue;
+            }
             if dominates(&pop[i], &pop[j]) {
                 dominated_individuals[i].push(j);
             } else if dominates(&pop[j], &pop[i]) {
@@ -69,33 +72,40 @@ pub fn assign_rank_and_crowding_distance(pop: &mut [Individual]) {
                 }
             }
         }
-        if next_front.is_empty() { break; }
+        if next_front.is_empty() {
+            break;
+        }
         fronts.push(next_front);
         i += 1;
     }
 
     for front in fronts {
-        if front.is_empty() { continue; }
-        
+        if front.is_empty() {
+            continue;
+        }
+
         for &idx in &front {
             pop[idx].crowding_distance = 0.0;
         }
 
         if front.len() < 3 {
-            for &idx in &front { pop[idx].crowding_distance = f32::MAX; }
+            for &idx in &front {
+                pop[idx].crowding_distance = f32::MAX;
+            }
             continue;
         }
 
         let mut sorted_front = front.clone();
         sorted_front.sort_by(|&a, &b| pop[a].fitness.partial_cmp(&pop[b].fitness).unwrap());
-        
+
         pop[sorted_front[0]].crowding_distance = f32::MAX;
         pop[*sorted_front.last().unwrap()].crowding_distance = f32::MAX;
 
         let mse_range = pop[*sorted_front.last().unwrap()].fitness - pop[sorted_front[0]].fitness;
         if mse_range > 1e-9 {
-            for k in 1..sorted_front.len()-1 {
-                let dist = (pop[sorted_front[k+1]].fitness - pop[sorted_front[k-1]].fitness) / mse_range;
+            for k in 1..sorted_front.len() - 1 {
+                let dist = (pop[sorted_front[k + 1]].fitness - pop[sorted_front[k - 1]].fitness)
+                    / mse_range;
                 if pop[sorted_front[k]].crowding_distance != f32::MAX {
                     pop[sorted_front[k]].crowding_distance += dist;
                 }
@@ -111,9 +121,9 @@ pub fn assign_rank_and_crowding_distance(pop: &mut [Individual]) {
         let age_range = age_max - age_min;
 
         if age_range > 1e-9 {
-             for k in 1..sorted_front.len()-1 {
-                let a_next = pop[sorted_front[k+1]].age as f32;
-                let a_prev = pop[sorted_front[k-1]].age as f32;
+            for k in 1..sorted_front.len() - 1 {
+                let a_next = pop[sorted_front[k + 1]].age as f32;
+                let a_prev = pop[sorted_front[k - 1]].age as f32;
                 let dist = (a_next - a_prev) / age_range;
                 if pop[sorted_front[k]].crowding_distance != f32::MAX {
                     pop[sorted_front[k]].crowding_distance += dist;

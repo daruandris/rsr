@@ -1,12 +1,12 @@
 use rayon::prelude::*;
 use std::collections::HashMap;
 
+use crate::data::dataset::Dataset;
 use crate::eval::op::Op;
 use crate::eval::types::ValueType;
-use crate::data::dataset::Dataset;
-use crate::search::strategy::Strategy;
 use crate::search::individual::Individual;
 use crate::search::island::Island;
+use crate::search::strategy::Strategy;
 
 pub struct Engine<S: Strategy> {
     pub islands: Vec<Island<S>>,
@@ -18,12 +18,21 @@ impl<S: Strategy> Engine<S> {
     pub fn new(strategy: S, variable_registry: Vec<(ValueType, u8)>, allowed_ops: Vec<Op>) -> Self {
         let num_islands = strategy.num_islands();
         let mut islands = Vec::with_capacity(num_islands);
-        
+
         for i in 0..num_islands {
-            islands.push(Island::new(42 + i as u64, variable_registry.clone(), strategy.clone(), allowed_ops.clone()));
+            islands.push(Island::new(
+                42 + i as u64,
+                variable_registry.clone(),
+                strategy.clone(),
+                allowed_ops.clone(),
+            ));
         }
-        
-        Self { islands, global_strategy: strategy, global_hof: HashMap::new() }
+
+        Self {
+            islands,
+            global_strategy: strategy,
+            global_hof: HashMap::new(),
+        }
     }
 
     pub fn run(&mut self, dataset: &Dataset) {
@@ -31,12 +40,12 @@ impl<S: Strategy> Engine<S> {
         let target_mse = self.global_strategy.target_mse();
         let migration_interval = self.global_strategy.migration_interval();
         let verbose = self.global_strategy.verbose();
-        
+
         for generation in 0..max_generations {
             self.islands.par_iter_mut().for_each(|island| {
                 island.step_generation(dataset);
             });
-            
+
             for island in &self.islands {
                 for (&complexity, &(mse, ref ind)) in &island.local_hof {
                     let is_global_best = match self.global_hof.get(&complexity) {
@@ -51,16 +60,29 @@ impl<S: Strategy> Engine<S> {
 
             let pure_mse = self.get_global_best().clone().calculate_mse(dataset);
             if pure_mse <= target_mse {
-                if verbose { println!("\n>>> Target reached in {}. generation: {}! <<<", generation, self.get_global_best()); }
+                if verbose {
+                    println!(
+                        "\n>>> Target reached in {}. generation: {}! <<<",
+                        generation,
+                        self.get_global_best()
+                    );
+                }
                 break;
             }
 
             if generation > 0 && generation % migration_interval == 0 {
                 self.migrate_individuals();
-                if verbose { println!("Generation: {}, Best MSE: {}, Equation: {}", generation, pure_mse, self.get_global_best()); }
+                if verbose {
+                    println!(
+                        "Generation: {}, Best MSE: {}, Equation: {}",
+                        generation,
+                        pure_mse,
+                        self.get_global_best()
+                    );
+                }
             }
         }
-        
+
         let final_opt_iters = self.global_strategy.final_opt_iterations();
         let mut final_best = self.get_global_best().clone();
         final_best.optimize_constants(dataset, final_opt_iters);
@@ -68,9 +90,13 @@ impl<S: Strategy> Engine<S> {
 
     fn migrate_individuals(&mut self) {
         let num_islands = self.islands.len();
-        if num_islands < 2 { return; }
-        
-        let mut migrants: Vec<Individual> = self.islands.iter()
+        if num_islands < 2 {
+            return;
+        }
+
+        let mut migrants: Vec<Individual> = self
+            .islands
+            .iter()
             .map(|island| island.best_individual.clone())
             .collect();
         migrants.rotate_right(1);
@@ -82,21 +108,29 @@ impl<S: Strategy> Engine<S> {
     }
 
     pub fn get_global_best(&self) -> &Individual {
-        self.islands.iter()
-            .min_by(|a, b| a.best_individual.fitness.partial_cmp(&b.best_individual.fitness).unwrap())
+        self.islands
+            .iter()
+            .min_by(|a, b| {
+                a.best_individual
+                    .fitness
+                    .partial_cmp(&b.best_individual.fitness)
+                    .unwrap()
+            })
             .map(|island| &island.best_individual)
             .unwrap()
     }
 
     pub fn get_pareto_front(&self) -> Vec<(usize, f32, Individual)> {
-        let mut front: Vec<(usize, f32, Individual)> = self.global_hof.iter()
+        let mut front: Vec<(usize, f32, Individual)> = self
+            .global_hof
+            .iter()
             .map(|(&c, &(mse, ref ind))| (c, mse, ind.clone()))
             .collect();
         front.sort_by_key(|k| k.0);
 
         let mut pareto = Vec::new();
         let mut best_mse = f32::MAX;
-        
+
         for (comp, mse, ind) in front {
             if mse < best_mse {
                 best_mse = mse;

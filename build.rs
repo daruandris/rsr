@@ -9,10 +9,9 @@ fn main() {
         .compile("simplify_native");
 
     println!("cargo:rustc-link-search=native=vendor/lib");
-    
+
     println!("cargo:rustc-link-lib=static=symengine");
     println!("cargo:rustc-link-lib=static=gmp");
-
 
     let git_hash = Command::new("git")
         .args(["rev-parse", "--short", "HEAD"])

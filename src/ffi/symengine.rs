@@ -12,9 +12,9 @@ pub fn simplify_symengine(eq: &str) -> String {
 
     unsafe {
         simplify_symengine_cpp(
-            c_input.as_ptr(), 
-            buffer.as_mut_ptr() as *mut c_char, 
-            BUFFER_SIZE
+            c_input.as_ptr(),
+            buffer.as_mut_ptr() as *mut c_char,
+            BUFFER_SIZE,
         );
         CStr::from_ptr(buffer.as_ptr() as *const c_char)
             .to_string_lossy()

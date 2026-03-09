@@ -15,38 +15,105 @@ fn rand_normal(rng: &mut impl RngExt) -> f32 {
     (-2.0 * u1.ln()).sqrt() * (2.0 * std::f32::consts::PI * u2).cos()
 }
 
-pub fn run_cma_es(
-    ind: &mut Individual, 
-    dataset: &Dataset, 
-    max_iterations: usize
-) {
-    let program = match ind.program.as_mut() { Some(p) => p, None => return, };
+pub fn run_cma_es(ind: &mut Individual, dataset: &Dataset, max_iterations: usize) {
+    let program = match ind.program.as_mut() {
+        Some(p) => p,
+        None => return,
+    };
 
     let mut mean = [0.0f32; MAX_PARAMS];
     let mut n = 0;
 
     for c in &program.constants {
         match c {
-            Scalar::Float(f) => { if n < MAX_PARAMS { mean[n] = *f; n += 1; } },
-            Scalar::Vec2(v) => { for i in 0..2 { if n < MAX_PARAMS { mean[n] = v[i]; n += 1; } } },
-            Scalar::Vec3(v) => { for i in 0..3 { if n < MAX_PARAMS { mean[n] = v[i]; n += 1; } } },
-            Scalar::Mat2(m) => { for i in 0..4 { if n < MAX_PARAMS { mean[n] = m[i]; n += 1; } } },
-            Scalar::Mat3(m) => { for i in 0..9 { if n < MAX_PARAMS { mean[n] = m[i]; n += 1; } } },
+            Scalar::Float(f) => {
+                if n < MAX_PARAMS {
+                    mean[n] = *f;
+                    n += 1;
+                }
+            }
+            Scalar::Vec2(v) => {
+                for i in 0..2 {
+                    if n < MAX_PARAMS {
+                        mean[n] = v[i];
+                        n += 1;
+                    }
+                }
+            }
+            Scalar::Vec3(v) => {
+                for i in 0..3 {
+                    if n < MAX_PARAMS {
+                        mean[n] = v[i];
+                        n += 1;
+                    }
+                }
+            }
+            Scalar::Mat2(m) => {
+                for i in 0..4 {
+                    if n < MAX_PARAMS {
+                        mean[n] = m[i];
+                        n += 1;
+                    }
+                }
+            }
+            Scalar::Mat3(m) => {
+                for i in 0..9 {
+                    if n < MAX_PARAMS {
+                        mean[n] = m[i];
+                        n += 1;
+                    }
+                }
+            }
             _ => {}
         }
     }
 
-    if n == 0 { return; }
+    if n == 0 {
+        return;
+    }
 
     let update_constants = |prog_consts: &mut Vec<Scalar>, flat_vals: &[f32; MAX_PARAMS]| {
         let mut ptr = 0;
         for c in prog_consts.iter_mut() {
             match c {
-                Scalar::Float(f) => { if ptr < n { *f = flat_vals[ptr]; ptr += 1; } },
-                Scalar::Vec2(v) => { for i in 0..2 { if ptr < n { v[i] = flat_vals[ptr]; ptr += 1; } } },
-                Scalar::Vec3(v) => { for i in 0..3 { if ptr < n { v[i] = flat_vals[ptr]; ptr += 1; } } },
-                Scalar::Mat2(m) => { for i in 0..4 { if ptr < n { m[i] = flat_vals[ptr]; ptr += 1; } } },
-                Scalar::Mat3(m) => { for i in 0..9 { if ptr < n { m[i] = flat_vals[ptr]; ptr += 1; } } },
+                Scalar::Float(f) => {
+                    if ptr < n {
+                        *f = flat_vals[ptr];
+                        ptr += 1;
+                    }
+                }
+                Scalar::Vec2(v) => {
+                    for i in 0..2 {
+                        if ptr < n {
+                            v[i] = flat_vals[ptr];
+                            ptr += 1;
+                        }
+                    }
+                }
+                Scalar::Vec3(v) => {
+                    for i in 0..3 {
+                        if ptr < n {
+                            v[i] = flat_vals[ptr];
+                            ptr += 1;
+                        }
+                    }
+                }
+                Scalar::Mat2(m) => {
+                    for i in 0..4 {
+                        if ptr < n {
+                            m[i] = flat_vals[ptr];
+                            ptr += 1;
+                        }
+                    }
+                }
+                Scalar::Mat3(m) => {
+                    for i in 0..9 {
+                        if ptr < n {
+                            m[i] = flat_vals[ptr];
+                            ptr += 1;
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -55,15 +122,15 @@ pub fn run_cma_es(
     let mut sigma = 0.5f32;
     let mut c_diag = [1.0f32; MAX_PARAMS];
     let mut p_c = [0.0f32; MAX_PARAMS];
-    
+
     let mut weights = [0.0f32; MU];
     let mut sum_weights = 0.0;
-    
+
     for i in 0..MU {
         weights[i] = ((MU as f32 + 0.5).ln() - ((i + 1) as f32).ln()).max(0.0);
         sum_weights += weights[i];
     }
-    
+
     let mut mu_eff = 0.0;
     for i in 0..MU {
         weights[i] /= sum_weights;
@@ -72,13 +139,15 @@ pub fn run_cma_es(
     mu_eff = 1.0 / mu_eff;
 
     let c_c = (4.0 + mu_eff / (n as f32)) / ((n as f32) + 4.0 + 2.0 * mu_eff / (n as f32));
-    let c_cov = (1.0 / mu_eff) * (2.0 / ((n as f32) + 1.414).powi(2)) 
-              + (1.0 - 1.0 / mu_eff) * ((2.0 * mu_eff - 1.0) / (((n as f32) + 2.0).powi(2) + mu_eff));
+    let c_cov = (1.0 / mu_eff) * (2.0 / ((n as f32) + 1.414).powi(2))
+        + (1.0 - 1.0 / mu_eff) * ((2.0 * mu_eff - 1.0) / (((n as f32) + 2.0).powi(2) + mu_eff));
 
     let initial_mse = evaluator::compute_mse(program, dataset);
 
     let mut initial_l1 = 0.0f32;
-    for j in 0..n { initial_l1 += mean[j].abs(); }
+    for j in 0..n {
+        initial_l1 += mean[j].abs();
+    }
 
     let mut best_overall_point = mean;
     let mut best_overall_mse = initial_mse;
@@ -99,14 +168,15 @@ pub fn run_cma_es(
                 population[i][j] = val;
                 l1_norm += val.abs();
             }
-            
+
             update_constants(&mut program.constants, &population[i]);
             let mse = evaluator::compute_mse(program, dataset);
             let fitness = mse + L1_REG_LAMBDA * l1_norm;
             pop_fitness[i] = (fitness, mse, i);
         }
 
-        pop_fitness.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+        pop_fitness
+            .sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 
         let current_best_fitness = pop_fitness[0].0;
         let current_best_mse = pop_fitness[0].1;
@@ -118,7 +188,9 @@ pub fn run_cma_es(
             best_overall_point = population[best_idx];
         }
 
-        if best_overall_mse < 1e-8 { break; }
+        if best_overall_mse < 1e-8 {
+            break;
+        }
 
         let mut step_mean = [0.0f32; MAX_PARAMS];
         let old_mean = mean;
@@ -137,19 +209,19 @@ pub fn run_cma_es(
                 let idx = pop_fitness[i].2;
                 cov_update += weights[i] * (step_vectors[idx][j] * step_vectors[idx][j]);
             }
-            
-            c_diag[j] = (1.0 - c_cov) * c_diag[j] 
-                      + (c_cov / mu_eff) * (p_c[j] * p_c[j]) 
-                      + c_cov * (1.0 - 1.0 / mu_eff) * cov_update;
+
+            c_diag[j] = (1.0 - c_cov) * c_diag[j]
+                + (c_cov / mu_eff) * (p_c[j] * p_c[j])
+                + c_cov * (1.0 - 1.0 / mu_eff) * cov_update;
             c_diag[j] = c_diag[j].clamp(1e-6, 1e6);
         }
-        
+
         sigma *= (-0.01_f32).exp();
     }
 
     update_constants(&mut program.constants, &best_overall_point);
     ind.fitness = best_overall_mse;
-    
+
     let mut const_idx = 0;
     for node in ind.nodes.iter_mut() {
         if let crate::expr::node::Node::Constant(val, _) = node {

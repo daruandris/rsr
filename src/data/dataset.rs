@@ -1,5 +1,5 @@
-use wide::f32x4;
 use crate::eval::types::ValueType;
+use wide::f32x4;
 
 pub struct Dataset {
     pub feature_flat: Vec<f32x4>,
@@ -7,18 +7,23 @@ pub struct Dataset {
     pub num_features: u8,
     pub num_batches: usize,
     pub num_samples: usize,
-    
+
     pub feature_means: Vec<f32>,
     pub feature_std_devs: Vec<f32>,
     pub target_mean: f32,
     pub target_std_dev: f32,
-    
+
     pub is_normalized: bool,
     pub feature_types: Vec<ValueType>,
 }
 
 impl Dataset {
-    pub fn new(data_x: &[Vec<f32>], data_y: &[f32], feature_types: Vec<ValueType>, normalize: bool) -> Self {
+    pub fn new(
+        data_x: &[Vec<f32>],
+        data_y: &[f32],
+        feature_types: Vec<ValueType>,
+        normalize: bool,
+    ) -> Self {
         let num_samples = data_x.len();
         let mut num_features_usize = 0;
 
@@ -32,8 +37,8 @@ impl Dataset {
                 _ => 1,
             };
         }
-        let num_features = num_features_usize as u8;       
-        
+        let num_features = num_features_usize as u8;
+
         let mut feature_means = vec![0.0; num_features_usize];
         let mut feature_std_devs = vec![1.0; num_features_usize];
         let mut target_mean = 0.0;
@@ -45,24 +50,40 @@ impl Dataset {
                 let mean = sum / num_samples as f32;
                 feature_means[f_idx] = mean;
 
-                let variance: f32 = data_x.iter()
+                let variance: f32 = data_x
+                    .iter()
                     .map(|row| (row[f_idx] - mean).powi(2))
-                    .sum::<f32>() / num_samples as f32;
-                feature_std_devs[f_idx] = if variance < 1e-9 { 1.0 } else { variance.sqrt() };
+                    .sum::<f32>()
+                    / num_samples as f32;
+                feature_std_devs[f_idx] = if variance < 1e-9 {
+                    1.0
+                } else {
+                    variance.sqrt()
+                };
             }
 
             let target_sum: f32 = data_y.iter().sum();
             target_mean = target_sum / num_samples as f32;
-            
-            let target_variance: f32 = data_y.iter()
+
+            let target_variance: f32 = data_y
+                .iter()
                 .map(|&y| (y - target_mean).powi(2))
-                .sum::<f32>() / num_samples as f32;
-            target_std_dev = if target_variance < 1e-9 { 1.0 } else { target_variance.sqrt() };
+                .sum::<f32>()
+                / num_samples as f32;
+            target_std_dev = if target_variance < 1e-9 {
+                1.0
+            } else {
+                target_variance.sqrt()
+            };
         }
 
         let simd_width = 4;
         let remainder = num_samples % simd_width;
-        let padding = if remainder == 0 { 0 } else { simd_width - remainder };
+        let padding = if remainder == 0 {
+            0
+        } else {
+            simd_width - remainder
+        };
         let padded_size = num_samples + padding;
         let num_batches = padded_size / simd_width;
 
@@ -140,7 +161,7 @@ impl Dataset {
             normalized_val
         }
     }
-    
+
     #[inline(always)]
     pub fn denormalize_target_simd(&self, normalized_batch: f32x4) -> f32x4 {
         if self.is_normalized {
@@ -155,7 +176,7 @@ impl Dataset {
     pub fn get_variable_registry(&self) -> Vec<(ValueType, u8)> {
         let mut registry = Vec::new();
         let mut current_idx = 0;
-        
+
         for &t in &self.feature_types {
             registry.push((t, current_idx));
             let size = match t {
