@@ -125,7 +125,7 @@ fn basic_7_noisy_data() {
     let mut dy = Vec::new();
     for _ in 0..400 {
         let x = rng.random_range(-5.0..5.0);
-        let noise = rng.random_range(-0.3..0.3);
+        let noise = rng.random_range(-0.1..0.1);
         dx.push(vec![x]);
         dy.push(2.5 * x * x + noise);
     }

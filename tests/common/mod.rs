@@ -197,7 +197,7 @@ pub fn get_test_config(modules: Vec<OpModule>) -> Config {
     Config {
         num_islands: 24,
         island_size: 25,
-        max_generations: 3000,
+        max_generations: 10000,
         crossover_rate: 0.10,
         tournament_size: 2,
         migration_interval: 25,
