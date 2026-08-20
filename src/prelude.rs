@@ -1,5 +1,5 @@
 pub use crate::data::dataset::Dataset;
-pub use crate::eval::op::Op;
+pub use crate::Instruction;
 pub use crate::eval::scalar::Scalar;
 pub use crate::eval::types::ValueType;
 pub use crate::expr::node::Node;

@@ -2,6 +2,7 @@ use crate::data::dataset::Dataset;
 use crate::eval::evaluator;
 use crate::eval::scalar::Scalar;
 use crate::search::individual::Individual;
+use crate::optimize::Parameterized;
 use rand::RngExt;
 
 const MAX_PARAMS: usize = 32;
@@ -21,8 +22,11 @@ pub fn run_cma_es(ind: &mut Individual, dataset: &Dataset, max_iterations: usize
         None => return,
     };
 
+    let mut n = program.param_count().min(MAX_PARAMS);
+    if n == 0 { return; }
+
     let mut mean = [0.0f32; MAX_PARAMS];
-    let mut n = 0;
+    program.flatten_params(&mut mean);
 
     for c in &program.constants {
         match c {
@@ -71,53 +75,6 @@ pub fn run_cma_es(ind: &mut Individual, dataset: &Dataset, max_iterations: usize
     if n == 0 {
         return;
     }
-
-    let update_constants = |prog_consts: &mut Vec<Scalar>, flat_vals: &[f32; MAX_PARAMS]| {
-        let mut ptr = 0;
-        for c in prog_consts.iter_mut() {
-            match c {
-                Scalar::Float(f) => {
-                    if ptr < n {
-                        *f = flat_vals[ptr];
-                        ptr += 1;
-                    }
-                }
-                Scalar::Vec2(v) => {
-                    for i in 0..2 {
-                        if ptr < n {
-                            v[i] = flat_vals[ptr];
-                            ptr += 1;
-                        }
-                    }
-                }
-                Scalar::Vec3(v) => {
-                    for i in 0..3 {
-                        if ptr < n {
-                            v[i] = flat_vals[ptr];
-                            ptr += 1;
-                        }
-                    }
-                }
-                Scalar::Mat2(m) => {
-                    for i in 0..4 {
-                        if ptr < n {
-                            m[i] = flat_vals[ptr];
-                            ptr += 1;
-                        }
-                    }
-                }
-                Scalar::Mat3(m) => {
-                    for i in 0..9 {
-                        if ptr < n {
-                            m[i] = flat_vals[ptr];
-                            ptr += 1;
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-    };
 
     let mut sigma = 0.5f32;
     let mut c_diag = [1.0f32; MAX_PARAMS];
@@ -169,7 +126,7 @@ pub fn run_cma_es(ind: &mut Individual, dataset: &Dataset, max_iterations: usize
                 l1_norm += val.abs();
             }
 
-            update_constants(&mut program.constants, &population[i]);
+            program.unflatten_params(&population[i]);
             let mse = evaluator::compute_mse(program, dataset);
             let fitness = mse + L1_REG_LAMBDA * l1_norm;
             pop_fitness[i] = (fitness, mse, i);
@@ -219,7 +176,7 @@ pub fn run_cma_es(ind: &mut Individual, dataset: &Dataset, max_iterations: usize
         sigma *= (-0.01_f32).exp();
     }
 
-    update_constants(&mut program.constants, &best_overall_point);
+    program.unflatten_params(&best_overall_point);
     ind.fitness = best_overall_mse;
 
     let mut const_idx = 0;

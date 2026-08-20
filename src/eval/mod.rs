@@ -1,8 +1,9 @@
 pub mod autodiff;
+pub mod state;
 pub mod basic;
+pub mod basic_domain;
 pub mod evaluator;
-pub mod instruction;
 pub mod linalg;
-pub mod op;
+pub mod linalg_domain;
 pub mod scalar;
 pub mod types;

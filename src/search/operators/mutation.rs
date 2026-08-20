@@ -1,4 +1,4 @@
-use crate::eval::op::Op;
+use crate::Instruction;
 use crate::eval::scalar::Scalar;
 use crate::eval::types::ValueType;
 use crate::expr::node::Node;
@@ -10,7 +10,7 @@ pub fn point_mutation(
     ind: &mut Individual,
     rng: &mut impl RngExt,
     variables: &[(ValueType, u8)],
-    allowed_ops: &[Op],
+    allowed_ops: &[Instruction],
 ) {
     if ind.nodes.is_empty() {
         return;
@@ -119,7 +119,7 @@ pub fn subtree_mutation(
     variables: &[(ValueType, u8)],
     max_size: usize,
     mutation_max_depth: usize,
-    allowed_ops: &[Op],
+    allowed_ops: &[Instruction],
 ) {
     if ind.nodes.is_empty() {
         return;

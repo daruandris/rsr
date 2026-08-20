@@ -1,10 +1,10 @@
-use crate::eval::op::Op;
+use crate::Instruction;
 use crate::eval::scalar::Scalar;
 use crate::eval::types::ValueType;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Node {
-    Operator(Op),
+    Operator(Instruction),
     Variable(u8, ValueType),
     Constant(Scalar, ValueType),
 }

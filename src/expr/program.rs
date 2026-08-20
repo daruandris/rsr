@@ -1,7 +1,8 @@
 use super::node::Node;
-use crate::eval::instruction::Instruction;
+use crate::Instruction;
 use crate::eval::scalar::Scalar;
 use crate::eval::types::ValueType;
+use crate::optimize::Parameterized;
 
 #[derive(Clone, Debug)]
 pub struct Program {
@@ -25,7 +26,7 @@ impl Program {
                     code.push(Self::load_const_instruction(c_idx as u16, *type_id));
                 }
                 Node::Operator(op) => {
-                    code.push(op.compile());
+                    code.push(*op);
                 }
             }
         }
@@ -56,6 +57,51 @@ impl Program {
             ValueType::Mat3 => Instruction::LoadConstM3(idx),
             ValueType::Bool => Instruction::LoadConstB(idx),
             ValueType::Int => Instruction::LoadConstI(idx),
+        }
+    }
+}
+
+impl Parameterized for Program {
+    fn param_count(&self) -> usize {
+        let mut n = 0;
+        for c in &self.constants {
+            n += match c {
+                Scalar::Float(_) => 1,
+                Scalar::Vec2(_) => 2,
+                Scalar::Vec3(_) => 3,
+                Scalar::Mat2(_) => 4,
+                Scalar::Mat3(_) => 9,
+                _ => 0,
+            };
+        }
+        n
+    }
+
+    fn flatten_params(&self, buffer: &mut [f32]) {
+        let mut ptr = 0;
+        for c in &self.constants {
+            match c {
+                Scalar::Float(f) => { if ptr < buffer.len() { buffer[ptr] = *f; ptr += 1; } }
+                Scalar::Vec2(v) => { for i in 0..2 { if ptr < buffer.len() { buffer[ptr] = v[i]; ptr += 1; } } }
+                Scalar::Vec3(v) => { for i in 0..3 { if ptr < buffer.len() { buffer[ptr] = v[i]; ptr += 1; } } }
+                Scalar::Mat2(m) => { for i in 0..4 { if ptr < buffer.len() { buffer[ptr] = m[i]; ptr += 1; } } }
+                Scalar::Mat3(m) => { for i in 0..9 { if ptr < buffer.len() { buffer[ptr] = m[i]; ptr += 1; } } }
+                _ => {}
+            }
+        }
+    }
+
+    fn unflatten_params(&mut self, buffer: &[f32]) {
+        let mut ptr = 0;
+        for c in self.constants.iter_mut() {
+            match c {
+                Scalar::Float(f) => { if ptr < buffer.len() { *f = buffer[ptr]; ptr += 1; } }
+                Scalar::Vec2(v) => { for i in 0..2 { if ptr < buffer.len() { v[i] = buffer[ptr]; ptr += 1; } } }
+                Scalar::Vec3(v) => { for i in 0..3 { if ptr < buffer.len() { v[i] = buffer[ptr]; ptr += 1; } } }
+                Scalar::Mat2(m) => { for i in 0..4 { if ptr < buffer.len() { m[i] = buffer[ptr]; ptr += 1; } } }
+                Scalar::Mat3(m) => { for i in 0..9 { if ptr < buffer.len() { m[i] = buffer[ptr]; ptr += 1; } } }
+                _ => {}
+            }
         }
     }
 }

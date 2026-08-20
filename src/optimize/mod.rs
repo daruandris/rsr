@@ -3,10 +3,11 @@ pub mod lbfgs;
 pub mod nelder_mead;
 
 use crate::data::dataset::Dataset;
-use crate::eval::op::Op;
+use crate::Instruction;
 use crate::eval::scalar::Scalar;
 use crate::expr::node::Node;
 use crate::search::individual::Individual;
+use crate::eval::linalg_domain::LinalgOpCode;
 
 pub fn optimize_individual_constants(
     ind: &mut Individual,
@@ -27,7 +28,7 @@ pub fn optimize_individual_constants(
 
     for node in &ind.nodes {
         if let Node::Operator(op) = node {
-            if matches!(*op, Op::IfElseF | Op::InverseM2 | Op::InverseM3) {
+            if matches!(*op, Instruction::Linalg(LinalgOpCode::InverseM2) | Instruction::Linalg(LinalgOpCode::InverseM3)) {
                 is_differentiable = false;
                 break;
             }
@@ -53,4 +54,10 @@ pub fn optimize_individual_constants(
     } else {
         nelder_mead::run_nelder_mead(ind, dataset, max_iterations);
     }
+}
+
+pub trait Parameterized {
+    fn param_count(&self) -> usize;
+    fn flatten_params(&self, buffer: &mut [f32]);
+    fn unflatten_params(&mut self, buffer: &[f32]);
 }

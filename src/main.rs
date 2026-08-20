@@ -1,6 +1,9 @@
 use rand::RngExt;
 use rsr::ffi::symengine::simplify_symengine;
 use rsr::prelude::*;
+use rsr::Instruction;
+use rsr::eval::basic_domain::BasicOpCode;
+use rsr::eval::linalg_domain::LinalgOpCode;
 use std::time::Instant;
 
 fn main() {
@@ -57,14 +60,21 @@ fn main() {
         verbose: true,
         allowed_modules: vec![OpModule::Basic],
         custom_ops: vec![
-            Op::AddV3,
-            Op::SubV3,
-            Op::CrossV3,
-            Op::DotV3,
-            Op::NormV3,
-            Op::ScaleV3,
+            Instruction::Linalg(LinalgOpCode::AddV3),
+            Instruction::Linalg(LinalgOpCode::SubV3),
+            Instruction::Linalg(LinalgOpCode::CrossV3),
+            Instruction::Linalg(LinalgOpCode::DotV3),
+            Instruction::Linalg(LinalgOpCode::NormV3),
+            Instruction::Linalg(LinalgOpCode::ScaleV3),
         ],
-        excluded_ops: vec![Op::SinF, Op::CosF, Op::ExpF, Op::LnF, Op::SqrtF, Op::SqrF],
+        excluded_ops: vec![
+            Instruction::Basic(BasicOpCode::SinF),
+            Instruction::Basic(BasicOpCode::CosF),
+            Instruction::Basic(BasicOpCode::ExpF),
+            Instruction::Basic(BasicOpCode::LnF),
+            Instruction::Basic(BasicOpCode::SqrtF),
+            Instruction::Basic(BasicOpCode::SqrF),
+        ],
         ..Default::default()
     };
 

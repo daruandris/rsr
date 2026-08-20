@@ -1,4 +1,4 @@
-use crate::eval::op::Op;
+use crate::Instruction;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum OpModule {
@@ -30,8 +30,8 @@ pub struct Config {
     pub verbose: bool,
 
     pub allowed_modules: Vec<OpModule>,
-    pub custom_ops: Vec<Op>,
-    pub excluded_ops: Vec<Op>,
+    pub custom_ops: Vec<Instruction>,
+    pub excluded_ops: Vec<Instruction>,
 }
 
 impl Default for Config {
@@ -71,14 +71,14 @@ impl Config {
         self
     }
 
-    pub fn with_op(mut self, op: Op) -> Self {
+    pub fn with_op(mut self, op: Instruction) -> Self {
         if !self.custom_ops.contains(&op) {
             self.custom_ops.push(op);
         }
         self
     }
 
-    pub fn without_op(mut self, op: Op) -> Self {
+    pub fn without_op(mut self, op: Instruction) -> Self {
         if !self.excluded_ops.contains(&op) {
             self.excluded_ops.push(op);
         }

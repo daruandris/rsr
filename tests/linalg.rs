@@ -2,6 +2,8 @@ mod common;
 
 use rand::RngExt;
 use rsr::prelude::*;
+use rsr::Instruction;
+use rsr::eval::basic_domain::BasicOpCode;
 use std::time::Instant;
 
 fn run_linalg_test(
@@ -15,7 +17,14 @@ fn run_linalg_test(
     let dataset = Dataset::new(&data_x, &data_y, feature_types, false);
 
     let mut config = common::get_test_config(vec![OpModule::Basic, OpModule::Linalg]);
-    config.excluded_ops = vec![Op::SinF, Op::CosF, Op::ExpF, Op::SqrtF, Op::LnF, Op::SqrF];
+    config.excluded_ops = vec![
+        Instruction::Basic(BasicOpCode::SinF),
+        Instruction::Basic(BasicOpCode::CosF),
+        Instruction::Basic(BasicOpCode::ExpF),
+        Instruction::Basic(BasicOpCode::SqrtF),
+        Instruction::Basic(BasicOpCode::LnF),
+        Instruction::Basic(BasicOpCode::SqrF),
+    ];
     config.mutation_max_depth = 7;
     config.parsimony_penalty = 0.0;
 

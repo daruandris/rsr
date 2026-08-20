@@ -1,4 +1,4 @@
-use crate::eval::op::Op;
+use crate::Instruction;
 use crate::eval::scalar::Scalar;
 use crate::eval::types::ValueType;
 use crate::expr::node::Node;
@@ -9,7 +9,7 @@ pub fn generate_random_ast(
     max_depth: usize,
     rng: &mut impl RngExt,
     variables: &[(ValueType, u8)],
-    allowed_ops: &[Op],
+    allowed_ops: &[Instruction],
 ) -> Vec<Node> {
     let cap = 1 << (max_depth.min(6));
     let mut nodes = Vec::with_capacity(cap);
@@ -33,8 +33,8 @@ fn build_ast_recursive(
     max_depth: usize,
     rng: &mut impl RngExt,
     variables: &[(ValueType, u8)],
-    allowed_ops: &[Op],
-    parent_op: Option<Op>,
+    allowed_ops: &[Instruction],
+    parent_op: Option<Instruction>,
 ) {
     let is_terminal =
         current_depth >= max_depth || (current_depth > 0 && rng.random::<f32>() < 0.2);
@@ -60,27 +60,13 @@ fn build_ast_recursive(
             (false, Some(c)) => nodes.push(Node::Constant(c, target_type)),
             (false, None) => {
                 add_operator_node(
-                    nodes,
-                    target_type,
-                    current_depth,
-                    max_depth,
-                    rng,
-                    variables,
-                    allowed_ops,
-                    parent_op,
+                    nodes, target_type, current_depth, max_depth, rng, variables, allowed_ops, parent_op,
                 );
             }
         }
     } else {
         add_operator_node(
-            nodes,
-            target_type,
-            current_depth,
-            max_depth,
-            rng,
-            variables,
-            allowed_ops,
-            parent_op,
+            nodes, target_type, current_depth, max_depth, rng, variables, allowed_ops, parent_op,
         );
     }
 }
@@ -92,38 +78,47 @@ fn add_operator_node(
     max_depth: usize,
     rng: &mut impl RngExt,
     variables: &[(ValueType, u8)],
-    allowed_ops: &[Op],
-    parent_op: Option<Op>,
+    allowed_ops: &[Instruction],
+    parent_op: Option<Instruction>,
 ) {
     if let Some(chosen_op) = random_operator(target_type, allowed_ops, parent_op, rng) {
         let expected_children_types = chosen_op.expected_types();
         for &child_type in expected_children_types {
             build_ast_recursive(
-                nodes,
-                child_type,
-                current_depth + 1,
-                max_depth,
-                rng,
-                variables,
-                allowed_ops,
-                Some(chosen_op),
+                nodes, child_type, current_depth + 1, max_depth, rng, variables, allowed_ops, Some(chosen_op),
             );
         }
         nodes.push(Node::Operator(chosen_op));
     } else {
-        panic!(
-            "Nyelvtani hiba: Nincs érvényes operátor a {:?} típushoz!",
-            target_type
-        );
+        // PÁNIK HELYETT: Ha elfogytak a megengedett operátorok, visszazuhanunk egy terminálisra!
+        let valid_vars: Vec<_> = variables.iter().filter(|v| v.0 == target_type).collect();
+        let maybe_const = random_constant(target_type, rng);
+        
+        if !valid_vars.is_empty() && maybe_const.is_some() {
+            if rng.random::<bool>() {
+                let chosen = valid_vars[rng.random_range(0..valid_vars.len())];
+                nodes.push(Node::Variable(chosen.1, target_type));
+            } else {
+                nodes.push(Node::Constant(maybe_const.unwrap(), target_type));
+            }
+        } else if !valid_vars.is_empty() {
+            let chosen = valid_vars[rng.random_range(0..valid_vars.len())];
+            nodes.push(Node::Variable(chosen.1, target_type));
+        } else if let Some(c) = maybe_const {
+            nodes.push(Node::Constant(c, target_type));
+        } else {
+            // Ha ide eljutunk, az azt jelenti, hogy sem operátor, sem konstans, sem változó nem létezik a kért típusra.
+            panic!("Kritikus hiba: Nincs operátor, változó vagy konstans a {:?} típushoz!", target_type);
+        }
     }
 }
 
 pub fn random_operator(
     target_type: ValueType,
-    allowed_ops: &[Op],
-    parent_op: Option<Op>,
+    allowed_ops: &[Instruction],
+    parent_op: Option<Instruction>,
     rng: &mut impl RngExt,
-) -> Option<Op> {
+) -> Option<Instruction> {
     let forbidden = parent_op.map(|p| p.forbidden_children()).unwrap_or(&[]);
     let valid_count = allowed_ops
         .iter()
@@ -146,31 +141,13 @@ pub fn random_operator(
 pub fn random_constant(target_type: ValueType, rng: &mut impl RngExt) -> Option<Scalar> {
     match target_type {
         ValueType::Float => Some(Scalar::Float(rng.random_range(-5.0..5.0))),
-        ValueType::Vec2 => Some(Scalar::Vec2([
-            rng.random_range(-5.0..5.0),
-            rng.random_range(-5.0..5.0),
-        ])),
-        ValueType::Vec3 => Some(Scalar::Vec3([
-            rng.random_range(-5.0..5.0),
-            rng.random_range(-5.0..5.0),
-            rng.random_range(-5.0..5.0),
-        ])),
-        ValueType::Mat2 => Some(Scalar::Mat2([
-            rng.random_range(-5.0..5.0),
-            rng.random_range(-5.0..5.0),
-            rng.random_range(-5.0..5.0),
-            rng.random_range(-5.0..5.0),
-        ])),
+        ValueType::Vec2 => Some(Scalar::Vec2([rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0)])),
+        ValueType::Vec3 => Some(Scalar::Vec3([rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0)])),
+        ValueType::Mat2 => Some(Scalar::Mat2([rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0)])),
         ValueType::Mat3 => Some(Scalar::Mat3([
-            rng.random_range(-5.0..5.0),
-            rng.random_range(-5.0..5.0),
-            rng.random_range(-5.0..5.0),
-            rng.random_range(-5.0..5.0),
-            rng.random_range(-5.0..5.0),
-            rng.random_range(-5.0..5.0),
-            rng.random_range(-5.0..5.0),
-            rng.random_range(-5.0..5.0),
-            rng.random_range(-5.0..5.0),
+            rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0),
+            rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0),
+            rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0),
         ])),
         ValueType::Bool => Some(Scalar::Bool(rng.random::<bool>())),
         ValueType::Int => Some(Scalar::Int(rng.random_range(-10..10))),

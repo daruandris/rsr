@@ -1,7 +1,7 @@
 use crate::data::dataset::Dataset;
 use crate::eval::evaluator;
-use crate::eval::scalar::Scalar;
 use crate::search::individual::Individual;
+use crate::optimize::Parameterized;
 
 const MAX_PARAMS: usize = 32;
 const M: usize = 6;
@@ -15,115 +15,11 @@ pub fn run_lbfgs(ind: &mut Individual, dataset: &Dataset, max_iterations: usize)
         None => return,
     };
 
+    let n = program.param_count().min(MAX_PARAMS);
+    if n == 0 { return; }
+
     let mut x = [0.0f32; MAX_PARAMS];
-    let mut n = 0;
-
-    for c in &program.constants {
-        n += match c {
-            Scalar::Float(_) => 1,
-            Scalar::Vec2(_) => 2,
-            Scalar::Vec3(_) => 3,
-            Scalar::Mat2(_) => 4,
-            Scalar::Mat3(_) => 9,
-            _ => 0,
-        };
-    }
-    n = n.min(MAX_PARAMS);
-    if n == 0 {
-        return;
-    }
-
-    let mut ptr = 0;
-    for c in &program.constants {
-        match c {
-            Scalar::Float(f) => {
-                if ptr < n {
-                    x[ptr] = *f;
-                    ptr += 1;
-                }
-            }
-            Scalar::Vec2(v) => {
-                for i in 0..2 {
-                    if ptr < n {
-                        x[ptr] = v[i];
-                        ptr += 1;
-                    }
-                }
-            }
-            Scalar::Vec3(v) => {
-                for i in 0..3 {
-                    if ptr < n {
-                        x[ptr] = v[i];
-                        ptr += 1;
-                    }
-                }
-            }
-            Scalar::Mat2(m) => {
-                for i in 0..4 {
-                    if ptr < n {
-                        x[ptr] = m[i];
-                        ptr += 1;
-                    }
-                }
-            }
-            Scalar::Mat3(m) => {
-                for i in 0..9 {
-                    if ptr < n {
-                        x[ptr] = m[i];
-                        ptr += 1;
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
-    let update_constants = |prog_consts: &mut Vec<Scalar>, flat_vals: &[f32; MAX_PARAMS]| {
-        let mut p = 0;
-        for c in prog_consts.iter_mut() {
-            match c {
-                Scalar::Float(f) => {
-                    if p < n {
-                        *f = flat_vals[p];
-                        p += 1;
-                    }
-                }
-                Scalar::Vec2(v) => {
-                    for i in 0..2 {
-                        if p < n {
-                            v[i] = flat_vals[p];
-                            p += 1;
-                        }
-                    }
-                }
-                Scalar::Vec3(v) => {
-                    for i in 0..3 {
-                        if p < n {
-                            v[i] = flat_vals[p];
-                            p += 1;
-                        }
-                    }
-                }
-                Scalar::Mat2(m) => {
-                    for i in 0..4 {
-                        if p < n {
-                            m[i] = flat_vals[p];
-                            p += 1;
-                        }
-                    }
-                }
-                Scalar::Mat3(m) => {
-                    for i in 0..9 {
-                        if p < n {
-                            m[i] = flat_vals[p];
-                            p += 1;
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-    };
+    program.flatten_params(&mut x);
 
     let mut s = [[0.0f32; MAX_PARAMS]; M];
     let mut y = [[0.0f32; MAX_PARAMS]; M];
@@ -218,7 +114,7 @@ pub fn run_lbfgs(ind: &mut Individual, dataset: &Dataset, max_iterations: usize)
             for j in 0..n {
                 next_x[j] = x[j] + step_size * p[j];
             }
-            update_constants(&mut program.constants, &next_x);
+            program.unflatten_params(&next_x);
             let mse = evaluator::compute_mse(program, dataset);
 
             if mse <= current_mse + c1 * step_size * dir_dot_grad || ls_iters > 10 {
@@ -259,7 +155,7 @@ pub fn run_lbfgs(ind: &mut Individual, dataset: &Dataset, max_iterations: usize)
         current_grad = next_grad;
     }
 
-    update_constants(&mut program.constants, &x);
+    program.unflatten_params(&x);
     ind.fitness = current_mse;
 
     let mut const_idx = 0;

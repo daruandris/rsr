@@ -1,5 +1,7 @@
 use crate::eval::types::ValueType;
 use wide::f32x4;
+use std::error::Error;
+use std::path::Path;
 
 pub struct Dataset {
     pub feature_flat: Vec<f32x4>,
@@ -195,5 +197,55 @@ impl Dataset {
             current_idx += size;
         }
         registry
+    }
+
+    pub fn from_csv<P: AsRef<Path>>(
+        path: P,
+        feature_types: Vec<ValueType>,
+        target_col_index: Option<usize>,
+        normalize: bool,
+    ) -> Result<Self, Box<dyn Error>> {
+        let mut rdr = csv::ReaderBuilder::new().has_headers(true).from_path(path)?;
+        let expected_floats: usize = feature_types.iter().map(|t| match t {
+            ValueType::Float => 1,
+            ValueType::Vec2 => 2,
+            ValueType::Vec3 => 3,
+            ValueType::Mat2 => 4,
+            ValueType::Mat3 => 9,
+            _ => 1,
+        }).sum();
+
+        let mut data_x = Vec::new();
+        let mut data_y = Vec::new();
+
+        for (line_idx, result) in rdr.records().enumerate() {
+            let record = result?;
+            let target_idx = target_col_index.unwrap_or(record.len() - 1);
+
+            if record.len() < expected_floats + 1 {
+                return Err(format!(
+                    "Error at line {}. : not enough column! Expected: {}, actual: {}", 
+                    line_idx + 1, expected_floats + 1, record.len()
+                ).into());
+            }
+
+            let y_val: f32 = record.get(target_idx).unwrap().parse()?;
+            let mut x_row = Vec::with_capacity(expected_floats);
+            let mut current_col = 0;
+
+            for _ in 0..expected_floats {
+                if current_col == target_idx {
+                    current_col += 1;
+                }
+                let val: f32 = record.get(current_col).unwrap().parse()?;
+                x_row.push(val);
+                current_col += 1;
+            }
+
+            data_x.push(x_row);
+            data_y.push(y_val);
+        }
+
+        Ok(Dataset::new(&data_x, &data_y, feature_types, normalize))
     }
 }

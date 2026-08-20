@@ -1,238 +1,101 @@
 use wide::f32x4;
-
-use super::autodiff::{self, DualSimd};
-use super::basic;
-use super::instruction::Instruction;
-use super::linalg;
-use super::scalar::Scalar;
+use crate::Instruction;
 use crate::data::dataset::Dataset;
 use crate::expr::program::Program;
+use crate::eval::state::{VmState, DualVmState};
+use crate::eval::scalar::Scalar;
+use crate::eval::autodiff::{self, DualSimd};
+use crate::eval::basic_domain::BasicOpCode;
+use crate::eval::linalg_domain::LinalgOpCode;
+use crate::optimize::Parameterized;
+use crate::SymbolicEngine;
 
 #[inline(always)]
 pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
-    let code = &program.code;
+    let mut ctx = VmState::new();
     let constants = &program.constants;
 
-    let mut stack_f: [f32x4; 32] = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
-    let mut sp_f: usize = 0;
-
-    let mut stack_v2: [[f32x4; 2]; 32] = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
-    let mut sp_v2: usize = 0;
-
-    let mut stack_v3: [[f32x4; 3]; 32] = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
-    let mut sp_v3: usize = 0;
-
-    let mut stack_m2: [[f32x4; 4]; 32] = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
-    let mut sp_m2: usize = 0;
-
-    let mut stack_m3: [[f32x4; 9]; 32] = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
-    let mut sp_m3: usize = 0;
-
-    for op in code {
+    for op in &program.code {
         match op {
+            // --- Memória betöltése (Load utasítások) ---
             Instruction::LoadVarF(idx) => unsafe {
-                *stack_f.get_unchecked_mut(sp_f) = *features.get_unchecked(*idx as usize);
-                sp_f += 1;
+                *ctx.stack_f.get_unchecked_mut(ctx.sp_f) = *features.get_unchecked(*idx as usize);
+                ctx.sp_f += 1;
             },
             Instruction::LoadConstF(idx) => unsafe {
                 if let Scalar::Float(val) = constants.get_unchecked(*idx as usize) {
-                    *stack_f.get_unchecked_mut(sp_f) = f32x4::splat(*val);
+                    *ctx.stack_f.get_unchecked_mut(ctx.sp_f) = f32x4::splat(*val);
                 }
-                sp_f += 1;
+                ctx.sp_f += 1;
+            },
+            Instruction::LoadVarV2(idx) => unsafe {
+                let i = *idx as usize;
+                *ctx.stack_v2.get_unchecked_mut(ctx.sp_v2) = [*features.get_unchecked(i), *features.get_unchecked(i + 1)];
+                ctx.sp_v2 += 1;
             },
             Instruction::LoadConstV2(idx) => unsafe {
                 if let Scalar::Vec2(val) = constants.get_unchecked(*idx as usize) {
-                    *stack_v2.get_unchecked_mut(sp_v2) =
-                        [f32x4::splat(val[0]), f32x4::splat(val[1])];
+                    *ctx.stack_v2.get_unchecked_mut(ctx.sp_v2) = [f32x4::splat(val[0]), f32x4::splat(val[1])];
                 }
-                sp_v2 += 1;
-            },
-            Instruction::LoadConstV3(idx) => unsafe {
-                if let Scalar::Vec3(val) = constants.get_unchecked(*idx as usize) {
-                    *stack_v3.get_unchecked_mut(sp_v3) = [
-                        f32x4::splat(val[0]),
-                        f32x4::splat(val[1]),
-                        f32x4::splat(val[2]),
-                    ];
-                }
-                sp_v3 += 1;
-            },
-            Instruction::LoadConstM2(idx) => unsafe {
-                if let Scalar::Mat2(val) = constants.get_unchecked(*idx as usize) {
-                    *stack_m2.get_unchecked_mut(sp_m2) = [
-                        f32x4::splat(val[0]),
-                        f32x4::splat(val[1]),
-                        f32x4::splat(val[2]),
-                        f32x4::splat(val[3]),
-                    ];
-                }
-                sp_m2 += 1;
-            },
-            Instruction::LoadConstM3(idx) => unsafe {
-                if let Scalar::Mat3(val) = constants.get_unchecked(*idx as usize) {
-                    *stack_m3.get_unchecked_mut(sp_m3) = [
-                        f32x4::splat(val[0]),
-                        f32x4::splat(val[1]),
-                        f32x4::splat(val[2]),
-                        f32x4::splat(val[3]),
-                        f32x4::splat(val[4]),
-                        f32x4::splat(val[5]),
-                        f32x4::splat(val[6]),
-                        f32x4::splat(val[7]),
-                        f32x4::splat(val[8]),
-                    ];
-                }
-                sp_m3 += 1;
-            },
-
-            Instruction::AddF => unsafe { basic::eval_add_f(&mut sp_f, &mut stack_f) },
-            Instruction::SubF => unsafe { basic::eval_sub_f(&mut sp_f, &mut stack_f) },
-            Instruction::MulF => unsafe { basic::eval_mul_f(&mut sp_f, &mut stack_f) },
-            Instruction::DivF => unsafe { basic::eval_div_f(&mut sp_f, &mut stack_f) },
-            Instruction::SinF => unsafe { basic::eval_sin_f(&mut sp_f, &mut stack_f) },
-            Instruction::CosF => unsafe { basic::eval_cos_f(&mut sp_f, &mut stack_f) },
-            Instruction::ExpF => unsafe { basic::eval_exp_f(&mut sp_f, &mut stack_f) },
-            Instruction::SqrF => unsafe { basic::eval_sqr_f(&mut sp_f, &mut stack_f) },
-            Instruction::SqrtF => unsafe { basic::eval_sqrt_f(&mut sp_f, &mut stack_f) },
-            Instruction::LnF => unsafe { basic::eval_ln_f(&mut sp_f, &mut stack_f) },
-
-            Instruction::MakeVec2 => unsafe {
-                linalg::eval_make_vec2(&mut sp_f, &stack_f, &mut sp_v2, &mut stack_v2)
-            },
-            Instruction::MakeVec3 => unsafe {
-                linalg::eval_make_vec3(&mut sp_f, &stack_f, &mut sp_v3, &mut stack_v3)
-            },
-            Instruction::GetXV2 => unsafe {
-                linalg::eval_get_x_v2(&mut sp_f, &mut stack_f, &mut sp_v2, &stack_v2)
-            },
-            Instruction::GetYV2 => unsafe {
-                linalg::eval_get_y_v2(&mut sp_f, &mut stack_f, &mut sp_v2, &stack_v2)
-            },
-            Instruction::GetXV3 => unsafe {
-                linalg::eval_get_x_v3(&mut sp_f, &mut stack_f, &mut sp_v3, &stack_v3)
-            },
-            Instruction::GetYV3 => unsafe {
-                linalg::eval_get_y_v3(&mut sp_f, &mut stack_f, &mut sp_v3, &stack_v3)
-            },
-            Instruction::GetZV3 => unsafe {
-                linalg::eval_get_z_v3(&mut sp_f, &mut stack_f, &mut sp_v3, &stack_v3)
-            },
-            Instruction::AddV2 => unsafe { linalg::eval_add_v2(&mut sp_v2, &mut stack_v2) },
-            Instruction::SubV2 => unsafe { linalg::eval_sub_v2(&mut sp_v2, &mut stack_v2) },
-            Instruction::ScaleV2 => unsafe {
-                linalg::eval_scale_v2(&mut sp_f, &stack_f, &mut sp_v2, &mut stack_v2)
-            },
-            Instruction::DotV2 => unsafe {
-                linalg::eval_dot_v2(&mut sp_f, &mut stack_f, &mut sp_v2, &stack_v2)
-            },
-            Instruction::NormV2 => unsafe {
-                linalg::eval_norm_v2(&mut sp_f, &mut stack_f, &mut sp_v2, &stack_v2)
-            },
-            Instruction::AddV3 => unsafe { linalg::eval_add_v3(&mut sp_v3, &mut stack_v3) },
-            Instruction::SubV3 => unsafe { linalg::eval_sub_v3(&mut sp_v3, &mut stack_v3) },
-            Instruction::ScaleV3 => unsafe {
-                linalg::eval_scale_v3(&mut sp_f, &stack_f, &mut sp_v3, &mut stack_v3)
-            },
-            Instruction::DotV3 => unsafe {
-                linalg::eval_dot_v3(&mut sp_f, &mut stack_f, &mut sp_v3, &stack_v3)
-            },
-            Instruction::NormV3 => unsafe {
-                linalg::eval_norm_v3(&mut sp_f, &mut stack_f, &mut sp_v3, &stack_v3)
-            },
-            Instruction::CrossV3 => unsafe { linalg::eval_cross_v3(&mut sp_v3, &mut stack_v3) },
-            Instruction::MakeMat2 => unsafe {
-                linalg::eval_make_mat2(&mut sp_v2, &stack_v2, &mut sp_m2, &mut stack_m2)
-            },
-            Instruction::AddM2 => unsafe { linalg::eval_add_m2(&mut sp_m2, &mut stack_m2) },
-            Instruction::SubM2 => unsafe { linalg::eval_sub_m2(&mut sp_m2, &mut stack_m2) },
-            Instruction::ScaleM2 => unsafe {
-                linalg::eval_scale_m2(&mut sp_f, &stack_f, &mut sp_m2, &mut stack_m2)
-            },
-            Instruction::MulM2 => unsafe { linalg::eval_mul_m2(&mut sp_m2, &mut stack_m2) },
-            Instruction::MulM2V2 => unsafe {
-                linalg::eval_mul_m2v2(&mut sp_m2, &stack_m2, &mut sp_v2, &mut stack_v2)
-            },
-            Instruction::DetM2 => unsafe {
-                linalg::eval_det_m2(&mut sp_f, &mut stack_f, &mut sp_m2, &stack_m2)
-            },
-            Instruction::TraceM2 => unsafe {
-                linalg::eval_trace_m2(&mut sp_f, &mut stack_f, &mut sp_m2, &stack_m2)
-            },
-            Instruction::TransposeM2 => unsafe {
-                linalg::eval_transpose_m2(&mut sp_m2, &mut stack_m2)
-            },
-            Instruction::InverseM2 => unsafe { linalg::eval_inverse_m2(&mut sp_m2, &mut stack_m2) },
-            Instruction::MakeMat3 => unsafe {
-                linalg::eval_make_mat3(&mut sp_v3, &stack_v3, &mut sp_m3, &mut stack_m3)
-            },
-            Instruction::AddM3 => unsafe { linalg::eval_add_m3(&mut sp_m3, &mut stack_m3) },
-            Instruction::SubM3 => unsafe { linalg::eval_sub_m3(&mut sp_m3, &mut stack_m3) },
-            Instruction::ScaleM3 => unsafe {
-                linalg::eval_scale_m3(&mut sp_f, &stack_f, &mut sp_m3, &mut stack_m3)
-            },
-            Instruction::MulM3 => unsafe { linalg::eval_mul_m3(&mut sp_m3, &mut stack_m3) },
-            Instruction::MulM3V3 => unsafe {
-                linalg::eval_mul_m3v3(&mut sp_m3, &stack_m3, &mut sp_v3, &mut stack_v3)
-            },
-            Instruction::DetM3 => unsafe {
-                linalg::eval_det_m3(&mut sp_f, &mut stack_f, &mut sp_m3, &stack_m3)
-            },
-            Instruction::TraceM3 => unsafe {
-                linalg::eval_trace_m3(&mut sp_f, &mut stack_f, &mut sp_m3, &stack_m3)
-            },
-            Instruction::TransposeM3 => unsafe {
-                linalg::eval_transpose_m3(&mut sp_m3, &mut stack_m3)
-            },
-            Instruction::InverseM3 => unsafe { linalg::eval_inverse_m3(&mut sp_m3, &mut stack_m3) },
-
-            Instruction::LoadVarV2(idx) => unsafe {
-                let i = *idx as usize;
-                *stack_v2.get_unchecked_mut(sp_v2) =
-                    [*features.get_unchecked(i), *features.get_unchecked(i + 1)];
-                sp_v2 += 1;
+                ctx.sp_v2 += 1;
             },
             Instruction::LoadVarV3(idx) => unsafe {
                 let i = *idx as usize;
-                *stack_v3.get_unchecked_mut(sp_v3) = [
-                    *features.get_unchecked(i),
-                    *features.get_unchecked(i + 1),
-                    *features.get_unchecked(i + 2),
-                ];
-                sp_v3 += 1;
+                *ctx.stack_v3.get_unchecked_mut(ctx.sp_v3) = [*features.get_unchecked(i), *features.get_unchecked(i + 1), *features.get_unchecked(i + 2)];
+                ctx.sp_v3 += 1;
+            },
+            Instruction::LoadConstV3(idx) => unsafe {
+                if let Scalar::Vec3(val) = constants.get_unchecked(*idx as usize) {
+                    *ctx.stack_v3.get_unchecked_mut(ctx.sp_v3) = [f32x4::splat(val[0]), f32x4::splat(val[1]), f32x4::splat(val[2])];
+                }
+                ctx.sp_v3 += 1;
             },
             Instruction::LoadVarM2(idx) => unsafe {
                 let i = *idx as usize;
-                *stack_m2.get_unchecked_mut(sp_m2) = [
-                    *features.get_unchecked(i),
-                    *features.get_unchecked(i + 1),
-                    *features.get_unchecked(i + 2),
-                    *features.get_unchecked(i + 3),
+                *ctx.stack_m2.get_unchecked_mut(ctx.sp_m2) = [
+                    *features.get_unchecked(i), *features.get_unchecked(i + 1),
+                    *features.get_unchecked(i + 2), *features.get_unchecked(i + 3),
                 ];
-                sp_m2 += 1;
+                ctx.sp_m2 += 1;
+            },
+            Instruction::LoadConstM2(idx) => unsafe {
+                if let Scalar::Mat2(val) = constants.get_unchecked(*idx as usize) {
+                    *ctx.stack_m2.get_unchecked_mut(ctx.sp_m2) = [
+                        f32x4::splat(val[0]), f32x4::splat(val[1]),
+                        f32x4::splat(val[2]), f32x4::splat(val[3]),
+                    ];
+                }
+                ctx.sp_m2 += 1;
             },
             Instruction::LoadVarM3(idx) => unsafe {
                 let i = *idx as usize;
-                *stack_m3.get_unchecked_mut(sp_m3) = [
-                    *features.get_unchecked(i),
-                    *features.get_unchecked(i + 1),
-                    *features.get_unchecked(i + 2),
-                    *features.get_unchecked(i + 3),
-                    *features.get_unchecked(i + 4),
-                    *features.get_unchecked(i + 5),
-                    *features.get_unchecked(i + 6),
-                    *features.get_unchecked(i + 7),
-                    *features.get_unchecked(i + 8),
+                *ctx.stack_m3.get_unchecked_mut(ctx.sp_m3) = [
+                    *features.get_unchecked(i), *features.get_unchecked(i + 1), *features.get_unchecked(i + 2),
+                    *features.get_unchecked(i + 3), *features.get_unchecked(i + 4), *features.get_unchecked(i + 5),
+                    *features.get_unchecked(i + 6), *features.get_unchecked(i + 7), *features.get_unchecked(i + 8),
                 ];
-                sp_m3 += 1;
+                ctx.sp_m3 += 1;
             },
-            _ => {}
+            Instruction::LoadConstM3(idx) => unsafe {
+                if let Scalar::Mat3(val) = constants.get_unchecked(*idx as usize) {
+                    *ctx.stack_m3.get_unchecked_mut(ctx.sp_m3) = [
+                        f32x4::splat(val[0]), f32x4::splat(val[1]), f32x4::splat(val[2]),
+                        f32x4::splat(val[3]), f32x4::splat(val[4]), f32x4::splat(val[5]),
+                        f32x4::splat(val[6]), f32x4::splat(val[7]), f32x4::splat(val[8]),
+                    ];
+                }
+                ctx.sp_m3 += 1;
+            },
+            
+            // Ha nem memóriaművelet, delegáljuk a Makró által generált motornak!
+            _ => SymbolicEngine::eval_simd(std::slice::from_ref(op), &mut ctx),
         }
     }
-    unsafe { *stack_f.get_unchecked(0) }
+    unsafe { *ctx.stack_f.get_unchecked(0) }
 }
 
 pub fn compute_mse(program: &Program, dataset: &Dataset) -> f32 {
-    let mut sum_squared_error = 0.0;
+    let mut sum_squared_error = f32x4::splat(0.0);
     let num_features = dataset.num_features as usize;
     let flat_features = &dataset.feature_flat;
     let targets = &dataset.target_batches;
@@ -242,17 +105,18 @@ pub fn compute_mse(program: &Program, dataset: &Dataset) -> f32 {
         let input_batch = unsafe { flat_features.get_unchecked(start..start + num_features) };
 
         let prediction = eval_simd(program, input_batch);
-
         let target = unsafe { *targets.get_unchecked(i) };
+        
         let diff = prediction - target;
-        sum_squared_error += (diff * diff).reduce_add();
+        sum_squared_error += diff * diff;
     }
 
-    if !sum_squared_error.is_finite() {
-        return f32::MAX;
+    let mse = sum_squared_error.reduce_add() / (dataset.num_samples as f32);
+    if !mse.is_finite() {
+        f32::MAX
+    } else {
+        mse
     }
-
-    sum_squared_error / (dataset.num_samples as f32)
 }
 
 pub fn compute_mse_with_gradient(program: &Program, dataset: &Dataset) -> (f32, [f32; 32]) {
@@ -263,18 +127,7 @@ pub fn compute_mse_with_gradient(program: &Program, dataset: &Dataset) -> (f32, 
     let flat_features = &dataset.feature_flat;
     let targets = &dataset.target_batches;
 
-    let mut active_params_count = 0;
-    for c in &program.constants {
-        active_params_count += match c {
-            Scalar::Float(_) => 1,
-            Scalar::Vec2(_) => 2,
-            Scalar::Vec3(_) => 3,
-            Scalar::Mat2(_) => 4,
-            Scalar::Mat3(_) => 9,
-            _ => 0,
-        };
-    }
-    active_params_count = active_params_count.min(32);
+    let active_params_count = program.param_count().min(32);
 
     if active_params_count == 0 {
         return (compute_mse(program, dataset), [0.0; 32]);
@@ -315,27 +168,8 @@ pub fn compute_mse_with_gradient(program: &Program, dataset: &Dataset) -> (f32, 
 
 #[inline(always)]
 pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: usize) -> DualSimd {
-    let code = &program.code;
+    let mut ctx = DualVmState::new();
     let constants = &program.constants;
-
-    let mut stack_f: [DualSimd; 32] = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
-    let mut sp_f: usize = 0;
-
-    let mut stack_v2: [[DualSimd; 2]; 32] =
-        unsafe { std::mem::MaybeUninit::uninit().assume_init() };
-    let mut sp_v2: usize = 0;
-
-    let mut stack_v3: [[DualSimd; 3]; 32] =
-        unsafe { std::mem::MaybeUninit::uninit().assume_init() };
-    let mut sp_v3: usize = 0;
-
-    let mut stack_m2: [[DualSimd; 4]; 32] =
-        unsafe { std::mem::MaybeUninit::uninit().assume_init() };
-    let mut sp_m2: usize = 0;
-
-    let mut stack_m3: [[DualSimd; 9]; 32] =
-        unsafe { std::mem::MaybeUninit::uninit().assume_init() };
-    let mut sp_m3: usize = 0;
 
     let get_flat_start_idx = |target_c_idx: usize| -> usize {
         let mut flat_idx = 0;
@@ -360,167 +194,125 @@ pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: u
         }
     };
 
-    for op in code {
+    for op in &program.code {
         match op {
+            // --- Memória (DualSimd) ---
             Instruction::LoadVarF(idx) => unsafe {
-                *stack_f.get_unchecked_mut(sp_f) =
-                    DualSimd::constant(*features.get_unchecked(*idx as usize));
-                sp_f += 1;
-            },
-            Instruction::LoadVarV2(idx) => unsafe {
-                let i = *idx as usize;
-                *stack_v2.get_unchecked_mut(sp_v2) = [
-                    DualSimd::constant(*features.get_unchecked(i)),
-                    DualSimd::constant(*features.get_unchecked(i + 1)),
-                ];
-                sp_v2 += 1;
-            },
-            Instruction::LoadVarV3(idx) => unsafe {
-                let i = *idx as usize;
-                *stack_v3.get_unchecked_mut(sp_v3) = [
-                    DualSimd::constant(*features.get_unchecked(i)),
-                    DualSimd::constant(*features.get_unchecked(i + 1)),
-                    DualSimd::constant(*features.get_unchecked(i + 2)),
-                ];
-                sp_v3 += 1;
+                *ctx.stack_f.get_unchecked_mut(ctx.sp_f) = DualSimd::constant(*features.get_unchecked(*idx as usize));
+                ctx.sp_f += 1;
             },
             Instruction::LoadConstF(idx) => unsafe {
                 if let Scalar::Float(val) = constants.get_unchecked(*idx as usize) {
                     let flat_idx = get_flat_start_idx(*idx as usize);
-                    *stack_f.get_unchecked_mut(sp_f) =
-                        DualSimd::new(f32x4::splat(*val), get_grad(flat_idx));
+                    *ctx.stack_f.get_unchecked_mut(ctx.sp_f) = DualSimd::new(f32x4::splat(*val), get_grad(flat_idx));
                 }
-                sp_f += 1;
+                ctx.sp_f += 1;
+            },
+            Instruction::LoadVarV2(idx) => unsafe {
+                let i = *idx as usize;
+                *ctx.stack_v2.get_unchecked_mut(ctx.sp_v2) = [
+                    DualSimd::constant(*features.get_unchecked(i)),
+                    DualSimd::constant(*features.get_unchecked(i + 1)),
+                ];
+                ctx.sp_v2 += 1;
             },
             Instruction::LoadConstV2(idx) => unsafe {
                 if let Scalar::Vec2(val) = constants.get_unchecked(*idx as usize) {
                     let flat_idx = get_flat_start_idx(*idx as usize);
-                    *stack_v2.get_unchecked_mut(sp_v2) = [
+                    *ctx.stack_v2.get_unchecked_mut(ctx.sp_v2) = [
                         DualSimd::new(f32x4::splat(val[0]), get_grad(flat_idx)),
                         DualSimd::new(f32x4::splat(val[1]), get_grad(flat_idx + 1)),
                     ];
                 }
-                sp_v2 += 1;
+                ctx.sp_v2 += 1;
+            },
+            Instruction::LoadVarV3(idx) => unsafe {
+                let i = *idx as usize;
+                *ctx.stack_v3.get_unchecked_mut(ctx.sp_v3) = [
+                    DualSimd::constant(*features.get_unchecked(i)),
+                    DualSimd::constant(*features.get_unchecked(i + 1)),
+                    DualSimd::constant(*features.get_unchecked(i + 2)),
+                ];
+                ctx.sp_v3 += 1;
             },
             Instruction::LoadConstV3(idx) => unsafe {
                 if let Scalar::Vec3(val) = constants.get_unchecked(*idx as usize) {
                     let flat_idx = get_flat_start_idx(*idx as usize);
-                    *stack_v3.get_unchecked_mut(sp_v3) = [
+                    *ctx.stack_v3.get_unchecked_mut(ctx.sp_v3) = [
                         DualSimd::new(f32x4::splat(val[0]), get_grad(flat_idx)),
                         DualSimd::new(f32x4::splat(val[1]), get_grad(flat_idx + 1)),
                         DualSimd::new(f32x4::splat(val[2]), get_grad(flat_idx + 2)),
                     ];
                 }
-                sp_v3 += 1;
+                ctx.sp_v3 += 1;
             },
 
-            Instruction::AddF => unsafe { autodiff::eval_add_dual_f(&mut sp_f, &mut stack_f) },
-            Instruction::SubF => unsafe { autodiff::eval_sub_dual_f(&mut sp_f, &mut stack_f) },
-            Instruction::MulF => unsafe { autodiff::eval_mul_dual_f(&mut sp_f, &mut stack_f) },
-            Instruction::DivF => unsafe { autodiff::eval_div_dual_f(&mut sp_f, &mut stack_f) },
-            Instruction::SinF => unsafe { autodiff::eval_sin_dual_f(&mut sp_f, &mut stack_f) },
-            Instruction::CosF => unsafe { autodiff::eval_cos_dual_f(&mut sp_f, &mut stack_f) },
-            Instruction::ExpF => unsafe { autodiff::eval_exp_dual_f(&mut sp_f, &mut stack_f) },
-            Instruction::SqrF => unsafe { autodiff::eval_sqr_dual_f(&mut sp_f, &mut stack_f) },
-            Instruction::SqrtF => unsafe { autodiff::eval_sqrt_dual_f(&mut sp_f, &mut stack_f) },
-            Instruction::LnF => unsafe { autodiff::eval_ln_dual_f(&mut sp_f, &mut stack_f) },
-
-            Instruction::MakeVec2 => unsafe {
-                autodiff::eval_make_dual_vec2(&mut sp_f, &stack_f, &mut sp_v2, &mut stack_v2)
-            },
-            Instruction::MakeVec3 => unsafe {
-                autodiff::eval_make_dual_vec3(&mut sp_f, &stack_f, &mut sp_v3, &mut stack_v3)
-            },
-            Instruction::GetXV2 => unsafe {
-                autodiff::eval_get_x_dual_v2(&mut sp_f, &mut stack_f, &mut sp_v2, &stack_v2)
-            },
-            Instruction::GetYV2 => unsafe {
-                autodiff::eval_get_y_dual_v2(&mut sp_f, &mut stack_f, &mut sp_v2, &stack_v2)
-            },
-            Instruction::GetXV3 => unsafe {
-                autodiff::eval_get_x_dual_v3(&mut sp_f, &mut stack_f, &mut sp_v3, &stack_v3)
-            },
-            Instruction::GetYV3 => unsafe {
-                autodiff::eval_get_y_dual_v3(&mut sp_f, &mut stack_f, &mut sp_v3, &stack_v3)
-            },
-            Instruction::GetZV3 => unsafe {
-                autodiff::eval_get_z_dual_v3(&mut sp_f, &mut stack_f, &mut sp_v3, &stack_v3)
+            // --- Basic Operátorok Autodiff ---
+            Instruction::Basic(b) => unsafe {
+                match b {
+                    BasicOpCode::AddF => autodiff::eval_add_dual_f(&mut ctx.sp_f, &mut ctx.stack_f),
+                    BasicOpCode::SubF => autodiff::eval_sub_dual_f(&mut ctx.sp_f, &mut ctx.stack_f),
+                    BasicOpCode::MulF => autodiff::eval_mul_dual_f(&mut ctx.sp_f, &mut ctx.stack_f),
+                    BasicOpCode::DivF => autodiff::eval_div_dual_f(&mut ctx.sp_f, &mut ctx.stack_f),
+                    BasicOpCode::SinF => autodiff::eval_sin_dual_f(&mut ctx.sp_f, &mut ctx.stack_f),
+                    BasicOpCode::CosF => autodiff::eval_cos_dual_f(&mut ctx.sp_f, &mut ctx.stack_f),
+                    BasicOpCode::ExpF => autodiff::eval_exp_dual_f(&mut ctx.sp_f, &mut ctx.stack_f),
+                    BasicOpCode::SqrF => autodiff::eval_sqr_dual_f(&mut ctx.sp_f, &mut ctx.stack_f),
+                    BasicOpCode::SqrtF => autodiff::eval_sqrt_dual_f(&mut ctx.sp_f, &mut ctx.stack_f),
+                    BasicOpCode::LnF => autodiff::eval_ln_dual_f(&mut ctx.sp_f, &mut ctx.stack_f),
+                }
             },
 
-            Instruction::AddV2 => unsafe { autodiff::eval_add_dual_v2(&mut sp_v2, &mut stack_v2) },
-            Instruction::SubV2 => unsafe { autodiff::eval_sub_dual_v2(&mut sp_v2, &mut stack_v2) },
-            Instruction::ScaleV2 => unsafe {
-                autodiff::eval_scale_dual_v2(&mut sp_f, &stack_f, &mut sp_v2, &mut stack_v2)
-            },
-            Instruction::DotV2 => unsafe {
-                autodiff::eval_dot_dual_v2(&mut sp_f, &mut stack_f, &mut sp_v2, &stack_v2)
-            },
-            Instruction::NormV2 => unsafe {
-                autodiff::eval_norm_dual_v2(&mut sp_f, &mut stack_f, &mut sp_v2, &stack_v2)
-            },
+            // --- Linalg Operátorok Autodiff ---
+            Instruction::Linalg(l) => unsafe {
+                match l {
+                    LinalgOpCode::MakeVec2 => autodiff::eval_make_dual_vec2(&mut ctx.sp_f, &ctx.stack_f, &mut ctx.sp_v2, &mut ctx.stack_v2),
+                    LinalgOpCode::MakeVec3 => autodiff::eval_make_dual_vec3(&mut ctx.sp_f, &ctx.stack_f, &mut ctx.sp_v3, &mut ctx.stack_v3),
+                    LinalgOpCode::GetXV2 => autodiff::eval_get_x_dual_v2(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_v2, &ctx.stack_v2),
+                    LinalgOpCode::GetYV2 => autodiff::eval_get_y_dual_v2(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_v2, &ctx.stack_v2),
+                    LinalgOpCode::GetXV3 => autodiff::eval_get_x_dual_v3(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_v3, &ctx.stack_v3),
+                    LinalgOpCode::GetYV3 => autodiff::eval_get_y_dual_v3(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_v3, &ctx.stack_v3),
+                    LinalgOpCode::GetZV3 => autodiff::eval_get_z_dual_v3(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_v3, &ctx.stack_v3),
+                    
+                    LinalgOpCode::AddV2 => autodiff::eval_add_dual_v2(&mut ctx.sp_v2, &mut ctx.stack_v2),
+                    LinalgOpCode::SubV2 => autodiff::eval_sub_dual_v2(&mut ctx.sp_v2, &mut ctx.stack_v2),
+                    LinalgOpCode::ScaleV2 => autodiff::eval_scale_dual_v2(&mut ctx.sp_f, &ctx.stack_f, &mut ctx.sp_v2, &mut ctx.stack_v2),
+                    LinalgOpCode::DotV2 => autodiff::eval_dot_dual_v2(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_v2, &ctx.stack_v2),
+                    LinalgOpCode::NormV2 => autodiff::eval_norm_dual_v2(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_v2, &ctx.stack_v2),
+                    
+                    LinalgOpCode::AddV3 => autodiff::eval_add_dual_v3(&mut ctx.sp_v3, &mut ctx.stack_v3),
+                    LinalgOpCode::SubV3 => autodiff::eval_sub_dual_v3(&mut ctx.sp_v3, &mut ctx.stack_v3),
+                    LinalgOpCode::ScaleV3 => autodiff::eval_scale_dual_v3(&mut ctx.sp_f, &ctx.stack_f, &mut ctx.sp_v3, &mut ctx.stack_v3),
+                    LinalgOpCode::DotV3 => autodiff::eval_dot_dual_v3(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_v3, &ctx.stack_v3),
+                    LinalgOpCode::NormV3 => autodiff::eval_norm_dual_v3(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_v3, &ctx.stack_v3),
+                    LinalgOpCode::CrossV3 => autodiff::eval_cross_dual_v3(&mut ctx.sp_v3, &mut ctx.stack_v3),
 
-            Instruction::AddV3 => unsafe { autodiff::eval_add_dual_v3(&mut sp_v3, &mut stack_v3) },
-            Instruction::SubV3 => unsafe { autodiff::eval_sub_dual_v3(&mut sp_v3, &mut stack_v3) },
-            Instruction::ScaleV3 => unsafe {
-                autodiff::eval_scale_dual_v3(&mut sp_f, &stack_f, &mut sp_v3, &mut stack_v3)
-            },
-            Instruction::DotV3 => unsafe {
-                autodiff::eval_dot_dual_v3(&mut sp_f, &mut stack_f, &mut sp_v3, &stack_v3)
-            },
-            Instruction::NormV3 => unsafe {
-                autodiff::eval_norm_dual_v3(&mut sp_f, &mut stack_f, &mut sp_v3, &stack_v3)
-            },
-            Instruction::CrossV3 => unsafe {
-                autodiff::eval_cross_dual_v3(&mut sp_v3, &mut stack_v3)
-            },
+                    LinalgOpCode::MakeMat2 => autodiff::eval_make_dual_mat2(&mut ctx.sp_v2, &ctx.stack_v2, &mut ctx.sp_m2, &mut ctx.stack_m2),
+                    LinalgOpCode::AddM2 => autodiff::eval_add_dual_m2(&mut ctx.sp_m2, &mut ctx.stack_m2),
+                    LinalgOpCode::SubM2 => autodiff::eval_sub_dual_m2(&mut ctx.sp_m2, &mut ctx.stack_m2),
+                    LinalgOpCode::ScaleM2 => autodiff::eval_scale_dual_m2(&mut ctx.sp_f, &ctx.stack_f, &mut ctx.sp_m2, &mut ctx.stack_m2),
+                    LinalgOpCode::MulM2 => autodiff::eval_mul_dual_m2(&mut ctx.sp_m2, &mut ctx.stack_m2),
+                    LinalgOpCode::MulM2V2 => autodiff::eval_mul_dual_m2v2(&mut ctx.sp_m2, &ctx.stack_m2, &mut ctx.sp_v2, &mut ctx.stack_v2),
+                    LinalgOpCode::DetM2 => autodiff::eval_det_dual_m2(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m2, &ctx.stack_m2),
+                    LinalgOpCode::TraceM2 => autodiff::eval_trace_dual_m2(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m2, &ctx.stack_m2),
+                    LinalgOpCode::TransposeM2 => autodiff::eval_transpose_dual_m2(&mut ctx.sp_m2, &mut ctx.stack_m2),
 
-            Instruction::MakeMat2 => unsafe {
-                autodiff::eval_make_dual_mat2(&mut sp_v2, &stack_v2, &mut sp_m2, &mut stack_m2)
+                    LinalgOpCode::MakeMat3 => autodiff::eval_make_dual_mat3(&mut ctx.sp_v3, &ctx.stack_v3, &mut ctx.sp_m3, &mut ctx.stack_m3),
+                    LinalgOpCode::AddM3 => autodiff::eval_add_dual_m3(&mut ctx.sp_m3, &mut ctx.stack_m3),
+                    LinalgOpCode::SubM3 => autodiff::eval_sub_dual_m3(&mut ctx.sp_m3, &mut ctx.stack_m3),
+                    LinalgOpCode::ScaleM3 => autodiff::eval_scale_dual_m3(&mut ctx.sp_f, &ctx.stack_f, &mut ctx.sp_m3, &mut ctx.stack_m3),
+                    LinalgOpCode::MulM3 => autodiff::eval_mul_dual_m3(&mut ctx.sp_m3, &mut ctx.stack_m3),
+                    LinalgOpCode::MulM3V3 => autodiff::eval_mul_dual_m3v3(&mut ctx.sp_m3, &ctx.stack_m3, &mut ctx.sp_v3, &mut ctx.stack_v3),
+                    LinalgOpCode::DetM3 => autodiff::eval_det_dual_m3(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3),
+                    LinalgOpCode::TraceM3 => autodiff::eval_trace_dual_m3(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3),
+                    LinalgOpCode::TransposeM3 => autodiff::eval_transpose_dual_m3(&mut ctx.sp_m3, &mut ctx.stack_m3),
+                    
+                    _ => {} // Inverse műveletek deriválása nem támogatott
+                }
             },
-            Instruction::AddM2 => unsafe { autodiff::eval_add_dual_m2(&mut sp_m2, &mut stack_m2) },
-            Instruction::SubM2 => unsafe { autodiff::eval_sub_dual_m2(&mut sp_m2, &mut stack_m2) },
-            Instruction::ScaleM2 => unsafe {
-                autodiff::eval_scale_dual_m2(&mut sp_f, &stack_f, &mut sp_m2, &mut stack_m2)
-            },
-            Instruction::MulM2 => unsafe { autodiff::eval_mul_dual_m2(&mut sp_m2, &mut stack_m2) },
-            Instruction::MulM2V2 => unsafe {
-                autodiff::eval_mul_dual_m2v2(&mut sp_m2, &stack_m2, &mut sp_v2, &mut stack_v2)
-            },
-            Instruction::DetM2 => unsafe {
-                autodiff::eval_det_dual_m2(&mut sp_f, &mut stack_f, &mut sp_m2, &stack_m2)
-            },
-            Instruction::TraceM2 => unsafe {
-                autodiff::eval_trace_dual_m2(&mut sp_f, &mut stack_f, &mut sp_m2, &stack_m2)
-            },
-            Instruction::TransposeM2 => unsafe {
-                autodiff::eval_transpose_dual_m2(&mut sp_m2, &mut stack_m2)
-            },
-
-            Instruction::MakeMat3 => unsafe {
-                autodiff::eval_make_dual_mat3(&mut sp_v3, &stack_v3, &mut sp_m3, &mut stack_m3)
-            },
-            Instruction::AddM3 => unsafe { autodiff::eval_add_dual_m3(&mut sp_m3, &mut stack_m3) },
-            Instruction::SubM3 => unsafe { autodiff::eval_sub_dual_m3(&mut sp_m3, &mut stack_m3) },
-            Instruction::ScaleM3 => unsafe {
-                autodiff::eval_scale_dual_m3(&mut sp_f, &stack_f, &mut sp_m3, &mut stack_m3)
-            },
-            Instruction::MulM3 => unsafe { autodiff::eval_mul_dual_m3(&mut sp_m3, &mut stack_m3) },
-            Instruction::MulM3V3 => unsafe {
-                autodiff::eval_mul_dual_m3v3(&mut sp_m3, &stack_m3, &mut sp_v3, &mut stack_v3)
-            },
-            Instruction::DetM3 => unsafe {
-                autodiff::eval_det_dual_m3(&mut sp_f, &mut stack_f, &mut sp_m3, &stack_m3)
-            },
-            Instruction::TraceM3 => unsafe {
-                autodiff::eval_trace_dual_m3(&mut sp_f, &mut stack_f, &mut sp_m3, &stack_m3)
-            },
-            Instruction::TransposeM3 => unsafe {
-                autodiff::eval_transpose_dual_m3(&mut sp_m3, &mut stack_m3)
-            },
-
             _ => {}
         }
     }
 
-    unsafe { *stack_f.get_unchecked(0) }
+    unsafe { *ctx.stack_f.get_unchecked(0) }
 }

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::mem;
 
 use crate::data::dataset::Dataset;
-use crate::eval::op::Op;
+use crate::Instruction;
 use crate::eval::types::ValueType;
 use crate::search::individual::Individual;
 use crate::search::operators::crossover::crossover;
@@ -24,7 +24,7 @@ pub struct Island<S: Strategy> {
     pub stagnation_counter: usize,
     pub local_hof: HashMap<usize, (f32, Individual)>,
     pub strategy: S,
-    pub allowed_ops: Vec<Op>,
+    pub allowed_ops: Vec<Instruction>,
     pub variable_registry: Vec<(ValueType, u8)>,
 }
 
@@ -33,7 +33,7 @@ impl<S: Strategy> Island<S> {
         seed: u64,
         variable_registry: Vec<(ValueType, u8)>,
         strategy: S,
-        allowed_ops: Vec<Op>,
+        allowed_ops: Vec<Instruction>,
     ) -> Self {
         let size = strategy.island_size();
         let mut rng = Xoshiro256PlusPlus::seed_from_u64(seed);
