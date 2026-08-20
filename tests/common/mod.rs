@@ -4,11 +4,10 @@ use serde::{Deserialize, Serialize};
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
-
-use rsr::prelude::*; // Az új prelude!
+use rsr::prelude::*;
 
 const MAX_ENTRIES: usize = 30;
-const TIME_LIMIT: u64 = 43200; // Fél nap
+const TIME_LIMIT: u64 = 43200;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct BenchmarkEntry {
@@ -197,7 +196,7 @@ pub fn get_test_config(modules: Vec<OpModule>) -> Config {
     Config {
         num_islands: 24,
         island_size: 25,
-        max_generations: 10000,
+        max_generations: 5000,
         crossover_rate: 0.10,
         tournament_size: 2,
         migration_interval: 25,

@@ -17,7 +17,7 @@
     </style>
 </head>
 <body>
-    <h1>RSR Evolúciós Motor Teljesítmény</h1>
+    <h1>RSR Benchmark history</h1>
 
     <div class="chart-container">
         <canvas id="mseChart"></canvas>
@@ -38,16 +38,13 @@
                     ? entry.commit_hash.substring(0, 7)
                     : "unknown";
                 
-                // Dátum formázása a timestamp-ből
                 const date = new Date(entry.timestamp * 1000);
                 const timeString = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
                 
                 return `Run ${index + 1}\n${shortHash}\n${timeString}`;
             });
 
-            // Kategóriák definiálása színekkel
             const categories = [
-                // --- Basic Modul Tesztek (Kékes/Zöldes/Hideg színek) ---
                 { key: 'basic1', label: 'Basic 1 (Sqr)', color: '#1f77b4' },
                 { key: 'basic2', label: 'Basic 2 (Cos)', color: '#aec7e8' },
                 { key: 'basic3', label: 'Basic 3 (Exp)', color: '#2ca02c' },
@@ -58,15 +55,12 @@
                 { key: 'basic8', label: 'Basic 8 (HidDim)', color: '#c7c7c7' },
                 { key: 'basic9', label: 'Basic 9 (Div)', color: '#bcbd22' },
                 { key: 'basic10', label: 'Basic 10 (All)', color: '#dbdb8d' },
-
-                // --- Linalg Modul Tesztek (Pirosas/Narancsos/Meleg színek) ---
                 { key: 'linalg1', label: 'Linalg 1', color: '#d62728' },
                 { key: 'linalg2', label: 'Linalg 2', color: '#ff9896' },
                 { key: 'linalg3', label: 'Linalg 3', color: '#ff7f0e' },
                 { key: 'linalg4', label: 'Linalg 4', color: '#ffbb78' }
             ];
 
-            // Dinamikusan legeneráljuk az MSE adatsorokat
             const mseDatasets = categories.map(cat => ({
                 label: cat.label + ' MSE',
                 data: data.map(d => d[`${cat.key}_mse`] || null),
@@ -74,22 +68,20 @@
                 backgroundColor: cat.color,
                 tension: 0.1,
                 fill: false,
-                spanGaps: true // Áthidalja a null/hiányzó értékeket
+                spanGaps: true 
             }));
 
-            // Dinamikusan legeneráljuk az Idő (Time) adatsorokat
             const timeDatasets = categories.map(cat => ({
                 label: cat.label + ' Time (ms)',
                 data: data.map(d => d[`${cat.key}_time_ms`] || null),
                 borderColor: cat.color,
                 backgroundColor: cat.color,
-                borderDash: [5, 5], // Szaggatott vonal az időnek
+                borderDash: [5, 5],
                 tension: 0.1,
                 fill: false,
                 spanGaps: true
             }));
 
-            // 1. MSE Grafikon (Logaritmikus Y tengely)
             new Chart(document.getElementById('mseChart'), {
                 type: 'line',
                 data: {
@@ -99,7 +91,7 @@
                 options: { 
                     responsive: true,
                     plugins: {
-                        title: { display: true, text: 'Mean Squared Error (Alacsonyabb a jobb)' },
+                        title: { display: true, text: 'Mean Squared Error' },
                         legend: { position: 'right' }
                     },
                     scales: { 
@@ -111,7 +103,6 @@
                 }
             });
 
-            // 2. Idő Grafikon (Lineáris Y tengely)
             new Chart(document.getElementById('timeChart'), {
                 type: 'line',
                 data: {
@@ -121,13 +112,13 @@
                 options: {
                     responsive: true,
                     plugins: {
-                        title: { display: true, text: 'Futási idő milliszekundumban (Alacsonyabb a jobb)' },
+                        title: { display: true, text: 'Time(ms)' },
                         legend: { position: 'right' }
                     },
                     scales: {
                         y: {
                             beginAtZero: true,
-                            title: { display: true, text: 'Idő (ms)' }
+                            title: { display: true, text: 'Time (ms)' }
                         }
                     }
                 }
