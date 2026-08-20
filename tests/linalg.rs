@@ -3,7 +3,7 @@ mod common;
 use rand::RngExt;
 use rsr::prelude::*;
 use rsr::Instruction;
-use rsr::eval::basic_domain::BasicOpCode;
+use rsr::domains::basic::BasicOpCode;
 use std::time::Instant;
 
 fn run_linalg_test(
@@ -56,9 +56,9 @@ fn linalg_1_rigid_body_energy() {
     let i_mat = [2.0, 0.1, 0.0, 0.1, 1.5, -0.2, 0.0, -0.2, 1.0];
 
     for _ in 0..400 {
-        let w0 = rng.random_range(-2.0..2.0);
-        let w1 = rng.random_range(-2.0..2.0);
-        let w2 = rng.random_range(-2.0..2.0);
+        let w0 = rng.random_range(-5.0..5.0);
+        let w1 = rng.random_range(-5.0..5.0);
+        let w2 = rng.random_range(-5.0..5.0);
         dx.push(vec![w0, w1, w2]);
 
         let iw0 = i_mat[0] * w0 + i_mat[3] * w1 + i_mat[6] * w2;
@@ -118,16 +118,16 @@ fn linalg_3_matrix_inverse_trace() {
     let mut dx = Vec::new();
     let mut dy = Vec::new();
     for _ in 0..400 {
-        let a0 = rng.random_range(1.0..3.0);
-        let a1 = rng.random_range(-1.0..1.0);
+        let a0 = rng.random_range(1.0..8.0);
+        let a1 = rng.random_range(-4.0..4.0);
         let a2 = rng.random_range(-1.0..1.0);
-        let a3 = rng.random_range(1.0..3.0);
+        let a3 = rng.random_range(1.0..8.0);
         let det_a = a0 * a3 - a1 * a2;
 
-        let b0 = rng.random_range(-2.0..2.0);
-        let b1 = rng.random_range(-2.0..2.0);
+        let b0 = rng.random_range(-6.0..2.0);
+        let b1 = rng.random_range(-2.0..6.0);
         let b2 = rng.random_range(-2.0..2.0);
-        let b3 = rng.random_range(-2.0..2.0);
+        let b3 = rng.random_range(-10.0..0.0);
 
         dx.push(vec![a0, a1, a2, a3, b0, b1, b2, b3]);
 
@@ -156,19 +156,19 @@ fn linalg_4_transform_error() {
         let mut row = Vec::new();
         let mut m = [0.0; 9];
         for i in 0..9 {
-            m[i] = rng.random_range(-2.0..2.0);
+            m[i] = rng.random_range(-5.0..5.0);
             row.push(m[i]);
         }
 
         let mut v = [0.0; 3];
         for i in 0..3 {
-            v[i] = rng.random_range(-2.0..2.0);
+            v[i] = rng.random_range(-5.0..5.0);
             row.push(v[i]);
         }
 
         let mut u = [0.0; 3];
         for i in 0..3 {
-            u[i] = rng.random_range(-2.0..2.0);
+            u[i] = rng.random_range(-5.0..5.0);
             row.push(u[i]);
         }
 

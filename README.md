@@ -25,7 +25,7 @@ You can try it with `cargo run --release`.
 
 | Problem | Target Equation | Features | Execution Time |
 | :--- | :--- | :--- | :--- |
-| **Square** | `y = 2.5x² - 1.2` | `f32` | **~33 ms** |
-| **Electromagnetism** | `norm(E + v × B)` | 3x `Vec3` | **~115 ms** |
-| **3D Transform Error** | `norm(M * v - u)` | `Mat3`, 2x `Vec3` | **~1.0 s** |
-| **Inverse & Trace** | `Tr(A⁻¹ * B) + det(A)` | 2x `Mat2` | **~3.6 s** |
+| **Square** | `y = 2.5x² - 1.2` | `f32` | **~751 ms** |
+| **Electromagnetism** | `norm(E + v × B)` | 3x `Vec3` | **~2.3 s** |
+| **3D Transform Error** | `norm(M * v - u)` | `Mat3`, 2x `Vec3` | **~9.8 s** |
+| **Inverse & Trace** | `Tr(A⁻¹ * B) + det(A)` | 2x `Mat2` | **~58.2 s** |

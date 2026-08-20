@@ -1,13 +1,13 @@
 use rand::RngExt;
-use rsr::ffi::symengine::simplify_symengine;
-use rsr::prelude::*;
-use rsr::Instruction;
-use rsr::eval::basic_domain::BasicOpCode;
-use rsr::eval::linalg_domain::LinalgOpCode;
 use std::time::Instant;
 
+use rsr::api::SymbolicRegressor;
+use rsr::engine::data::dataset::Dataset;
+use rsr::engine::data::schema::Schema;
+use rsr::prelude::*;
+use rsr::domains::basic::BasicOpCode;
+
 fn main() {
-    //generating the data
     let mut rng = rand::rng();
     let num_samples = 400;
 
@@ -36,65 +36,28 @@ fn main() {
         dy.push((fx * fx + fy * fy + fz * fz).sqrt());
     }
 
-    //set config
-    let feature_types = vec![ValueType::Vec3, ValueType::Vec3, ValueType::Vec3];
-    let config = Config {
-        num_islands: 24,
-        island_size: 25,
-        max_generations: 3000,
-        crossover_rate: 0.10,
-        tournament_size: 2,
-        migration_interval: 25,
-        parsimony_penalty: 0.0,
-        target_mse: 1e-7,
-        min_improvement: 1e-6,
-        opt_prob: 0.2,
-        opt_iterations: 100,
-        final_opt_iterations: 5000,
-        stagnation_threshold: 1000,
-        random_injection_rate: 0.10,
-        min_random_injection: 2,
-        max_tree_size: 32,
-        mutation_max_depth: 7,
-        mutation_cycles: 5,
-        verbose: true,
-        allowed_modules: vec![OpModule::Basic],
-        custom_ops: vec![
-            Instruction::Linalg(LinalgOpCode::AddV3),
-            Instruction::Linalg(LinalgOpCode::SubV3),
-            Instruction::Linalg(LinalgOpCode::CrossV3),
-            Instruction::Linalg(LinalgOpCode::DotV3),
-            Instruction::Linalg(LinalgOpCode::NormV3),
-            Instruction::Linalg(LinalgOpCode::ScaleV3),
-        ],
-        excluded_ops: vec![
+    let schema = Schema::new(vec![ValueType::Vec3, ValueType::Vec3, ValueType::Vec3])
+        .with_normalization(false);
+    
+    let dataset = Dataset::from_arrays(&dx, &dy, &schema);
+    let config = Config::default(vec![OpModule::Basic, OpModule::Linalg]).without_ops(vec![
             Instruction::Basic(BasicOpCode::SinF),
             Instruction::Basic(BasicOpCode::CosF),
             Instruction::Basic(BasicOpCode::ExpF),
             Instruction::Basic(BasicOpCode::LnF),
             Instruction::Basic(BasicOpCode::SqrtF),
             Instruction::Basic(BasicOpCode::SqrF),
-        ],
-        ..Default::default()
-    };
+        ]);
 
-    //start the algorithm
     println!("Starting the algorithm...");
-    let dataset = Dataset::new(&dx, &dy, feature_types, false);
-
-    let strategy = StaticStrategy::new(config);
-    let allowed_ops = strategy.get_allowed_operators();
-
-    let mut engine = Engine::new(strategy, dataset.get_variable_registry(), allowed_ops);
+    
+    let regressor = SymbolicRegressor { config };
 
     let start_time = Instant::now();
-    engine.run(&dataset);
+    let result = regressor.fit(&dataset);
     let duration = start_time.elapsed();
 
-    let best_ind = engine.get_global_best();
-    let clean_eq = simplify_symengine(&best_ind.to_string());
-
     println!("\nEquation found in {:.3} seconds!", duration.as_secs_f64());
-    println!("Equation: {}", clean_eq);
-    println!("MSE:    {:.10}", best_ind.fitness);
+    println!("Equation: {}", result.equation);
+    println!("MSE:    {:.10}", result.mse);
 }
