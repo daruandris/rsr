@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 use fs2::FileExt;
+use rsr::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
-use rsr::prelude::*;
 
 const MAX_ENTRIES: usize = 30;
 const TIME_LIMIT: u64 = 43200;
