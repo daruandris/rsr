@@ -17,7 +17,6 @@ pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
 
     for op in &program.code {
         match op {
-            // --- Memória betöltése (Load utasítások) ---
             Instruction::LoadVarF(idx) => unsafe {
                 *ctx.stack_f.get_unchecked_mut(ctx.sp_f) = *features.get_unchecked(*idx as usize);
                 ctx.sp_f += 1;
@@ -87,8 +86,7 @@ pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
                 ctx.sp_m3 += 1;
             },
             
-            // Ha nem memóriaművelet, delegáljuk a Makró által generált motornak!
-            _ => SymbolicEngine::eval_simd(std::slice::from_ref(op), &mut ctx),
+            _ => SymbolicEngine::eval_single(*op, &mut ctx),
         }
     }
     unsafe { *ctx.stack_f.get_unchecked(0) }
@@ -196,7 +194,6 @@ pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: u
 
     for op in &program.code {
         match op {
-            // --- Memória (DualSimd) ---
             Instruction::LoadVarF(idx) => unsafe {
                 *ctx.stack_f.get_unchecked_mut(ctx.sp_f) = DualSimd::constant(*features.get_unchecked(*idx as usize));
                 ctx.sp_f += 1;
@@ -246,8 +243,61 @@ pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: u
                 }
                 ctx.sp_v3 += 1;
             },
+            Instruction::LoadVarM2(idx) => unsafe {
+                let i = *idx as usize;
+                *ctx.stack_m2.get_unchecked_mut(ctx.sp_m2) = [
+                    DualSimd::constant(*features.get_unchecked(i)),
+                    DualSimd::constant(*features.get_unchecked(i + 1)),
+                    DualSimd::constant(*features.get_unchecked(i + 2)),
+                    DualSimd::constant(*features.get_unchecked(i + 3)),
+                ];
+                ctx.sp_m2 += 1;
+            },
+            Instruction::LoadConstM2(idx) => unsafe {
+                if let Scalar::Mat2(val) = constants.get_unchecked(*idx as usize) {
+                    let flat_idx = get_flat_start_idx(*idx as usize);
+                    *ctx.stack_m2.get_unchecked_mut(ctx.sp_m2) = [
+                        DualSimd::new(f32x4::splat(val[0]), get_grad(flat_idx)),
+                        DualSimd::new(f32x4::splat(val[1]), get_grad(flat_idx + 1)),
+                        DualSimd::new(f32x4::splat(val[2]), get_grad(flat_idx + 2)),
+                        DualSimd::new(f32x4::splat(val[3]), get_grad(flat_idx + 3)),
+                    ];
+                }
+                ctx.sp_m2 += 1;
+            },
+            Instruction::LoadVarM3(idx) => unsafe {
+                let i = *idx as usize;
+                *ctx.stack_m3.get_unchecked_mut(ctx.sp_m3) = [
+                    DualSimd::constant(*features.get_unchecked(i)),
+                    DualSimd::constant(*features.get_unchecked(i + 1)),
+                    DualSimd::constant(*features.get_unchecked(i + 2)),
+                    DualSimd::constant(*features.get_unchecked(i + 3)),
+                    DualSimd::constant(*features.get_unchecked(i + 4)),
+                    DualSimd::constant(*features.get_unchecked(i + 5)),
+                    DualSimd::constant(*features.get_unchecked(i + 6)),
+                    DualSimd::constant(*features.get_unchecked(i + 7)),
+                    DualSimd::constant(*features.get_unchecked(i + 8)),
+                ];
+                ctx.sp_m3 += 1;
+            },
+            Instruction::LoadConstM3(idx) => unsafe {
+                if let Scalar::Mat3(val) = constants.get_unchecked(*idx as usize) {
+                    let flat_idx = get_flat_start_idx(*idx as usize);
+                    *ctx.stack_m3.get_unchecked_mut(ctx.sp_m3) = [
+                        DualSimd::new(f32x4::splat(val[0]), get_grad(flat_idx)),
+                        DualSimd::new(f32x4::splat(val[1]), get_grad(flat_idx + 1)),
+                        DualSimd::new(f32x4::splat(val[2]), get_grad(flat_idx + 2)),
+                        DualSimd::new(f32x4::splat(val[3]), get_grad(flat_idx + 3)),
+                        DualSimd::new(f32x4::splat(val[4]), get_grad(flat_idx + 4)),
+                        DualSimd::new(f32x4::splat(val[5]), get_grad(flat_idx + 5)),
+                        DualSimd::new(f32x4::splat(val[6]), get_grad(flat_idx + 6)),
+                        DualSimd::new(f32x4::splat(val[7]), get_grad(flat_idx + 7)),
+                        DualSimd::new(f32x4::splat(val[8]), get_grad(flat_idx + 8)),
+                    ];
+                }
+                ctx.sp_m3 += 1;
+            },
 
-            // --- Basic Operátorok Autodiff ---
             Instruction::Basic(b) => unsafe {
                 match b {
                     BasicOpCode::AddF => autodiff::eval_add_dual_f(&mut ctx.sp_f, &mut ctx.stack_f),
@@ -263,7 +313,6 @@ pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: u
                 }
             },
 
-            // --- Linalg Operátorok Autodiff ---
             Instruction::Linalg(l) => unsafe {
                 match l {
                     LinalgOpCode::MakeVec2 => autodiff::eval_make_dual_vec2(&mut ctx.sp_f, &ctx.stack_f, &mut ctx.sp_v2, &mut ctx.stack_v2),
@@ -307,7 +356,7 @@ pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: u
                     LinalgOpCode::TraceM3 => autodiff::eval_trace_dual_m3(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3),
                     LinalgOpCode::TransposeM3 => autodiff::eval_transpose_dual_m3(&mut ctx.sp_m3, &mut ctx.stack_m3),
                     
-                    _ => {} // Inverse műveletek deriválása nem támogatott
+                    _ => {}
                 }
             },
             _ => {}

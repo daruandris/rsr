@@ -10,7 +10,7 @@ pub enum SimplifyAction {
 
 pub trait Domain {
     type OpCode: Clone + Copy + std::fmt::Debug + PartialEq + Eq;
-    
+
     fn eval(op: Self::OpCode, ctx: &mut VmState);
     fn try_simplify(op: Self::OpCode, const_vals: &[Option<Scalar>], args_equal: bool) -> SimplifyAction;
     fn arity(op: Self::OpCode) -> usize;
@@ -55,6 +55,16 @@ macro_rules! compose_engine {
                         })+
                         _ => {}
                     }
+                }
+            }
+
+            #[inline(always)]
+            pub fn eval_single(op: Instruction, ctx: &mut $crate::eval::state::VmState) {
+                match op {
+                    $( Instruction::$domain_name(domain_op) => {
+                        <$domain_type as $crate::domain::Domain>::eval(domain_op, ctx);
+                    })+
+                    _ => {}
                 }
             }
 
