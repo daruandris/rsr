@@ -4,13 +4,15 @@ use rand_xoshiro::Xoshiro256PlusPlus;
 use std::collections::HashMap;
 use std::mem;
 
-use crate::engine::data::dataset::Dataset;
 use crate::Instruction;
+use crate::engine::data::dataset::Dataset;
 use crate::engine::eval::types::ValueType;
 use crate::engine::search::individual::Individual;
 use crate::engine::search::operators::crossover::crossover;
 use crate::engine::search::operators::generator::generate_random_ast;
-use crate::engine::search::operators::mutation::{constant_perturbation, point_mutation, subtree_mutation};
+use crate::engine::search::operators::mutation::{
+    constant_perturbation, point_mutation, subtree_mutation,
+};
 use crate::engine::search::operators::selection::{
     assign_rank_and_crowding_distance, tournament_selection_pareto,
 };

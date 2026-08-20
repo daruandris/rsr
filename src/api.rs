@@ -1,7 +1,7 @@
 use crate::engine::data::dataset::Dataset;
 use crate::engine::search::config::{Config, OpModule};
-use crate::engine::search::strategy::{StaticStrategy, Strategy};
 use crate::engine::search::engine::Engine;
+use crate::engine::search::strategy::{StaticStrategy, Strategy};
 
 pub struct SymbolicRegressor {
     pub config: Config,
@@ -39,13 +39,13 @@ impl SymbolicRegressor {
     pub fn fit(&self, dataset: &Dataset) -> FitResult {
         let strategy = StaticStrategy::new(self.config.clone());
         let allowed_ops = strategy.get_allowed_operators();
-        
+
         let mut engine = Engine::new(strategy, dataset.get_variable_registry(), allowed_ops);
         engine.run(dataset);
-        
+
         let best = engine.get_global_best();
         let clean_eq = crate::engine::ffi::symengine::simplify_symengine(&best.to_string());
-        
+
         FitResult {
             equation: clean_eq,
             mse: best.fitness,

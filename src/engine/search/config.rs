@@ -56,7 +56,7 @@ impl Config {
             mutation_max_depth: 4,
             mutation_cycles: 5,
             verbose: true,
-            allowed_modules: allowed_modules,
+            allowed_modules,
             custom_ops: vec![],
             excluded_ops: vec![],
         }
@@ -110,7 +110,7 @@ impl Config {
         self
     }
 
-     pub fn verbose(mut self, verbose: bool) -> Self {
+    pub fn verbose(mut self, verbose: bool) -> Self {
         self.verbose = verbose;
         self
     }

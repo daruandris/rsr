@@ -3,7 +3,9 @@ use crate::engine::eval::scalar::Scalar;
 use crate::engine::eval::types::ValueType;
 use crate::engine::expr::node::Node;
 use crate::engine::search::individual::Individual;
-use crate::engine::search::operators::generator::{generate_random_ast, random_constant, random_operator};
+use crate::engine::search::operators::generator::{
+    generate_random_ast, random_constant, random_operator,
+};
 use rand::RngExt;
 
 pub fn point_mutation(
@@ -44,14 +46,11 @@ pub fn point_mutation(
             }
             (false, None) => {}
         }
-    } else {
-        if let Some(new_op) = random_operator(target_type, allowed_ops, None, rng) {
-            if let Node::Operator(old_op) = target_node {
-                if new_op.expected_types() == old_op.expected_types() {
-                    ind.nodes[idx] = Node::Operator(new_op);
-                }
-            }
-        }
+    } else if let Some(new_op) = random_operator(target_type, allowed_ops, None, rng)
+        && let Node::Operator(old_op) = target_node
+        && new_op.expected_types() == old_op.expected_types()
+    {
+        ind.nodes[idx] = Node::Operator(new_op);
     }
     ind.invalidate();
 }
@@ -69,11 +68,11 @@ pub fn constant_perturbation(ind: &mut Individual, rng: &mut impl RngExt) {
         }
     }
 
-    if let Some(idx) = target_idx {
-        if let Node::Constant(ref mut val, _) = ind.nodes[idx] {
-            perturb_constant(val, rng);
-            ind.invalidate();
-        }
+    if let Some(idx) = target_idx
+        && let Node::Constant(ref mut val, _) = ind.nodes[idx]
+    {
+        perturb_constant(val, rng);
+        ind.invalidate();
     }
 }
 
@@ -90,23 +89,23 @@ fn perturb_constant(val: &mut Scalar, rng: &mut impl RngExt) {
             }
         }
         Scalar::Vec2(v) => {
-            for i in 0..2 {
-                v[i] += rng.random_range(-0.5..0.5);
+            for item in v {
+                *item += rng.random_range(-0.5..0.5);
             }
         }
         Scalar::Vec3(v) => {
-            for i in 0..3 {
-                v[i] += rng.random_range(-0.5..0.5);
+            for item in v {
+                *item += rng.random_range(-0.5..0.5);
             }
         }
         Scalar::Mat2(m) => {
-            for i in 0..4 {
-                m[i] += rng.random_range(-0.5..0.5);
+            for item in m {
+                *item += rng.random_range(-0.5..0.5);
             }
         }
         Scalar::Mat3(m) => {
-            for i in 0..9 {
-                m[i] += rng.random_range(-0.5..0.5);
+            for item in m {
+                *item += rng.random_range(-0.5..0.5);
             }
         }
         _ => {}

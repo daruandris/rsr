@@ -1,9 +1,9 @@
 mod common;
 
 use rand::RngExt;
-use rsr::prelude::*;
 use rsr::Instruction;
 use rsr::domains::basic::BasicOpCode;
+use rsr::prelude::*;
 use std::time::Instant;
 
 fn run_linalg_test(
@@ -155,21 +155,21 @@ fn linalg_4_transform_error() {
     for _ in 0..400 {
         let mut row = Vec::new();
         let mut m = [0.0; 9];
-        for i in 0..9 {
-            m[i] = rng.random_range(-5.0..5.0);
-            row.push(m[i]);
+        for item in &mut m {
+            *item = rng.random_range(-5.0..5.0);
+            row.push(*item);
         }
 
         let mut v = [0.0; 3];
-        for i in 0..3 {
-            v[i] = rng.random_range(-5.0..5.0);
-            row.push(v[i]);
+        for item in &mut v {
+            *item = rng.random_range(-5.0..5.0);
+            row.push(*item);
         }
 
         let mut u = [0.0; 3];
-        for i in 0..3 {
-            u[i] = rng.random_range(-5.0..5.0);
-            row.push(u[i]);
+        for item in &mut u {
+            *item = rng.random_range(-5.0..5.0);
+            row.push(*item);
         }
 
         dx.push(row);

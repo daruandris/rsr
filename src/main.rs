@@ -2,10 +2,10 @@ use rand::RngExt;
 use std::time::Instant;
 
 use rsr::api::SymbolicRegressor;
+use rsr::domains::basic::BasicOpCode;
 use rsr::engine::data::dataset::Dataset;
 use rsr::engine::data::schema::Schema;
 use rsr::prelude::*;
-use rsr::domains::basic::BasicOpCode;
 
 fn main() {
     let mut rng = rand::rng();
@@ -38,19 +38,19 @@ fn main() {
 
     let schema = Schema::new(vec![ValueType::Vec3, ValueType::Vec3, ValueType::Vec3])
         .with_normalization(false);
-    
+
     let dataset = Dataset::from_arrays(&dx, &dy, &schema);
     let config = Config::default(vec![OpModule::Basic, OpModule::Linalg]).without_ops(vec![
-            Instruction::Basic(BasicOpCode::SinF),
-            Instruction::Basic(BasicOpCode::CosF),
-            Instruction::Basic(BasicOpCode::ExpF),
-            Instruction::Basic(BasicOpCode::LnF),
-            Instruction::Basic(BasicOpCode::SqrtF),
-            Instruction::Basic(BasicOpCode::SqrF),
-        ]);
+        Instruction::Basic(BasicOpCode::SinF),
+        Instruction::Basic(BasicOpCode::CosF),
+        Instruction::Basic(BasicOpCode::ExpF),
+        Instruction::Basic(BasicOpCode::LnF),
+        Instruction::Basic(BasicOpCode::SqrtF),
+        Instruction::Basic(BasicOpCode::SqrF),
+    ]);
 
     println!("Starting the algorithm...");
-    
+
     let regressor = SymbolicRegressor { config };
 
     let start_time = Instant::now();

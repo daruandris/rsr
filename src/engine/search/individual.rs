@@ -64,11 +64,11 @@ impl Individual {
     pub fn set_constants(&mut self, new_constants: &[Scalar]) {
         let mut const_idx = 0;
         for node in self.nodes.iter_mut() {
-            if let Node::Constant(c, _) = node {
-                if const_idx < new_constants.len() {
-                    *c = new_constants[const_idx];
-                    const_idx += 1;
-                }
+            if let Node::Constant(c, _) = node
+                && const_idx < new_constants.len()
+            {
+                *c = new_constants[const_idx];
+                const_idx += 1;
             }
         }
         self.invalidate();

@@ -1,8 +1,8 @@
 use crate::engine::data::dataset::Dataset;
 use crate::engine::eval::evaluator;
 use crate::engine::eval::scalar::Scalar;
-use crate::engine::search::individual::Individual;
 use crate::engine::optimize::Parameterized;
+use crate::engine::search::individual::Individual;
 use rand::RngExt;
 
 const MAX_PARAMS: usize = 32;
@@ -23,7 +23,9 @@ pub fn run_cma_es(ind: &mut Individual, dataset: &Dataset, max_iterations: usize
     };
 
     let mut n = program.param_count().min(MAX_PARAMS);
-    if n == 0 { return; }
+    if n == 0 {
+        return;
+    }
 
     let mut mean = [0.0f32; MAX_PARAMS];
     program.flatten_params(&mut mean);
@@ -37,33 +39,33 @@ pub fn run_cma_es(ind: &mut Individual, dataset: &Dataset, max_iterations: usize
                 }
             }
             Scalar::Vec2(v) => {
-                for i in 0..2 {
+                for item in v.iter().take(2) {
                     if n < MAX_PARAMS {
-                        mean[n] = v[i];
+                        mean[n] = *item;
                         n += 1;
                     }
                 }
             }
             Scalar::Vec3(v) => {
-                for i in 0..3 {
+                for item in v.iter().take(3) {
                     if n < MAX_PARAMS {
-                        mean[n] = v[i];
+                        mean[n] = *item;
                         n += 1;
                     }
                 }
             }
             Scalar::Mat2(m) => {
-                for i in 0..4 {
+                for item in m.iter().take(4) {
                     if n < MAX_PARAMS {
-                        mean[n] = m[i];
+                        mean[n] = *item;
                         n += 1;
                     }
                 }
             }
             Scalar::Mat3(m) => {
-                for i in 0..9 {
+                for item in m.iter().take(9) {
                     if n < MAX_PARAMS {
-                        mean[n] = m[i];
+                        mean[n] = *item;
                         n += 1;
                     }
                 }
@@ -83,15 +85,15 @@ pub fn run_cma_es(ind: &mut Individual, dataset: &Dataset, max_iterations: usize
     let mut weights = [0.0f32; MU];
     let mut sum_weights = 0.0;
 
-    for i in 0..MU {
-        weights[i] = ((MU as f32 + 0.5).ln() - ((i + 1) as f32).ln()).max(0.0);
-        sum_weights += weights[i];
+    for (i, weight) in weights.iter_mut().enumerate().take(MU) {
+        *weight = ((MU as f32 + 0.5).ln() - ((i + 1) as f32).ln()).max(0.0);
+        sum_weights += *weight;
     }
 
     let mut mu_eff = 0.0;
-    for i in 0..MU {
-        weights[i] /= sum_weights;
-        mu_eff += weights[i] * weights[i];
+    for weight in weights.iter_mut().take(MU) {
+        *weight /= sum_weights;
+        mu_eff += *weight * *weight;
     }
     mu_eff = 1.0 / mu_eff;
 
@@ -102,8 +104,8 @@ pub fn run_cma_es(ind: &mut Individual, dataset: &Dataset, max_iterations: usize
     let initial_mse = evaluator::compute_mse(program, dataset);
 
     let mut initial_l1 = 0.0f32;
-    for j in 0..n {
-        initial_l1 += mean[j].abs();
+    for m in mean.iter().take(n) {
+        initial_l1 += m.abs();
     }
 
     let mut best_overall_point = mean;
@@ -181,11 +183,11 @@ pub fn run_cma_es(ind: &mut Individual, dataset: &Dataset, max_iterations: usize
 
     let mut const_idx = 0;
     for node in ind.nodes.iter_mut() {
-        if let crate::engine::expr::node::Node::Constant(val, _) = node {
-            if const_idx < program.constants.len() {
-                *val = program.constants[const_idx];
-                const_idx += 1;
-            }
+        if let crate::engine::expr::node::Node::Constant(val, _) = node
+            && const_idx < program.constants.len()
+        {
+            *val = program.constants[const_idx];
+            const_idx += 1;
         }
     }
 }

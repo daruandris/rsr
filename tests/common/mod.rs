@@ -109,9 +109,11 @@ pub fn update_history(category: &str, mut mse: f32, time_ms: u64) {
     };
 
     if needs_new_entry {
-        let mut new_entry = BenchmarkEntry::default();
-        new_entry.timestamp = now;
-        new_entry.commit_hash = env!("GIT_HASH").to_string();
+        let new_entry = BenchmarkEntry {
+            timestamp: now,
+            commit_hash: env!("GIT_HASH").to_string(),
+            ..Default::default()
+        };
         history.push(new_entry);
     }
 

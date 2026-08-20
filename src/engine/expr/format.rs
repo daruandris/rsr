@@ -23,5 +23,7 @@ pub fn format_ast(nodes: &[Node]) -> String {
             }
         }
     }
-    stack.pop().unwrap_or_else(|| "Empty expression".to_string())
+    stack
+        .pop()
+        .unwrap_or_else(|| "Empty expression".to_string())
 }

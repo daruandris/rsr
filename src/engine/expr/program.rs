@@ -81,11 +81,44 @@ impl Parameterized for Program {
         let mut ptr = 0;
         for c in &self.constants {
             match c {
-                Scalar::Float(f) => { if ptr < buffer.len() { buffer[ptr] = *f; ptr += 1; } }
-                Scalar::Vec2(v) => { for i in 0..2 { if ptr < buffer.len() { buffer[ptr] = v[i]; ptr += 1; } } }
-                Scalar::Vec3(v) => { for i in 0..3 { if ptr < buffer.len() { buffer[ptr] = v[i]; ptr += 1; } } }
-                Scalar::Mat2(m) => { for i in 0..4 { if ptr < buffer.len() { buffer[ptr] = m[i]; ptr += 1; } } }
-                Scalar::Mat3(m) => { for i in 0..9 { if ptr < buffer.len() { buffer[ptr] = m[i]; ptr += 1; } } }
+                Scalar::Float(f) => {
+                    if ptr < buffer.len() {
+                        buffer[ptr] = *f;
+                        ptr += 1;
+                    }
+                }
+                Scalar::Vec2(v) => {
+                    for i in 0..2 {
+                        if ptr < buffer.len() {
+                            buffer[ptr] = v[i];
+                            ptr += 1;
+                        }
+                    }
+                }
+                Scalar::Vec3(v) => {
+                    for i in 0..3 {
+                        if ptr < buffer.len() {
+                            buffer[ptr] = v[i];
+                            ptr += 1;
+                        }
+                    }
+                }
+                Scalar::Mat2(m) => {
+                    for i in 0..4 {
+                        if ptr < buffer.len() {
+                            buffer[ptr] = m[i];
+                            ptr += 1;
+                        }
+                    }
+                }
+                Scalar::Mat3(m) => {
+                    for i in 0..9 {
+                        if ptr < buffer.len() {
+                            buffer[ptr] = m[i];
+                            ptr += 1;
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -95,11 +128,44 @@ impl Parameterized for Program {
         let mut ptr = 0;
         for c in self.constants.iter_mut() {
             match c {
-                Scalar::Float(f) => { if ptr < buffer.len() { *f = buffer[ptr]; ptr += 1; } }
-                Scalar::Vec2(v) => { for i in 0..2 { if ptr < buffer.len() { v[i] = buffer[ptr]; ptr += 1; } } }
-                Scalar::Vec3(v) => { for i in 0..3 { if ptr < buffer.len() { v[i] = buffer[ptr]; ptr += 1; } } }
-                Scalar::Mat2(m) => { for i in 0..4 { if ptr < buffer.len() { m[i] = buffer[ptr]; ptr += 1; } } }
-                Scalar::Mat3(m) => { for i in 0..9 { if ptr < buffer.len() { m[i] = buffer[ptr]; ptr += 1; } } }
+                Scalar::Float(f) => {
+                    if ptr < buffer.len() {
+                        *f = buffer[ptr];
+                        ptr += 1;
+                    }
+                }
+                Scalar::Vec2(v) => {
+                    for i in 0..2 {
+                        if ptr < buffer.len() {
+                            v[i] = buffer[ptr];
+                            ptr += 1;
+                        }
+                    }
+                }
+                Scalar::Vec3(v) => {
+                    for i in 0..3 {
+                        if ptr < buffer.len() {
+                            v[i] = buffer[ptr];
+                            ptr += 1;
+                        }
+                    }
+                }
+                Scalar::Mat2(m) => {
+                    for i in 0..4 {
+                        if ptr < buffer.len() {
+                            m[i] = buffer[ptr];
+                            ptr += 1;
+                        }
+                    }
+                }
+                Scalar::Mat3(m) => {
+                    for i in 0..9 {
+                        if ptr < buffer.len() {
+                            m[i] = buffer[ptr];
+                            ptr += 1;
+                        }
+                    }
+                }
                 _ => {}
             }
         }

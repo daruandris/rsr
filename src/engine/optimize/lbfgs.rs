@@ -1,7 +1,7 @@
 use crate::engine::data::dataset::Dataset;
 use crate::engine::eval::evaluator;
-use crate::engine::search::individual::Individual;
 use crate::engine::optimize::Parameterized;
+use crate::engine::search::individual::Individual;
 
 const MAX_PARAMS: usize = 32;
 const M: usize = 6;
@@ -16,7 +16,9 @@ pub fn run_lbfgs(ind: &mut Individual, dataset: &Dataset, max_iterations: usize)
     };
 
     let n = program.param_count().min(MAX_PARAMS);
-    if n == 0 { return; }
+    if n == 0 {
+        return;
+    }
 
     let mut x = [0.0f32; MAX_PARAMS];
     program.flatten_params(&mut x);
@@ -35,16 +37,14 @@ pub fn run_lbfgs(ind: &mut Individual, dataset: &Dataset, max_iterations: usize)
 
     for _iter in 0..max_iterations {
         let mut grad_norm_sq: f32 = 0.0;
-        for i in 0..n {
-            grad_norm_sq += current_grad[i] * current_grad[i];
+        for item in current_grad.iter().take(n) {
+            grad_norm_sq += item * item;
         }
         if grad_norm_sq.sqrt() < 1e-5 {
             break;
         }
 
-        for i in 0..n {
-            q[i] = current_grad[i];
-        }
+        q[..n].copy_from_slice(&current_grad[..n]);
 
         let mut curr_idx = head;
         for _ in 0..history_size {
@@ -73,8 +73,8 @@ pub fn run_lbfgs(ind: &mut Individual, dataset: &Dataset, max_iterations: usize)
             }
         }
 
-        for j in 0..n {
-            q[j] *= gamma;
+        for q_val in q.iter_mut().take(n) {
+            *q_val *= gamma;
         }
 
         curr_idx = if history_size < M { 0 } else { head };
@@ -137,10 +137,8 @@ pub fn run_lbfgs(ind: &mut Individual, dataset: &Dataset, max_iterations: usize)
         }
 
         if dot_sy > 1e-10 {
-            for j in 0..n {
-                s[head][j] = s_new[j];
-                y[head][j] = y_new[j];
-            }
+            s[head][..n].copy_from_slice(&s_new[..n]);
+            y[head][..n].copy_from_slice(&y_new[..n]);
             rho[head] = 1.0 / dot_sy;
             head = (head + 1) % M;
             if history_size < M {
@@ -148,9 +146,7 @@ pub fn run_lbfgs(ind: &mut Individual, dataset: &Dataset, max_iterations: usize)
             }
         }
 
-        for j in 0..n {
-            x[j] = next_x[j];
-        }
+        x[..n].copy_from_slice(&next_x[..n]);
         current_mse = next_mse;
         current_grad = next_grad;
     }
@@ -160,11 +156,11 @@ pub fn run_lbfgs(ind: &mut Individual, dataset: &Dataset, max_iterations: usize)
 
     let mut const_idx = 0;
     for node in ind.nodes.iter_mut() {
-        if let crate::engine::expr::node::Node::Constant(val, _) = node {
-            if const_idx < program.constants.len() {
-                *val = program.constants[const_idx];
-                const_idx += 1;
-            }
+        if let crate::engine::expr::node::Node::Constant(val, _) = node
+            && const_idx < program.constants.len()
+        {
+            *val = program.constants[const_idx];
+            const_idx += 1;
         }
     }
 }

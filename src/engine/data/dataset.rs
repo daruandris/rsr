@@ -1,10 +1,10 @@
-use crate::engine::eval::types::ValueType;
 use crate::engine::data::schema::Schema;
-use wide::f32x4;
+use crate::engine::eval::types::ValueType;
 use std::error::Error;
-use std::path::Path;
 use std::fs::File;
 use std::io::BufReader;
+use std::path::Path;
+use wide::f32x4;
 
 pub struct Dataset {
     pub feature_flat: Vec<f32x4>,
@@ -203,13 +203,15 @@ impl Dataset {
     }
 
     pub fn from_arrays(data_x: &[Vec<f32>], data_y: &[f32], schema: &Schema) -> Self {
-        Self::new(data_x, data_y, schema.feature_types.clone(), schema.normalize)
+        Self::new(
+            data_x,
+            data_y,
+            schema.feature_types.clone(),
+            schema.normalize,
+        )
     }
 
-    pub fn from_json<P: AsRef<Path>>(
-        path: P,
-        schema: &Schema,
-    ) -> Result<Self, Box<dyn Error>> {
+    pub fn from_json<P: AsRef<Path>>(path: P, schema: &Schema) -> Result<Self, Box<dyn Error>> {
         #[derive(serde::Deserialize)]
         struct Record {
             x: Vec<f32>,
@@ -228,23 +230,31 @@ impl Dataset {
             data_y.push(rec.y);
         }
 
-        Ok(Self::new(&data_x, &data_y, schema.feature_types.clone(), schema.normalize))
+        Ok(Self::new(
+            &data_x,
+            &data_y,
+            schema.feature_types.clone(),
+            schema.normalize,
+        ))
     }
 
-    pub fn from_csv<P: AsRef<Path>>(
-        path: P,
-        schema: &Schema,
-    ) -> Result<Self, Box<dyn Error>> {
-        let mut rdr = csv::ReaderBuilder::new().has_headers(true).from_path(path)?;
-        
-        let expected_floats: usize = schema.feature_types.iter().map(|t| match t {
-            ValueType::Float => 1,
-            ValueType::Vec2 => 2,
-            ValueType::Vec3 => 3,
-            ValueType::Mat2 => 4,
-            ValueType::Mat3 => 9,
-            _ => 1,
-        }).sum();
+    pub fn from_csv<P: AsRef<Path>>(path: P, schema: &Schema) -> Result<Self, Box<dyn Error>> {
+        let mut rdr = csv::ReaderBuilder::new()
+            .has_headers(true)
+            .from_path(path)?;
+
+        let expected_floats: usize = schema
+            .feature_types
+            .iter()
+            .map(|t| match t {
+                ValueType::Float => 1,
+                ValueType::Vec2 => 2,
+                ValueType::Vec3 => 3,
+                ValueType::Mat2 => 4,
+                ValueType::Mat3 => 9,
+                _ => 1,
+            })
+            .sum();
 
         let mut data_x = Vec::new();
         let mut data_y = Vec::new();
@@ -255,9 +265,12 @@ impl Dataset {
 
             if record.len() < expected_floats + 1 {
                 return Err(format!(
-                    "Error at line {}. : not enough column! Expected: {}, actual: {}", 
-                    line_idx + 1, expected_floats + 1, record.len()
-                ).into());
+                    "Error at line {}. : not enough column! Expected: {}, actual: {}",
+                    line_idx + 1,
+                    expected_floats + 1,
+                    record.len()
+                )
+                .into());
             }
 
             let y_val: f32 = record.get(target_idx).unwrap().parse()?;
@@ -277,6 +290,11 @@ impl Dataset {
             data_y.push(y_val);
         }
 
-        Ok(Self::new(&data_x, &data_y, schema.feature_types.clone(), schema.normalize))
+        Ok(Self::new(
+            &data_x,
+            &data_y,
+            schema.feature_types.clone(),
+            schema.normalize,
+        ))
     }
 }

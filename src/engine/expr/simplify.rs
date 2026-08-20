@@ -1,8 +1,8 @@
 use super::node::Node;
-use crate::domains::basic::BasicOpCode::{LnF, ExpF, SqrtF, SqrF};
 use crate::Instruction::Basic;
-use crate::engine::eval::scalar::Scalar;
+use crate::domains::basic::BasicOpCode::{ExpF, LnF, SqrF, SqrtF};
 use crate::engine::domain::SimplifyAction;
+use crate::engine::eval::scalar::Scalar;
 
 #[derive(Clone, Copy, Debug)]
 struct ExprInfo {
@@ -99,22 +99,23 @@ pub fn simplify_ast(nodes: &[Node]) -> Vec<Node> {
                     }
                     SimplifyAction::None => {
                         // Speciális inverz függvények kiejtése (pl. ln(exp(x)) == x)
-                        if arity == 1 && output.len() > args[0].start_idx {
-                            if let Node::Operator(child_op) = output[output.len() - 1] {
-                                match (op, child_op) {
-                                    (Basic(LnF), Basic(ExpF))
-                                    | (Basic(ExpF), Basic(LnF))
-                                    | (Basic(SqrtF), Basic(SqrF))
-                                    | (Basic(SqrF), Basic(SqrtF)) => {
-                                        output.pop(); // Levesszük a belső operátort
-                                        stack.push(ExprInfo {
-                                            start_idx: args[0].start_idx,
-                                            const_val: None,
-                                        });
-                                        continue;
-                                    }
-                                    _ => {}
+                        if arity == 1
+                            && output.len() > args[0].start_idx
+                            && let Node::Operator(child_op) = output[output.len() - 1]
+                        {
+                            match (op, child_op) {
+                                (Basic(LnF), Basic(ExpF))
+                                | (Basic(ExpF), Basic(LnF))
+                                | (Basic(SqrtF), Basic(SqrF))
+                                | (Basic(SqrF), Basic(SqrtF)) => {
+                                    output.pop(); // Levesszük a belső operátort
+                                    stack.push(ExprInfo {
+                                        start_idx: args[0].start_idx,
+                                        const_val: None,
+                                    });
+                                    continue;
                                 }
+                                _ => {}
                             }
                         }
                         output.push(node);

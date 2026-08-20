@@ -1,8 +1,8 @@
 use rayon::prelude::*;
 use std::collections::HashMap;
 
-use crate::engine::data::dataset::Dataset;
 use crate::Instruction;
+use crate::engine::data::dataset::Dataset;
 use crate::engine::eval::types::ValueType;
 use crate::engine::search::individual::Individual;
 use crate::engine::search::island::Island;
@@ -15,7 +15,11 @@ pub struct Engine<S: Strategy> {
 }
 
 impl<S: Strategy> Engine<S> {
-    pub fn new(strategy: S, variable_registry: Vec<(ValueType, u8)>, allowed_ops: Vec<Instruction>) -> Self {
+    pub fn new(
+        strategy: S,
+        variable_registry: Vec<(ValueType, u8)>,
+        allowed_ops: Vec<Instruction>,
+    ) -> Self {
         let num_islands = strategy.num_islands();
         let mut islands = Vec::with_capacity(num_islands);
 

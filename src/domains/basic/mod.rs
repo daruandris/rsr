@@ -1,14 +1,22 @@
 use crate::engine::domain::{Domain, SimplifyAction};
-use crate::engine::eval::state::{VmState, DualVmState};
-use crate::engine::eval::scalar::Scalar;
 use crate::engine::eval::autodiff;
+use crate::engine::eval::scalar::Scalar;
+use crate::engine::eval::state::{DualVmState, VmState};
 
 mod eval;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum BasicOpCode {
-    AddF, SubF, MulF, DivF,
-    SinF, CosF, ExpF, SqrF, SqrtF, LnF,
+    AddF,
+    SubF,
+    MulF,
+    DivF,
+    SinF,
+    CosF,
+    ExpF,
+    SqrF,
+    SqrtF,
+    LnF,
 }
 
 pub struct BasicDomain;
@@ -34,64 +42,89 @@ impl Domain for BasicDomain {
         }
     }
 
-    fn try_simplify(op: Self::OpCode, const_vals: &[Option<Scalar>], args_equal: bool) -> SimplifyAction {
+    fn try_simplify(
+        op: Self::OpCode,
+        const_vals: &[Option<Scalar>],
+        args_equal: bool,
+    ) -> SimplifyAction {
         let all_const = const_vals.iter().all(|c| c.is_some());
-        if all_const && !const_vals.is_empty() {
-            if let Scalar::Float(a) = const_vals[0].unwrap() {
-                if const_vals.len() == 1 {
-                    let res = match op {
-                        BasicOpCode::SinF => a.sin(),
-                        BasicOpCode::CosF => a.cos(),
-                        BasicOpCode::ExpF => a.exp(),
-                        BasicOpCode::SqrF => a * a,
-                        BasicOpCode::SqrtF => a.sqrt(),
-                        BasicOpCode::LnF => a.ln(),
-                        _ => f32::NAN,
-                    };
-                    if res.is_finite() {
-                        return SimplifyAction::ReplaceWithConstant(Scalar::Float(res));
-                    }
-                } else if const_vals.len() == 2 {
-                    if let Scalar::Float(b) = const_vals[1].unwrap() {
-                        let res = match op {
-                            BasicOpCode::AddF => a + b,
-                            BasicOpCode::SubF => a - b,
-                            BasicOpCode::MulF => a * b,
-                            BasicOpCode::DivF => a / b,
-                            _ => f32::NAN,
-                        };
-                        if res.is_finite() {
-                            return SimplifyAction::ReplaceWithConstant(Scalar::Float(res));
-                        }
-                    }
+        if all_const
+            && !const_vals.is_empty()
+            && let Scalar::Float(a) = const_vals[0].unwrap()
+        {
+            if const_vals.len() == 1 {
+                let res = match op {
+                    BasicOpCode::SinF => a.sin(),
+                    BasicOpCode::CosF => a.cos(),
+                    BasicOpCode::ExpF => a.exp(),
+                    BasicOpCode::SqrF => a * a,
+                    BasicOpCode::SqrtF => a.sqrt(),
+                    BasicOpCode::LnF => a.ln(),
+                    _ => f32::NAN,
+                };
+                if res.is_finite() {
+                    return SimplifyAction::ReplaceWithConstant(Scalar::Float(res));
+                }
+            } else if const_vals.len() == 2
+                && let Scalar::Float(b) = const_vals[1].unwrap()
+            {
+                let res = match op {
+                    BasicOpCode::AddF => a + b,
+                    BasicOpCode::SubF => a - b,
+                    BasicOpCode::MulF => a * b,
+                    BasicOpCode::DivF => a / b,
+                    _ => f32::NAN,
+                };
+                if res.is_finite() {
+                    return SimplifyAction::ReplaceWithConstant(Scalar::Float(res));
                 }
             }
         }
 
         if const_vals.len() == 2 {
-            let a_is_zero = const_vals[0].as_ref().map_or(false, |c| c.is_zero());
-            let b_is_zero = const_vals[1].as_ref().map_or(false, |c| c.is_zero());
-            let a_is_one = const_vals[0].as_ref().map_or(false, |c| c.is_one());
-            let b_is_one = const_vals[1].as_ref().map_or(false, |c| c.is_one());
+            let a_is_zero = const_vals[0].as_ref().is_some_and(|c| c.is_zero());
+            let b_is_zero = const_vals[1].as_ref().is_some_and(|c| c.is_zero());
+            let a_is_one = const_vals[0].as_ref().is_some_and(|c| c.is_one());
+            let b_is_one = const_vals[1].as_ref().is_some_and(|c| c.is_one());
 
             match op {
                 BasicOpCode::AddF => {
-                    if b_is_zero { return SimplifyAction::KeepArg(0); }
-                    if a_is_zero { return SimplifyAction::KeepArg(1); }
+                    if b_is_zero {
+                        return SimplifyAction::KeepArg(0);
+                    }
+                    if a_is_zero {
+                        return SimplifyAction::KeepArg(1);
+                    }
                 }
                 BasicOpCode::MulF => {
-                    if b_is_one { return SimplifyAction::KeepArg(0); }
-                    if a_is_one { return SimplifyAction::KeepArg(1); }
-                    if a_is_zero || b_is_zero { return SimplifyAction::ReplaceWithConstant(Scalar::Float(0.0)); }
+                    if b_is_one {
+                        return SimplifyAction::KeepArg(0);
+                    }
+                    if a_is_one {
+                        return SimplifyAction::KeepArg(1);
+                    }
+                    if a_is_zero || b_is_zero {
+                        return SimplifyAction::ReplaceWithConstant(Scalar::Float(0.0));
+                    }
                 }
                 BasicOpCode::SubF => {
-                    if b_is_zero { return SimplifyAction::KeepArg(0); }
-                    if args_equal { return SimplifyAction::ReplaceWithConstant(Scalar::Float(0.0)); }
+                    if b_is_zero {
+                        return SimplifyAction::KeepArg(0);
+                    }
+                    if args_equal {
+                        return SimplifyAction::ReplaceWithConstant(Scalar::Float(0.0));
+                    }
                 }
                 BasicOpCode::DivF => {
-                    if b_is_one { return SimplifyAction::KeepArg(0); }
-                    if a_is_zero && !b_is_zero { return SimplifyAction::ReplaceWithConstant(Scalar::Float(0.0)); }
-                    if args_equal { return SimplifyAction::ReplaceWithConstant(Scalar::Float(1.0)); }
+                    if b_is_one {
+                        return SimplifyAction::KeepArg(0);
+                    }
+                    if a_is_zero && !b_is_zero {
+                        return SimplifyAction::ReplaceWithConstant(Scalar::Float(0.0));
+                    }
+                    if args_equal {
+                        return SimplifyAction::ReplaceWithConstant(Scalar::Float(1.0));
+                    }
                 }
                 _ => {}
             }
@@ -112,7 +145,10 @@ impl Domain for BasicDomain {
 
     fn expected_types(op: Self::OpCode) -> &'static [crate::engine::eval::types::ValueType] {
         match op {
-            BasicOpCode::AddF | BasicOpCode::SubF | BasicOpCode::MulF | BasicOpCode::DivF => &[crate::engine::eval::types::ValueType::Float, crate::engine::eval::types::ValueType::Float],
+            BasicOpCode::AddF | BasicOpCode::SubF | BasicOpCode::MulF | BasicOpCode::DivF => &[
+                crate::engine::eval::types::ValueType::Float,
+                crate::engine::eval::types::ValueType::Float,
+            ],
             _ => &[crate::engine::eval::types::ValueType::Float],
         }
     }
@@ -128,8 +164,18 @@ impl Domain for BasicDomain {
 
     fn is_forbidden_child(parent: Self::OpCode, child: Self::OpCode) -> bool {
         match parent {
-            BasicOpCode::SinF | BasicOpCode::CosF => matches!(child, BasicOpCode::SinF | BasicOpCode::CosF | BasicOpCode::ExpF),
-            BasicOpCode::ExpF => matches!(child, BasicOpCode::ExpF | BasicOpCode::SinF | BasicOpCode::CosF | BasicOpCode::SqrF | BasicOpCode::LnF),
+            BasicOpCode::SinF | BasicOpCode::CosF => matches!(
+                child,
+                BasicOpCode::SinF | BasicOpCode::CosF | BasicOpCode::ExpF
+            ),
+            BasicOpCode::ExpF => matches!(
+                child,
+                BasicOpCode::ExpF
+                    | BasicOpCode::SinF
+                    | BasicOpCode::CosF
+                    | BasicOpCode::SqrF
+                    | BasicOpCode::LnF
+            ),
             BasicOpCode::SqrtF => matches!(child, BasicOpCode::SqrtF | BasicOpCode::SqrF),
             BasicOpCode::SqrF => matches!(child, BasicOpCode::SqrF | BasicOpCode::SqrtF),
             BasicOpCode::LnF => matches!(child, BasicOpCode::LnF | BasicOpCode::ExpF),
@@ -137,8 +183,12 @@ impl Domain for BasicDomain {
         }
     }
 
-    fn is_differentiable(_op: Self::OpCode) -> bool { true }
-    fn requires_cmaes(_op: Self::OpCode) -> bool { false }
+    fn is_differentiable(_op: Self::OpCode) -> bool {
+        true
+    }
+    fn requires_cmaes(_op: Self::OpCode) -> bool {
+        false
+    }
 
     #[inline(always)]
     fn eval_dual(op: Self::OpCode, ctx: &mut DualVmState) {

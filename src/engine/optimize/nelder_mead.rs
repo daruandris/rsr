@@ -20,12 +20,12 @@ pub fn run_nelder_mead(ind: &mut Individual, dataset: &Dataset, max_iterations: 
     let mut n = 0;
 
     for (i, c) in program.constants.iter().enumerate() {
-        if let Scalar::Float(f) = c {
-            if n < 32 {
-                start_consts[n] = *f;
-                opt_indices[n] = i;
-                n += 1;
-            }
+        if let Scalar::Float(f) = c
+            && n < 32
+        {
+            start_consts[n] = *f;
+            opt_indices[n] = i;
+            n += 1;
         }
     }
 
@@ -44,10 +44,9 @@ pub fn run_nelder_mead(ind: &mut Individual, dataset: &Dataset, max_iterations: 
             prog.constants[opt_indices[j]] = Scalar::Float(vals[j]);
         }
         let mse = evaluator::compute_mse(prog, dataset);
-        let mut l1 = 0.0;
-        for j in 0..n {
-            l1 += vals[j].abs();
-        }
+
+        let l1: f32 = vals[..n].iter().map(|v| v.abs()).sum();
+
         (mse + L1_REG_LAMBDA * l1, mse)
     };
 
@@ -80,13 +79,14 @@ pub fn run_nelder_mead(ind: &mut Individual, dataset: &Dataset, max_iterations: 
         }
 
         centroid.fill(0.0);
-        for i in 0..n {
-            for j in 0..n {
-                centroid[j] += simplex[i].2[j];
+        for item in simplex.iter().take(n) {
+            for (j, c) in centroid.iter_mut().enumerate().take(n) {
+                *c += item.2[j];
             }
         }
-        for j in 0..n {
-            centroid[j] /= n as f32;
+
+        for c in centroid.iter_mut().take(n) {
+            *c /= n as f32;
         }
 
         let worst_point = simplex[n].2;
@@ -136,32 +136,32 @@ pub fn run_nelder_mead(ind: &mut Individual, dataset: &Dataset, max_iterations: 
         }
 
         let best_point = simplex[0].2;
-        for i in 1..=n {
-            for j in 0..n {
-                simplex[i].2[j] = best_point[j] + SIGMA * (simplex[i].2[j] - best_point[j]);
+        for item in simplex.iter_mut().take(n + 1).skip(1) {
+            for (j, bp) in best_point.iter().enumerate().take(n) {
+                item.2[j] = bp + SIGMA * (item.2[j] - bp);
             }
-            let (fit, mse) = evaluate(program, &simplex[i].2);
-            simplex[i].0 = fit;
-            simplex[i].1 = mse;
+            let (fit, mse) = evaluate(program, &item.2);
+            item.0 = fit;
+            item.1 = mse;
         }
     }
 
     simplex[0..=n]
         .sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 
-    for j in 0..n {
-        program.constants[opt_indices[j]] = Scalar::Float(simplex[0].2[j]);
+    for (j, &idx) in opt_indices.iter().enumerate().take(n) {
+        program.constants[idx] = Scalar::Float(simplex[0].2[j]);
     }
 
     let best_consts = &program.constants;
     let mut const_idx = 0;
 
     for node in ind.nodes.iter_mut() {
-        if let crate::engine::expr::node::Node::Constant(val, _) = node {
-            if const_idx < best_consts.len() {
-                *val = best_consts[const_idx];
-                const_idx += 1;
-            }
+        if let crate::engine::expr::node::Node::Constant(val, _) = node
+            && const_idx < best_consts.len()
+        {
+            *val = best_consts[const_idx];
+            const_idx += 1;
         }
     }
     ind.fitness = simplex[0].1;

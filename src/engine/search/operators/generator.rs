@@ -60,13 +60,27 @@ fn build_ast_recursive(
             (false, Some(c)) => nodes.push(Node::Constant(c, target_type)),
             (false, None) => {
                 add_operator_node(
-                    nodes, target_type, current_depth, max_depth, rng, variables, allowed_ops, parent_op,
+                    nodes,
+                    target_type,
+                    current_depth,
+                    max_depth,
+                    rng,
+                    variables,
+                    allowed_ops,
+                    parent_op,
                 );
             }
         }
     } else {
         add_operator_node(
-            nodes, target_type, current_depth, max_depth, rng, variables, allowed_ops, parent_op,
+            nodes,
+            target_type,
+            current_depth,
+            max_depth,
+            rng,
+            variables,
+            allowed_ops,
+            parent_op,
         );
     }
 }
@@ -85,30 +99,43 @@ fn add_operator_node(
         let expected_children_types = chosen_op.expected_types();
         for &child_type in expected_children_types {
             build_ast_recursive(
-                nodes, child_type, current_depth + 1, max_depth, rng, variables, allowed_ops, Some(chosen_op),
+                nodes,
+                child_type,
+                current_depth + 1,
+                max_depth,
+                rng,
+                variables,
+                allowed_ops,
+                Some(chosen_op),
             );
         }
         nodes.push(Node::Operator(chosen_op));
     } else {
-        // PÁNIK HELYETT: Ha elfogytak a megengedett operátorok, visszazuhanunk egy terminálisra!
         let valid_vars: Vec<_> = variables.iter().filter(|v| v.0 == target_type).collect();
         let maybe_const = random_constant(target_type, rng);
-        
-        if !valid_vars.is_empty() && maybe_const.is_some() {
-            if rng.random::<bool>() {
+
+        match (!valid_vars.is_empty(), maybe_const) {
+            (true, Some(c)) => {
+                if rng.random::<bool>() {
+                    let chosen = valid_vars[rng.random_range(0..valid_vars.len())];
+                    nodes.push(Node::Variable(chosen.1, target_type));
+                } else {
+                    nodes.push(Node::Constant(c, target_type));
+                }
+            }
+            (true, None) => {
                 let chosen = valid_vars[rng.random_range(0..valid_vars.len())];
                 nodes.push(Node::Variable(chosen.1, target_type));
-            } else {
-                nodes.push(Node::Constant(maybe_const.unwrap(), target_type));
             }
-        } else if !valid_vars.is_empty() {
-            let chosen = valid_vars[rng.random_range(0..valid_vars.len())];
-            nodes.push(Node::Variable(chosen.1, target_type));
-        } else if let Some(c) = maybe_const {
-            nodes.push(Node::Constant(c, target_type));
-        } else {
-            // Ha ide eljutunk, az azt jelenti, hogy sem operátor, sem konstans, sem változó nem létezik a kért típusra.
-            panic!("Kritikus hiba: Nincs operátor, változó vagy konstans a {:?} típushoz!", target_type);
+            (false, Some(c)) => {
+                nodes.push(Node::Constant(c, target_type));
+            }
+            (false, None) => {
+                panic!(
+                    "Error: No operator, variable or constant for {:?} type!",
+                    target_type
+                );
+            }
         }
     }
 }
@@ -123,10 +150,10 @@ pub fn random_operator(
         if op.return_type() != target_type {
             return false;
         }
-        if let Some(p) = parent_op {
-            if p.is_forbidden_child(op) {
-                return false;
-            }
+        if let Some(p) = parent_op
+            && p.is_forbidden_child(op)
+        {
+            return false;
         }
         true
     };
@@ -143,13 +170,31 @@ pub fn random_operator(
 pub fn random_constant(target_type: ValueType, rng: &mut impl RngExt) -> Option<Scalar> {
     match target_type {
         ValueType::Float => Some(Scalar::Float(rng.random_range(-5.0..5.0))),
-        ValueType::Vec2 => Some(Scalar::Vec2([rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0)])),
-        ValueType::Vec3 => Some(Scalar::Vec3([rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0)])),
-        ValueType::Mat2 => Some(Scalar::Mat2([rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0)])),
+        ValueType::Vec2 => Some(Scalar::Vec2([
+            rng.random_range(-5.0..5.0),
+            rng.random_range(-5.0..5.0),
+        ])),
+        ValueType::Vec3 => Some(Scalar::Vec3([
+            rng.random_range(-5.0..5.0),
+            rng.random_range(-5.0..5.0),
+            rng.random_range(-5.0..5.0),
+        ])),
+        ValueType::Mat2 => Some(Scalar::Mat2([
+            rng.random_range(-5.0..5.0),
+            rng.random_range(-5.0..5.0),
+            rng.random_range(-5.0..5.0),
+            rng.random_range(-5.0..5.0),
+        ])),
         ValueType::Mat3 => Some(Scalar::Mat3([
-            rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0),
-            rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0),
-            rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0), rng.random_range(-5.0..5.0),
+            rng.random_range(-5.0..5.0),
+            rng.random_range(-5.0..5.0),
+            rng.random_range(-5.0..5.0),
+            rng.random_range(-5.0..5.0),
+            rng.random_range(-5.0..5.0),
+            rng.random_range(-5.0..5.0),
+            rng.random_range(-5.0..5.0),
+            rng.random_range(-5.0..5.0),
+            rng.random_range(-5.0..5.0),
         ])),
         ValueType::Bool => Some(Scalar::Bool(rng.random::<bool>())),
         ValueType::Int => Some(Scalar::Int(rng.random_range(-10..10))),

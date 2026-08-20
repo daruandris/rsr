@@ -1,5 +1,5 @@
-pub mod engine;
 pub mod domains;
+pub mod engine;
 
 pub mod api;
 pub mod prelude;
@@ -10,5 +10,5 @@ crate::compose_engine!(
     Linalg => crate::domains::linalg::LinalgDomain
 );
 
-pub use prelude::*;
 pub use api::*;
+pub use prelude::*;

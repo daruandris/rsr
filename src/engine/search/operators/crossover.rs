@@ -55,7 +55,7 @@ fn select_node_index(
     let mut all_valid_indices: Vec<usize> = Vec::new();
 
     for (i, node) in ind.nodes.iter().enumerate() {
-        let is_type_match = required_type.map_or(true, |t| node.get_type() == t);
+        let is_type_match = required_type.is_none_or(|t| node.get_type() == t);
         if is_type_match {
             all_valid_indices.push(i);
             if node.arity() > 0 {

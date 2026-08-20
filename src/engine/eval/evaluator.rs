@@ -1,12 +1,12 @@
-use wide::f32x4;
 use crate::Instruction;
-use crate::engine::data::dataset::Dataset;
-use crate::engine::expr::program::Program;
-use crate::engine::eval::state::{VmState, DualVmState};
-use crate::engine::eval::scalar::Scalar;
-use crate::engine::eval::autodiff::{DualSimd};
-use crate::engine::optimize::Parameterized;
 use crate::SymbolicEngine;
+use crate::engine::data::dataset::Dataset;
+use crate::engine::eval::autodiff::DualSimd;
+use crate::engine::eval::scalar::Scalar;
+use crate::engine::eval::state::{DualVmState, VmState};
+use crate::engine::expr::program::Program;
+use crate::engine::optimize::Parameterized;
+use wide::f32x4;
 
 #[inline(always)]
 pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
@@ -27,39 +27,53 @@ pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
             },
             Instruction::LoadVarV2(idx) => unsafe {
                 let i = *idx as usize;
-                *ctx.stack_v2.get_unchecked_mut(ctx.sp_v2) = [*features.get_unchecked(i), *features.get_unchecked(i + 1)];
+                *ctx.stack_v2.get_unchecked_mut(ctx.sp_v2) =
+                    [*features.get_unchecked(i), *features.get_unchecked(i + 1)];
                 ctx.sp_v2 += 1;
             },
             Instruction::LoadConstV2(idx) => unsafe {
                 if let Scalar::Vec2(val) = constants.get_unchecked(*idx as usize) {
-                    *ctx.stack_v2.get_unchecked_mut(ctx.sp_v2) = [f32x4::splat(val[0]), f32x4::splat(val[1])];
+                    *ctx.stack_v2.get_unchecked_mut(ctx.sp_v2) =
+                        [f32x4::splat(val[0]), f32x4::splat(val[1])];
                 }
                 ctx.sp_v2 += 1;
             },
             Instruction::LoadVarV3(idx) => unsafe {
                 let i = *idx as usize;
-                *ctx.stack_v3.get_unchecked_mut(ctx.sp_v3) = [*features.get_unchecked(i), *features.get_unchecked(i + 1), *features.get_unchecked(i + 2)];
+                *ctx.stack_v3.get_unchecked_mut(ctx.sp_v3) = [
+                    *features.get_unchecked(i),
+                    *features.get_unchecked(i + 1),
+                    *features.get_unchecked(i + 2),
+                ];
                 ctx.sp_v3 += 1;
             },
             Instruction::LoadConstV3(idx) => unsafe {
                 if let Scalar::Vec3(val) = constants.get_unchecked(*idx as usize) {
-                    *ctx.stack_v3.get_unchecked_mut(ctx.sp_v3) = [f32x4::splat(val[0]), f32x4::splat(val[1]), f32x4::splat(val[2])];
+                    *ctx.stack_v3.get_unchecked_mut(ctx.sp_v3) = [
+                        f32x4::splat(val[0]),
+                        f32x4::splat(val[1]),
+                        f32x4::splat(val[2]),
+                    ];
                 }
                 ctx.sp_v3 += 1;
             },
             Instruction::LoadVarM2(idx) => unsafe {
                 let i = *idx as usize;
                 *ctx.stack_m2.get_unchecked_mut(ctx.sp_m2) = [
-                    *features.get_unchecked(i), *features.get_unchecked(i + 1),
-                    *features.get_unchecked(i + 2), *features.get_unchecked(i + 3),
+                    *features.get_unchecked(i),
+                    *features.get_unchecked(i + 1),
+                    *features.get_unchecked(i + 2),
+                    *features.get_unchecked(i + 3),
                 ];
                 ctx.sp_m2 += 1;
             },
             Instruction::LoadConstM2(idx) => unsafe {
                 if let Scalar::Mat2(val) = constants.get_unchecked(*idx as usize) {
                     *ctx.stack_m2.get_unchecked_mut(ctx.sp_m2) = [
-                        f32x4::splat(val[0]), f32x4::splat(val[1]),
-                        f32x4::splat(val[2]), f32x4::splat(val[3]),
+                        f32x4::splat(val[0]),
+                        f32x4::splat(val[1]),
+                        f32x4::splat(val[2]),
+                        f32x4::splat(val[3]),
                     ];
                 }
                 ctx.sp_m2 += 1;
@@ -67,23 +81,35 @@ pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
             Instruction::LoadVarM3(idx) => unsafe {
                 let i = *idx as usize;
                 *ctx.stack_m3.get_unchecked_mut(ctx.sp_m3) = [
-                    *features.get_unchecked(i), *features.get_unchecked(i + 1), *features.get_unchecked(i + 2),
-                    *features.get_unchecked(i + 3), *features.get_unchecked(i + 4), *features.get_unchecked(i + 5),
-                    *features.get_unchecked(i + 6), *features.get_unchecked(i + 7), *features.get_unchecked(i + 8),
+                    *features.get_unchecked(i),
+                    *features.get_unchecked(i + 1),
+                    *features.get_unchecked(i + 2),
+                    *features.get_unchecked(i + 3),
+                    *features.get_unchecked(i + 4),
+                    *features.get_unchecked(i + 5),
+                    *features.get_unchecked(i + 6),
+                    *features.get_unchecked(i + 7),
+                    *features.get_unchecked(i + 8),
                 ];
                 ctx.sp_m3 += 1;
             },
             Instruction::LoadConstM3(idx) => unsafe {
                 if let Scalar::Mat3(val) = constants.get_unchecked(*idx as usize) {
                     *ctx.stack_m3.get_unchecked_mut(ctx.sp_m3) = [
-                        f32x4::splat(val[0]), f32x4::splat(val[1]), f32x4::splat(val[2]),
-                        f32x4::splat(val[3]), f32x4::splat(val[4]), f32x4::splat(val[5]),
-                        f32x4::splat(val[6]), f32x4::splat(val[7]), f32x4::splat(val[8]),
+                        f32x4::splat(val[0]),
+                        f32x4::splat(val[1]),
+                        f32x4::splat(val[2]),
+                        f32x4::splat(val[3]),
+                        f32x4::splat(val[4]),
+                        f32x4::splat(val[5]),
+                        f32x4::splat(val[6]),
+                        f32x4::splat(val[7]),
+                        f32x4::splat(val[8]),
                     ];
                 }
                 ctx.sp_m3 += 1;
             },
-            
+
             _ => SymbolicEngine::eval_single(*op, &mut ctx),
         }
     }
@@ -102,17 +128,13 @@ pub fn compute_mse(program: &Program, dataset: &Dataset) -> f32 {
 
         let prediction = eval_simd(program, input_batch);
         let target = unsafe { *targets.get_unchecked(i) };
-        
+
         let diff = prediction - target;
         sum_squared_error += diff * diff;
     }
 
     let mse = sum_squared_error.reduce_add() / (dataset.num_samples as f32);
-    if !mse.is_finite() {
-        f32::MAX
-    } else {
-        mse
-    }
+    if !mse.is_finite() { f32::MAX } else { mse }
 }
 
 pub fn compute_mse_with_gradient(program: &Program, dataset: &Dataset) -> (f32, [f32; 32]) {
@@ -193,13 +215,15 @@ pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: u
     for op in &program.code {
         match op {
             Instruction::LoadVarF(idx) => unsafe {
-                *ctx.stack_f.get_unchecked_mut(ctx.sp_f) = DualSimd::constant(*features.get_unchecked(*idx as usize));
+                *ctx.stack_f.get_unchecked_mut(ctx.sp_f) =
+                    DualSimd::constant(*features.get_unchecked(*idx as usize));
                 ctx.sp_f += 1;
             },
             Instruction::LoadConstF(idx) => unsafe {
                 if let Scalar::Float(val) = constants.get_unchecked(*idx as usize) {
                     let flat_idx = get_flat_start_idx(*idx as usize);
-                    *ctx.stack_f.get_unchecked_mut(ctx.sp_f) = DualSimd::new(f32x4::splat(*val), get_grad(flat_idx));
+                    *ctx.stack_f.get_unchecked_mut(ctx.sp_f) =
+                        DualSimd::new(f32x4::splat(*val), get_grad(flat_idx));
                 }
                 ctx.sp_f += 1;
             },
