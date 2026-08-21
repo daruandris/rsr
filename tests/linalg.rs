@@ -4,6 +4,8 @@ use rand::RngExt;
 use rsr::Instruction;
 use rsr::domains::basic::BasicOpCode;
 use rsr::prelude::*;
+use rsr::engine::search::strategy::{Strategy,StaticStrategy};
+use rsr::engine::search::engine::Engine;
 use std::time::Instant;
 
 fn run_linalg_test(

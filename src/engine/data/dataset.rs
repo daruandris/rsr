@@ -1,3 +1,4 @@
+//! SIMD-optimized dataset structures for ultra-fast evaluation.
 use crate::engine::data::schema::Schema;
 use crate::engine::eval::types::ValueType;
 use std::error::Error;
@@ -6,8 +7,17 @@ use std::io::BufReader;
 use std::path::Path;
 use wide::f32x4;
 
+/// A heavily optimized data container designed for SIMD execution.
+///
+/// The `Dataset` takes raw tabular data (from arrays, CSV, or JSON) and restructures 
+/// it into a vectorized format (`f32x4`). This allows the genetic engine's Virtual Machine 
+/// to evaluate 4 data points simultaneously in a single CPU cycle.
+///
+/// It also handles transparent Z-score standardization (normalization) and denormalization.
 pub struct Dataset {
+    /// Flattened and SIMD-aligned input features.
     pub feature_flat: Vec<f32x4>,
+    /// SIMD-aligned target values (Y).
     pub target_batches: Vec<f32x4>,
     pub num_features: u8,
     pub num_batches: usize,
@@ -201,7 +211,14 @@ impl Dataset {
         }
         registry
     }
-
+    
+    /// Loads a dataset directly from in-memory Rust arrays.
+    ///
+    /// # Arguments
+    ///
+    /// * `data_x` - A slice of vectors, where each vector is a row of input features.
+    /// * `data_y` - A slice containing the target values for each row.
+    /// * `schema` - The [`Schema`] defining data types and preprocessing rules.
     pub fn from_arrays(data_x: &[Vec<f32>], data_y: &[f32], schema: &Schema) -> Self {
         Self::new(
             data_x,
@@ -211,6 +228,31 @@ impl Dataset {
         )
     }
 
+    /// Loads a dataset from a JSON file based on the provided schema.
+    ///
+    /// The JSON file must contain a top-level array of objects. Each object must 
+    /// explicitly define an `"x"` field (an array of floating-point numbers representing the features) 
+    /// and a `"y"` field (a single floating-point number representing the target).
+    ///
+    /// # Expected JSON Format
+    ///
+    /// ```json
+    /// [
+    ///     { "x": [1.5, 2.0, -1.0], "y": 4.5 },
+    ///     { "x": [3.0, 0.5, 2.1], "y": 8.0 }
+    /// ]
+    /// ```
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path to the JSON file. Can be a string, `Path`, or `PathBuf`.
+    /// * `schema` - The [`Schema`] defining data types and preprocessing rules.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// * The file does not exist or cannot be read (I/O error).
+    /// * The JSON structure is invalid or does not match the expected `[{x: [...], y: ...}]` format.
     pub fn from_json<P: AsRef<Path>>(path: P, schema: &Schema) -> Result<Self, Box<dyn Error>> {
         #[derive(serde::Deserialize)]
         struct Record {
@@ -238,6 +280,13 @@ impl Dataset {
         ))
     }
 
+    /// Loads a dataset from a CSV file based on the provided schema.
+    ///
+    /// The CSV must have a header row. If `target_col_index` is not set in the schema, 
+    /// the last column is assumed to be the target variable.
+    ///
+    /// # Errors
+    /// Returns an error if the file cannot be read, parsed, or if a row has missing columns.
     pub fn from_csv<P: AsRef<Path>>(path: P, schema: &Schema) -> Result<Self, Box<dyn Error>> {
         let mut rdr = csv::ReaderBuilder::new()
             .has_headers(true)

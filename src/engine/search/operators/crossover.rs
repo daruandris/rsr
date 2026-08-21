@@ -50,29 +50,35 @@ fn select_node_index(
     if len == 0 {
         return None;
     }
-
-    let mut internal_indices: Vec<usize> = Vec::new();
-    let mut all_valid_indices: Vec<usize> = Vec::new();
+    const MAX_NODES: usize = 64;
+    let mut internal_indices = [0usize; MAX_NODES];
+    let mut all_valid_indices = [0usize; MAX_NODES];
+    let mut int_count = 0;
+    let mut all_count = 0;
 
     for (i, node) in ind.nodes.iter().enumerate() {
         let is_type_match = required_type.is_none_or(|t| node.get_type() == t);
         if is_type_match {
-            all_valid_indices.push(i);
-            if node.arity() > 0 {
-                internal_indices.push(i);
+            if all_count < MAX_NODES {
+                all_valid_indices[all_count] = i;
+                all_count += 1;
+            }
+            if node.arity() > 0 && int_count < MAX_NODES {
+                internal_indices[int_count] = i;
+                int_count += 1;
             }
         }
     }
 
-    if all_valid_indices.is_empty() {
+    if all_count == 0 {
         return None;
     }
 
-    if !internal_indices.is_empty() && rng.random::<f32>() < 0.9 {
-        let idx = rng.random_range(0..internal_indices.len());
+    if int_count > 0 && rng.random::<f32>() < 0.9 {
+        let idx = rng.random_range(0..int_count);
         Some(internal_indices[idx])
     } else {
-        let idx = rng.random_range(0..all_valid_indices.len());
+        let idx = rng.random_range(0..all_count);
         Some(all_valid_indices[idx])
     }
 }

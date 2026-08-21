@@ -1,7 +1,13 @@
+//! Forward-mode automatic differentiation using Dual numbers.
+//!
+//! Dual numbers simultaneously compute both the value and the derivative of an expression.
+//! This is heavily leveraged by continuous optimizers (like L-BFGS) to calculate exact 
+//! gradients during constant optimization.
 #![allow(unsafe_op_in_unsafe_fn)]
 use std::ops::{Add, Div, Mul, Sub};
 use wide::{CmpLt, f32x4};
 
+/// Represents a dual number for forward-mode AD using SIMD vectors.
 #[derive(Clone, Copy, Debug)]
 pub struct DualSimd {
     pub val: f32x4,
@@ -212,6 +218,9 @@ pub fn dual_inverse_m2(m: &[DualSimd; 4]) -> [DualSimd; 4] {
 
 // ---------------- Dual SIMD in-place Evaluation Functions ----------------
 
+/// # Safety
+/// The caller must ensure that `*sp_f >= 2` to prevent underflow, and that all memory accesses 
+/// via `get_unchecked` remain strictly within the bounds of `stack_f` and `stack_v2` (0..32).
 #[inline(always)]
 pub unsafe fn eval_make_dual_vec2(
     sp_f: &mut usize,
@@ -226,6 +235,10 @@ pub unsafe fn eval_make_dual_vec2(
     ];
     *sp_v2 += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_f >= 3` to prevent underflow, and that all memory accesses 
+/// via `get_unchecked` remain strictly within the bounds of `stack_f` and `stack_v3` (0..32).
 #[inline(always)]
 pub unsafe fn eval_make_dual_vec3(
     sp_f: &mut usize,
@@ -242,6 +255,8 @@ pub unsafe fn eval_make_dual_vec3(
     *sp_v3 += 1;
 }
 
+/// # Safety
+/// The caller must ensure that `*sp_f >= 2` to prevent underflow and out-of-bounds access
 #[inline(always)]
 pub unsafe fn eval_add_dual_f(sp_f: &mut usize, stack_f: &mut [DualSimd; 32]) {
     *sp_f -= 2;
@@ -250,6 +265,9 @@ pub unsafe fn eval_add_dual_f(sp_f: &mut usize, stack_f: &mut [DualSimd; 32]) {
     *stack_f.get_unchecked_mut(*sp_f) = a + b;
     *sp_f += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_f >= 2` to prevent underflow and out-of-bounds ac
 #[inline(always)]
 pub unsafe fn eval_sub_dual_f(sp_f: &mut usize, stack_f: &mut [DualSimd; 32]) {
     *sp_f -= 2;
@@ -258,6 +276,9 @@ pub unsafe fn eval_sub_dual_f(sp_f: &mut usize, stack_f: &mut [DualSimd; 32]) {
     *stack_f.get_unchecked_mut(*sp_f) = a - b;
     *sp_f += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_f >= 2` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_mul_dual_f(sp_f: &mut usize, stack_f: &mut [DualSimd; 32]) {
     *sp_f -= 2;
@@ -266,6 +287,9 @@ pub unsafe fn eval_mul_dual_f(sp_f: &mut usize, stack_f: &mut [DualSimd; 32]) {
     *stack_f.get_unchecked_mut(*sp_f) = a * b;
     *sp_f += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_f >= 2` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_div_dual_f(sp_f: &mut usize, stack_f: &mut [DualSimd; 32]) {
     *sp_f -= 2;
@@ -274,37 +298,57 @@ pub unsafe fn eval_div_dual_f(sp_f: &mut usize, stack_f: &mut [DualSimd; 32]) {
     *stack_f.get_unchecked_mut(*sp_f) = a / b;
     *sp_f += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_f >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_sin_dual_f(sp_f: &mut usize, stack_f: &mut [DualSimd; 32]) {
     let idx = *sp_f - 1;
     *stack_f.get_unchecked_mut(idx) = stack_f.get_unchecked(idx).sin();
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_f >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_cos_dual_f(sp_f: &mut usize, stack_f: &mut [DualSimd; 32]) {
     let idx = *sp_f - 1;
     *stack_f.get_unchecked_mut(idx) = stack_f.get_unchecked(idx).cos();
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_f >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_exp_dual_f(sp_f: &mut usize, stack_f: &mut [DualSimd; 32]) {
     let idx = *sp_f - 1;
     *stack_f.get_unchecked_mut(idx) = stack_f.get_unchecked(idx).exp();
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_f >= 1` to prevent underflow and out-of-bounds ac
 #[inline(always)]
 pub unsafe fn eval_sqr_dual_f(sp_f: &mut usize, stack_f: &mut [DualSimd; 32]) {
     let idx = *sp_f - 1;
     *stack_f.get_unchecked_mut(idx) = stack_f.get_unchecked(idx).sqr();
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_f >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_sqrt_dual_f(sp_f: &mut usize, stack_f: &mut [DualSimd; 32]) {
     let idx = *sp_f - 1;
     *stack_f.get_unchecked_mut(idx) = stack_f.get_unchecked(idx).sqrt();
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_f >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_ln_dual_f(sp_f: &mut usize, stack_f: &mut [DualSimd; 32]) {
     let idx = *sp_f - 1;
     *stack_f.get_unchecked_mut(idx) = stack_f.get_unchecked(idx).ln();
 }
 
+/// # Safety
+/// The caller must ensure that `*sp_v2 >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_get_x_dual_v2(
     sp_f: &mut usize,
@@ -316,6 +360,9 @@ pub unsafe fn eval_get_x_dual_v2(
     *stack_f.get_unchecked_mut(*sp_f) = stack_v2.get_unchecked(*sp_v2)[0];
     *sp_f += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_v2 >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_get_y_dual_v2(
     sp_f: &mut usize,
@@ -327,6 +374,9 @@ pub unsafe fn eval_get_y_dual_v2(
     *stack_f.get_unchecked_mut(*sp_f) = stack_v2.get_unchecked(*sp_v2)[1];
     *sp_f += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_v3 >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_get_x_dual_v3(
     sp_f: &mut usize,
@@ -338,6 +388,9 @@ pub unsafe fn eval_get_x_dual_v3(
     *stack_f.get_unchecked_mut(*sp_f) = stack_v3.get_unchecked(*sp_v3)[0];
     *sp_f += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_v3 >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_get_y_dual_v3(
     sp_f: &mut usize,
@@ -349,6 +402,9 @@ pub unsafe fn eval_get_y_dual_v3(
     *stack_f.get_unchecked_mut(*sp_f) = stack_v3.get_unchecked(*sp_v3)[1];
     *sp_f += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_v3 >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_get_z_dual_v3(
     sp_f: &mut usize,
@@ -361,6 +417,8 @@ pub unsafe fn eval_get_z_dual_v3(
     *sp_f += 1;
 }
 
+/// # Safety
+/// The caller must ensure that `*sp_v2 >= 2` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_add_dual_v2(sp_v2: &mut usize, stack_v2: &mut [[DualSimd; 2]; 32]) {
     *sp_v2 -= 2;
@@ -369,6 +427,9 @@ pub unsafe fn eval_add_dual_v2(sp_v2: &mut usize, stack_v2: &mut [[DualSimd; 2];
     *stack_v2.get_unchecked_mut(*sp_v2) = [a[0] + b[0], a[1] + b[1]];
     *sp_v2 += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_v2 >= 2` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_sub_dual_v2(sp_v2: &mut usize, stack_v2: &mut [[DualSimd; 2]; 32]) {
     *sp_v2 -= 2;
@@ -377,6 +438,9 @@ pub unsafe fn eval_sub_dual_v2(sp_v2: &mut usize, stack_v2: &mut [[DualSimd; 2];
     *stack_v2.get_unchecked_mut(*sp_v2) = [a[0] - b[0], a[1] - b[1]];
     *sp_v2 += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_f >= 1` and `*sp_v2 >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_scale_dual_v2(
     sp_f: &mut usize,
@@ -391,6 +455,9 @@ pub unsafe fn eval_scale_dual_v2(
     *stack_v2.get_unchecked_mut(*sp_v2) = [v[0] * s, v[1] * s];
     *sp_v2 += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_v2 >= 2` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_dot_dual_v2(
     sp_f: &mut usize,
@@ -404,6 +471,9 @@ pub unsafe fn eval_dot_dual_v2(
     *stack_f.get_unchecked_mut(*sp_f) = a[0] * b[0] + a[1] * b[1];
     *sp_f += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_v2 >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_norm_dual_v2(
     sp_f: &mut usize,
@@ -418,6 +488,8 @@ pub unsafe fn eval_norm_dual_v2(
     *sp_v2 -= 1;
 }
 
+/// # Safety
+/// The caller must ensure that `*sp_v3 >= 2` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_add_dual_v3(sp_v3: &mut usize, stack_v3: &mut [[DualSimd; 3]; 32]) {
     *sp_v3 -= 2;
@@ -426,6 +498,9 @@ pub unsafe fn eval_add_dual_v3(sp_v3: &mut usize, stack_v3: &mut [[DualSimd; 3];
     *stack_v3.get_unchecked_mut(*sp_v3) = [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
     *sp_v3 += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_v3 >= 2` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_sub_dual_v3(sp_v3: &mut usize, stack_v3: &mut [[DualSimd; 3]; 32]) {
     *sp_v3 -= 2;
@@ -434,6 +509,9 @@ pub unsafe fn eval_sub_dual_v3(sp_v3: &mut usize, stack_v3: &mut [[DualSimd; 3];
     *stack_v3.get_unchecked_mut(*sp_v3) = [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
     *sp_v3 += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_f >= 1` and `*sp_v3 >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_scale_dual_v3(
     sp_f: &mut usize,
@@ -448,6 +526,9 @@ pub unsafe fn eval_scale_dual_v3(
     *stack_v3.get_unchecked_mut(*sp_v3) = [v[0] * s, v[1] * s, v[2] * s];
     *sp_v3 += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_v3 >= 2` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_dot_dual_v3(
     sp_f: &mut usize,
@@ -461,6 +542,9 @@ pub unsafe fn eval_dot_dual_v3(
     *stack_f.get_unchecked_mut(*sp_f) = dual_dot_v3(&a, &b);
     *sp_f += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_v3 >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_norm_dual_v3(
     sp_f: &mut usize,
@@ -474,6 +558,9 @@ pub unsafe fn eval_norm_dual_v3(
     *sp_f += 1;
     *sp_v3 -= 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_v3 >= 2` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_cross_dual_v3(sp_v3: &mut usize, stack_v3: &mut [[DualSimd; 3]; 32]) {
     *sp_v3 -= 2;
@@ -487,6 +574,8 @@ pub unsafe fn eval_cross_dual_v3(sp_v3: &mut usize, stack_v3: &mut [[DualSimd; 3
     *sp_v3 += 1;
 }
 
+/// # Safety
+/// The caller must ensure that `*sp_v2 >= 2` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_make_dual_mat2(
     sp_v2: &mut usize,
@@ -500,6 +589,9 @@ pub unsafe fn eval_make_dual_mat2(
     *stack_m2.get_unchecked_mut(*sp_m2) = [c0[0], c0[1], c1[0], c1[1]];
     *sp_m2 += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_m2 >= 2` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_add_dual_m2(sp_m2: &mut usize, stack_m2: &mut [[DualSimd; 4]; 32]) {
     *sp_m2 -= 2;
@@ -508,6 +600,9 @@ pub unsafe fn eval_add_dual_m2(sp_m2: &mut usize, stack_m2: &mut [[DualSimd; 4];
     *stack_m2.get_unchecked_mut(*sp_m2) = [a[0] + b[0], a[1] + b[1], a[2] + b[2], a[3] + b[3]];
     *sp_m2 += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_m2 >= 2` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_sub_dual_m2(sp_m2: &mut usize, stack_m2: &mut [[DualSimd; 4]; 32]) {
     *sp_m2 -= 2;
@@ -516,6 +611,9 @@ pub unsafe fn eval_sub_dual_m2(sp_m2: &mut usize, stack_m2: &mut [[DualSimd; 4];
     *stack_m2.get_unchecked_mut(*sp_m2) = [a[0] - b[0], a[1] - b[1], a[2] - b[2], a[3] - b[3]];
     *sp_m2 += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_f >= 1` and `*sp_m2 >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_scale_dual_m2(
     sp_f: &mut usize,
@@ -530,6 +628,9 @@ pub unsafe fn eval_scale_dual_m2(
     *stack_m2.get_unchecked_mut(*sp_m2) = [m[0] * s, m[1] * s, m[2] * s, m[3] * s];
     *sp_m2 += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_m2 >= 2` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_mul_dual_m2(sp_m2: &mut usize, stack_m2: &mut [[DualSimd; 4]; 32]) {
     *sp_m2 -= 2;
@@ -543,6 +644,9 @@ pub unsafe fn eval_mul_dual_m2(sp_m2: &mut usize, stack_m2: &mut [[DualSimd; 4];
     ];
     *sp_m2 += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_m2 >= 1` and `*sp_v2 >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_mul_dual_m2v2(
     sp_m2: &mut usize,
@@ -557,6 +661,9 @@ pub unsafe fn eval_mul_dual_m2v2(
     *stack_v2.get_unchecked_mut(*sp_v2) = [m[0] * v[0] + m[2] * v[1], m[1] * v[0] + m[3] * v[1]];
     *sp_v2 += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_m2 >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_det_dual_m2(
     sp_f: &mut usize,
@@ -569,6 +676,9 @@ pub unsafe fn eval_det_dual_m2(
     *stack_f.get_unchecked_mut(*sp_f) = m[0] * m[3] - m[1] * m[2];
     *sp_f += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_m2 >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_trace_dual_m2(
     sp_f: &mut usize,
@@ -581,6 +691,9 @@ pub unsafe fn eval_trace_dual_m2(
     *stack_f.get_unchecked_mut(*sp_f) = m[0] + m[3];
     *sp_f += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_m2 >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_transpose_dual_m2(sp_m2: &mut usize, stack_m2: &mut [[DualSimd; 4]; 32]) {
     let idx = *sp_m2 - 1;
@@ -588,6 +701,8 @@ pub unsafe fn eval_transpose_dual_m2(sp_m2: &mut usize, stack_m2: &mut [[DualSim
     *stack_m2.get_unchecked_mut(idx) = [m[0], m[2], m[1], m[3]];
 }
 
+/// # Safety
+/// The caller must ensure that `*sp_v3 >= 3` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_make_dual_mat3(
     sp_v3: &mut usize,
@@ -604,6 +719,9 @@ pub unsafe fn eval_make_dual_mat3(
     ];
     *sp_m3 += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_m3 >= 2` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_add_dual_m3(sp_m3: &mut usize, stack_m3: &mut [[DualSimd; 9]; 32]) {
     *sp_m3 -= 2;
@@ -622,6 +740,9 @@ pub unsafe fn eval_add_dual_m3(sp_m3: &mut usize, stack_m3: &mut [[DualSimd; 9];
     ];
     *sp_m3 += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_m3 >= 2` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_sub_dual_m3(sp_m3: &mut usize, stack_m3: &mut [[DualSimd; 9]; 32]) {
     *sp_m3 -= 2;
@@ -640,6 +761,9 @@ pub unsafe fn eval_sub_dual_m3(sp_m3: &mut usize, stack_m3: &mut [[DualSimd; 9];
     ];
     *sp_m3 += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_f >= 1` and `*sp_m3 >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_scale_dual_m3(
     sp_f: &mut usize,
@@ -664,6 +788,9 @@ pub unsafe fn eval_scale_dual_m3(
     ];
     *sp_m3 += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_m3 >= 2` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_mul_dual_m3(sp_m3: &mut usize, stack_m3: &mut [[DualSimd; 9]; 32]) {
     *sp_m3 -= 2;
@@ -682,6 +809,9 @@ pub unsafe fn eval_mul_dual_m3(sp_m3: &mut usize, stack_m3: &mut [[DualSimd; 9];
     ];
     *sp_m3 += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_m3 >= 1` and `*sp_v3 >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_mul_dual_m3v3(
     sp_m3: &mut usize,
@@ -700,6 +830,9 @@ pub unsafe fn eval_mul_dual_m3v3(
     ];
     *sp_v3 += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_m3 >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_det_dual_m3(
     sp_f: &mut usize,
@@ -714,6 +847,9 @@ pub unsafe fn eval_det_dual_m3(
         + m[6] * (m[1] * m[5] - m[2] * m[4]);
     *sp_f += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_m3 >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_trace_dual_m3(
     sp_f: &mut usize,
@@ -726,6 +862,9 @@ pub unsafe fn eval_trace_dual_m3(
     *stack_f.get_unchecked_mut(*sp_f) = m[0] + m[4] + m[8];
     *sp_f += 1;
 }
+
+/// # Safety
+/// The caller must ensure that `*sp_m3 >= 1` to prevent underflow and out-of-bounds access.
 #[inline(always)]
 pub unsafe fn eval_transpose_dual_m3(sp_m3: &mut usize, stack_m3: &mut [[DualSimd; 9]; 32]) {
     let idx = *sp_m3 - 1;

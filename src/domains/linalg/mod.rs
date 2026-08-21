@@ -742,8 +742,11 @@ fn zero_for_op(op: LinalgOpCode) -> Scalar {
 
 fn fold_linalg_constants(op: LinalgOpCode, const_vals: &[Option<Scalar>]) -> Option<Scalar> {
     use Scalar::*;
-    let args: Vec<Scalar> = const_vals.iter().map(|c| c.unwrap()).collect();
-    match (op, args.as_slice()) {
+    let mut args = [Scalar::Float(0.0); 3];
+    for i in 0..const_vals.len() {
+        args[i] = const_vals[i].unwrap();
+    }
+    match (op, &args[..const_vals.len()]) {
         (LinalgOpCode::MakeVec2, [Float(x), Float(y)]) => Some(Vec2([*x, *y])),
         (LinalgOpCode::MakeVec3, [Float(x), Float(y), Float(z)]) => Some(Vec3([*x, *y, *z])),
         (LinalgOpCode::GetXV2, [Vec2(v)]) => Some(Float(v[0])),

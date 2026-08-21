@@ -63,7 +63,10 @@ pub fn simplify_ast(nodes: &[Node]) -> Vec<Node> {
                     }
                 }
 
-                let const_vals: Vec<Option<Scalar>> = args.iter().map(|a| a.const_val).collect();
+                let mut const_vals = [None; 3];
+                for i in 0..arity {
+                    const_vals[i] = args[i].const_val;
+                }
                 let action = crate::SymbolicEngine::try_simplify(op, &const_vals, args_equal);
 
                 match action {

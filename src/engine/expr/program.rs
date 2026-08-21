@@ -1,16 +1,36 @@
+//! Executable representation of mathematical expressions.
+
 use super::node::Node;
 use crate::Instruction;
 use crate::engine::eval::scalar::Scalar;
 use crate::engine::eval::types::ValueType;
 use crate::engine::optimize::Parameterized;
 
+// A flattened, compiled version of an AST.
+///
+/// While the genetic algorithm operates on tree structures (see [`crate::engine::expr::node::Node`]), 
+/// the evaluation engine requires a linear sequence of instructions for maximum performance.
+/// 
+/// `Program` separates the structural operations (`code`) from the numerical parameters (`constants`).
+/// This architecture makes it incredibly fast to evaluate, and allows continuous optimizers 
+/// (like L-BFGS or CMA-ES) to update the weights in-place without rebuilding the expression tree.
 #[derive(Clone, Debug)]
 pub struct Program {
+    /// The linear sequence of opcodes and memory load instructions in Postfix notation.
     pub code: Vec<Instruction>,
+    /// The numerical parameters (weights) extracted from the AST.
     pub constants: Vec<Scalar>,
 }
 
 impl Program {
+    /// Compiles a hierarchical AST into a linear executable program.
+    ///
+    /// This method traverses the provided nodes, extracting constants into a separate buffer 
+    /// and converting variables and operators into direct virtual machine instructions.
+    ///
+    /// # Arguments
+    ///
+    /// * `nodes` - A slice of [`crate::engine::expr::node::Node`] representing the expression tree.
     pub fn from_nodes(nodes: &[Node]) -> Self {
         let mut code = Vec::with_capacity(nodes.len());
         let mut constants = Vec::new();
