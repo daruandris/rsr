@@ -24,3 +24,4 @@ serde_json = "1.0.149"
 
 [lints.clippy]
 too_many_arguments = "allow"
+suspicious_open_options = "allow"

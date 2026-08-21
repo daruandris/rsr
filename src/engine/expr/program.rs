@@ -88,33 +88,33 @@ impl Parameterized for Program {
                     }
                 }
                 Scalar::Vec2(v) => {
-                    for i in 0..2 {
+                    for val in v.iter().take(2) {
                         if ptr < buffer.len() {
-                            buffer[ptr] = v[i];
+                            buffer[ptr] = *val;
                             ptr += 1;
                         }
                     }
                 }
                 Scalar::Vec3(v) => {
-                    for i in 0..3 {
+                    for val in v.iter().take(3) {
                         if ptr < buffer.len() {
-                            buffer[ptr] = v[i];
+                            buffer[ptr] = *val;
                             ptr += 1;
                         }
                     }
                 }
                 Scalar::Mat2(m) => {
-                    for i in 0..4 {
+                    for val in m.iter().take(4) {
                         if ptr < buffer.len() {
-                            buffer[ptr] = m[i];
+                            buffer[ptr] = *val;
                             ptr += 1;
                         }
                     }
                 }
                 Scalar::Mat3(m) => {
-                    for i in 0..9 {
+                    for val in m.iter().take(9) {
                         if ptr < buffer.len() {
-                            buffer[ptr] = m[i];
+                            buffer[ptr] = *val;
                             ptr += 1;
                         }
                     }
@@ -135,33 +135,33 @@ impl Parameterized for Program {
                     }
                 }
                 Scalar::Vec2(v) => {
-                    for i in 0..2 {
+                    for val in v.iter_mut().take(2) {
                         if ptr < buffer.len() {
-                            v[i] = buffer[ptr];
+                            *val = buffer[ptr];
                             ptr += 1;
                         }
                     }
                 }
                 Scalar::Vec3(v) => {
-                    for i in 0..3 {
+                    for val in v.iter_mut().take(3) {
                         if ptr < buffer.len() {
-                            v[i] = buffer[ptr];
+                            *val = buffer[ptr];
                             ptr += 1;
                         }
                     }
                 }
                 Scalar::Mat2(m) => {
-                    for i in 0..4 {
+                    for val in m.iter_mut().take(4) {
                         if ptr < buffer.len() {
-                            m[i] = buffer[ptr];
+                            *val = buffer[ptr];
                             ptr += 1;
                         }
                     }
                 }
                 Scalar::Mat3(m) => {
-                    for i in 0..9 {
+                    for val in m.iter_mut().take(9) {
                         if ptr < buffer.len() {
-                            m[i] = buffer[ptr];
+                            *val = buffer[ptr];
                             ptr += 1;
                         }
                     }

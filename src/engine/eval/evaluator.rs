@@ -158,14 +158,14 @@ pub fn compute_mse_with_gradient(program: &Program, dataset: &Dataset) -> (f32, 
 
         let mut diff = f32x4::splat(0.0);
 
-        for k in 0..active_params_count {
+        for (k, item) in grad_sum.iter_mut().enumerate().take(active_params_count) {
             let dual_result = eval_simd_dual(program, input_batch, k);
 
             if k == 0 {
                 diff = dual_result.val - target;
                 sum_squared_error += diff * diff;
             }
-            grad_sum[k] += f32x4::splat(2.0) * diff * dual_result.grad;
+            *item += f32x4::splat(2.0) * diff * dual_result.grad;
         }
     }
 
