@@ -1,19 +1,6 @@
 //!RSR is a high-performance, SIMD-accelerated genetic programming engine written in Rust, specialized for symbolic regression. It is designed to automatically discover mathematical equations and physical invariants directly from dataset observations.
 //!Unlike standard symbolic regression tools, RSR natively supports Tensor and Linear Algebra operations(2 and 3 dimensional vectors and matrices), combined with Forward-Mode Automatic Differentiation using custom SIMD-optimized dual numbers.
 //!
-//!## Key features
-//!
-//! * **Fast Evaluation**: A custom virtual machine leveraging the `wide` crate for SIMD (`f32x4`) execution, evaluating multiple data points in parallel.
-//! * **Zero-Cost Abstractions**: The hot paths of the engine—including evaluation, crossover, mutation, and AST simplification—are carefully designed to operate entirely on the stack, avoiding costly heap allocations.
-//! * **Automatic Differentiation**: Built-in forward-mode AD using dual numbers provides exact gradients, powering the L-BFGS optimizer for rapid constant fine-tuning.
-//! * **Hybrid Search Strategy**:
-//!   * **Island-model GP** handles the structural search across isolated populations.
-//!   * **Continuous Optimization** (L-BFGS for differentiable trees, CMA-ES / Nelder-Mead for non-differentiable or complex algebraic structures) optimizes the numeric constants within the formulas.
-//! * **Multi-Domain Support**:
-//!   * `Basic`: Scalar arithmetic, trigonometry, exponentials, and logarithms.
-//!   * `Linalg`: Comprehensive vector and matrix operations (`Vec2`, `Vec3`, `Mat2`, `Mat3`) with specialized dual-number evaluations.
-//! * **Algebraic Simplification**: Integrates seamlessly with SymEngine (via C++ FFI) to prune
-//!
 //! ## Quick Start
 //!
 //! ```rust

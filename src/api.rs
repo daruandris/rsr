@@ -20,7 +20,7 @@ use crate::engine::search::strategy::{StaticStrategy, Strategy};
 /// use rsr::prelude::*;
 /// use rsr::api::SymbolicRegressor;
 ///
-/// let regressor = SymbolicRegressor::new(vec![OpModule::Basic])
+/// let regressor = SymbolicRegressor::default_with_modules(vec![OpModule::Basic])
 ///     .target_mse(1e-6)
 ///     .generations(500)
 ///     .with_module(OpModule::Linalg);
