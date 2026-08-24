@@ -1,3 +1,5 @@
+use crate::Instruction;
+use crate::domains::basic::BasicOpCode;
 use crate::engine::data::dataset::Dataset;
 use crate::engine::eval::evaluator;
 use crate::engine::eval::scalar::Scalar;
@@ -117,6 +119,59 @@ impl Individual {
 
     pub fn complexity(&self) -> usize {
         self.nodes.iter().map(|node| node.weight()).sum()
+    }
+
+    pub fn has_forbidden_patterns(&self) -> bool {
+        const FLAG_TRIG: u8  = 1 << 0;
+        const FLAG_EXP: u8   = 1 << 1;
+        const FLAG_LN: u8    = 1 << 2;
+        const FLAG_POWER: u8 = 1 << 3;
+
+        let mut stack: Vec<u8> = Vec::with_capacity(32);
+
+        for node in &self.nodes {
+            match node {
+                Node::Variable(_, _) | Node::Constant(_, _) => {
+                    stack.push(0);
+                }
+                Node::Operator(op) => {
+                    let arity = op.arity();
+                    if stack.len() < arity { return true; }
+
+                    let mut child_flags = 0;
+                    for _ in 0..arity {
+                        child_flags |= stack.pop().unwrap();
+                    }
+
+                    if let Instruction::Basic(basic_op) = op {
+                        match basic_op {
+                            BasicOpCode::AddF | BasicOpCode::SubF | BasicOpCode::MulF | BasicOpCode::DivF => {
+                                stack.push(child_flags);
+                            }
+                            BasicOpCode::SinF | BasicOpCode::CosF => {
+                                if (child_flags & (FLAG_TRIG | FLAG_EXP | FLAG_LN)) != 0 { return true; }
+                                stack.push(child_flags | FLAG_TRIG);
+                            }
+                            BasicOpCode::ExpF => {
+                                if (child_flags & (FLAG_TRIG | FLAG_EXP | FLAG_LN | FLAG_POWER)) != 0 { return true; }
+                                stack.push(child_flags | FLAG_EXP);
+                            }
+                            BasicOpCode::LnF => {
+                                if (child_flags & (FLAG_TRIG | FLAG_EXP | FLAG_LN)) != 0 { return true; }
+                                stack.push(child_flags | FLAG_LN);
+                            }
+                            BasicOpCode::SqrtF | BasicOpCode::SqrF => {
+                                if (child_flags & (FLAG_POWER | FLAG_TRIG | FLAG_LN | FLAG_EXP)) != 0 { return true; }
+                                stack.push(child_flags | FLAG_POWER);
+                            }
+                        }
+                    } else {
+                        stack.push(child_flags);
+                    }
+                }
+            }
+        }
+        false
     }
 }
 

@@ -166,7 +166,7 @@ impl Domain for BasicDomain {
         match parent {
             BasicOpCode::SinF | BasicOpCode::CosF => matches!(
                 child,
-                BasicOpCode::SinF | BasicOpCode::CosF | BasicOpCode::ExpF
+                BasicOpCode::SinF | BasicOpCode::CosF | BasicOpCode::ExpF | BasicOpCode::LnF
             ),
             BasicOpCode::ExpF => matches!(
                 child,
@@ -176,9 +176,10 @@ impl Domain for BasicDomain {
                     | BasicOpCode::SqrF
                     | BasicOpCode::LnF
             ),
-            BasicOpCode::SqrtF => matches!(child, BasicOpCode::SqrtF | BasicOpCode::SqrF),
+            BasicOpCode::SqrtF => matches!(child, BasicOpCode::SqrtF | BasicOpCode::SqrF | BasicOpCode::SinF | BasicOpCode::CosF
+                | BasicOpCode::LnF | BasicOpCode::ExpF),
             BasicOpCode::SqrF => matches!(child, BasicOpCode::SqrF | BasicOpCode::SqrtF),
-            BasicOpCode::LnF => matches!(child, BasicOpCode::LnF | BasicOpCode::ExpF),
+            BasicOpCode::LnF => matches!(child, BasicOpCode::LnF | BasicOpCode::ExpF | BasicOpCode::SinF | BasicOpCode::CosF),
             _ => false,
         }
     }

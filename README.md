@@ -21,7 +21,7 @@ Just from 400 data points of 3D vectors (electric field, velocity, magnetic fiel
 You can try it with `cargo run --release`.
 
 ## Benchmarks
-*(Note: The following times represent the average execution time to find the exact target equation with `MSE < 1e-7` during our release benchmarks).*
+*(Note: The following times represent the average execution time to find the exact target equation with `MSE < 1e-7` during our release benchmarks from 400 data points each).*
 
 | Problem | Target Equation | Features | Execution Time |
 | :--- | :--- | :--- | :--- |

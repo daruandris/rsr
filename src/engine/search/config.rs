@@ -32,6 +32,7 @@ pub struct Config {
     pub allowed_modules: Vec<OpModule>,
     pub custom_ops: Vec<Instruction>,
     pub excluded_ops: Vec<Instruction>,
+    pub subset_size: Option<usize>,
 }
 
 impl Config {
@@ -59,6 +60,7 @@ impl Config {
             allowed_modules,
             custom_ops: vec![],
             excluded_ops: vec![],
+            subset_size: Some(400)
         }
     }
 
@@ -112,6 +114,11 @@ impl Config {
 
     pub fn verbose(mut self, verbose: bool) -> Self {
         self.verbose = verbose;
+        self
+    }
+
+    pub fn parsimony_penalty(mut self, penalty: f32) -> Self{
+        self.parsimony_penalty = penalty;
         self
     }
 }

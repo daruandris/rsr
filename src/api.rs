@@ -90,6 +90,11 @@ impl SymbolicRegressor {
         self
     }
 
+    pub fn train_subset_size(mut self, size: usize) -> Self {
+        self.config.subset_size = Some(size);
+        self
+    }
+
     /// Executes the symbolic regression process on the provided dataset.
     ///
     /// This method initializes the genetic [`Engine`], runs the evolutionary loop 
@@ -102,19 +107,26 @@ impl SymbolicRegressor {
     /// # Returns
     ///
     /// A [`FitResult`] containing the simplified equation string, its final MSE, and complexity.
-    pub fn fit(&self, dataset: &Dataset) -> FitResult {
+    pub fn fit(&self, full_dataset: &Dataset) -> FitResult {
         let strategy = StaticStrategy::new(self.config.clone());
         let allowed_ops = strategy.get_allowed_operators();
 
-        let mut engine = Engine::new(strategy, dataset.get_variable_registry(), allowed_ops);
-        engine.run(dataset);
+        let train_data = if let Some(size) = self.config.subset_size {
+            full_dataset.subset(size)
+        } else {
+            full_dataset.clone() 
+        };
 
-        let best = engine.get_global_best();
+        let mut engine = Engine::new(strategy, train_data.get_variable_registry(), allowed_ops);
+        engine.run(&train_data);
+
+        let mut best = engine.get_global_best().clone();
+        let final_mse = best.calculate_mse(full_dataset);
         let clean_eq = crate::engine::ffi::symengine::simplify_symengine(&best.to_string());
 
         FitResult {
             equation: clean_eq,
-            mse: best.fitness,
+            mse: final_mse,
             complexity: best.complexity(),
         }
     }

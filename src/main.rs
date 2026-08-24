@@ -7,6 +7,8 @@ use rsr::engine::data::dataset::Dataset;
 use rsr::engine::data::schema::Schema;
 use rsr::prelude::*;
 
+mod feyman;
+
 fn main() {
     let mut rng = rand::rng();
     let num_samples = 400;
@@ -14,15 +16,15 @@ fn main() {
     let mut dx = Vec::with_capacity(num_samples);
     let mut dy = Vec::with_capacity(num_samples);
     for _ in 0..num_samples {
-        let e0 = rng.random_range(-5.0..5.0);
-        let e1 = rng.random_range(-5.0..5.0);
-        let e2 = rng.random_range(-5.0..5.0);
-        let v0 = rng.random_range(-5.0..5.0);
-        let v1 = rng.random_range(-5.0..5.0);
-        let v2 = rng.random_range(-5.0..5.0);
-        let b0 = rng.random_range(-5.0..5.0);
-        let b1 = rng.random_range(-5.0..5.0);
-        let b2 = rng.random_range(-5.0..5.0);
+        let e0 = rng.random_range(-100.0..100.0);
+        let e1 = rng.random_range(-100.0..100.0);
+        let e2 = rng.random_range(-100.0..100.0);
+        let v0 = rng.random_range(-100.0..100.0);
+        let v1 = rng.random_range(-100.0..100.0);
+        let v2 = rng.random_range(-100.0..100.0);
+        let b0 = rng.random_range(-100.0..100.0);
+        let b1 = rng.random_range(-100.0..100.0);
+        let b2 = rng.random_range(-100.0..100.0);
 
         dx.push(vec![e0, e1, e2, v0, v1, v2, b0, b1, b2]);
 
@@ -60,4 +62,6 @@ fn main() {
     println!("\nEquation found in {:.3} seconds!", duration.as_secs_f64());
     println!("Equation: {}", result.equation);
     println!("MSE:    {:.10}", result.mse);
+
+    feyman::test();
 }

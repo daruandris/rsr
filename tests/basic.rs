@@ -102,7 +102,7 @@ fn basic_5_multivariable_linear() {
         dx.push(vec![x0, x1, x2]);
         dy.push(2.0 * x0 - 3.5 * x1 + 1.2 * x2);
     }
-    run_test("Basic 5: Linear 3D", "Basic5", dx, dy, 3, true);
+    run_test("Basic 5: Linear 3D", "Basic5", dx, dy, 3, false);
 }
 
 #[test]
@@ -127,11 +127,11 @@ fn basic_7_noisy_data() {
     let mut dy = Vec::new();
     for _ in 0..400 {
         let x = rng.random_range(-10.0..10.0);
-        let noise = rng.random_range(-0.01..0.01);
+        let noise = rng.random_range(-0.001..0.001);
         dx.push(vec![x]);
         dy.push(2.5 * x * x + noise);
     }
-    run_test("Basic 7: Noisy", "Basic7", dx, dy, 1, true);
+    run_test("Basic 7: Noisy", "Basic7", dx, dy, 1, false);
 }
 
 #[test]

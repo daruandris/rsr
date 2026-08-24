@@ -135,6 +135,9 @@ impl<S: Strategy> Island<S> {
                     &mut self.rng,
                     self.strategy.max_tree_size(),
                 );
+                if child.has_forbidden_patterns() {
+                    child = parent1.clone(); 
+                }
                 child.age = parent1.age.max(parent2.age);
                 child.simplify();
                 child.invalidate();
@@ -168,12 +171,13 @@ impl<S: Strategy> Island<S> {
                         ),
                     }
                     mutated_candidate.simplify();
-                    let new_mse = mutated_candidate.calculate_mse(dataset);
-
-                    if new_mse < current_fitness {
-                        candidate = mutated_candidate;
-                        current_fitness = new_mse;
-                        candidate.fitness = new_mse;
+                    if !mutated_candidate.has_forbidden_patterns() {
+                        let new_mse = mutated_candidate.calculate_mse(dataset);
+                        if new_mse < current_fitness {
+                            candidate = mutated_candidate;
+                            current_fitness = new_mse;
+                            candidate.fitness = new_mse;
+                        }
                     }
                 }
                 self.next_gen_buffer.push(candidate);

@@ -202,7 +202,7 @@ pub fn get_test_config(modules: Vec<OpModule>) -> Config {
         crossover_rate: 0.10,
         tournament_size: 2,
         migration_interval: 25,
-        parsimony_penalty: 0.000005,
+        parsimony_penalty: 0.00005,
         opt_prob: 0.2,
         opt_iterations: 100,
         final_opt_iterations: 5000,
@@ -218,5 +218,6 @@ pub fn get_test_config(modules: Vec<OpModule>) -> Config {
         allowed_modules: modules,
         custom_ops: vec![],
         excluded_ops: vec![],
+        subset_size: Some(400),
     }
 }

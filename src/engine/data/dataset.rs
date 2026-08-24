@@ -14,6 +14,7 @@ use wide::f32x4;
 /// to evaluate 4 data points simultaneously in a single CPU cycle.
 ///
 /// It also handles transparent Z-score standardization (normalization) and denormalization.
+#[derive(Clone)]
 pub struct Dataset {
     /// Flattened and SIMD-aligned input features.
     pub feature_flat: Vec<f32x4>,
@@ -345,5 +346,79 @@ impl Dataset {
             schema.feature_types.clone(),
             schema.normalize,
         ))
+    }
+
+    /// Get the subset of the data for better performance
+    pub fn subset(&self, target_samples: usize) -> Self {
+        let samples = target_samples.min(self.num_samples);
+        if samples == self.num_samples {
+            return self.clone();
+        }
+
+        let simd_width = 4;
+        let padding = if samples % simd_width == 0 { 0 } else { simd_width - (samples % simd_width) };
+        let num_batches = (samples + padding) / simd_width;
+
+        let num_features_usize = self.num_features as usize;
+        let mut feature_flat = Vec::with_capacity(num_batches * num_features_usize);
+        let mut target_batches = Vec::with_capacity(num_batches);
+
+        let step = (self.num_samples as f64 - 1.0) / (samples as f64 - 1.0).max(1.0);
+
+        let get_feature_val = |orig_idx: usize, f_idx: usize| -> f32 {
+            if orig_idx >= self.num_samples { return 0.0; }
+            let batch_idx = orig_idx / 4;
+            let lane_idx = orig_idx % 4;
+            
+            let vec_val = self.feature_flat[batch_idx * num_features_usize + f_idx];
+            let arr: &[f32; 4] = unsafe { &*(&vec_val as *const _ as *const [f32; 4]) };
+            arr[lane_idx]
+        };
+
+        let get_target_val = |orig_idx: usize| -> f32 {
+            if orig_idx >= self.num_samples { return 0.0; }
+            let batch_idx = orig_idx / 4;
+            let lane_idx = orig_idx % 4;
+            
+            let vec_val = self.target_batches[batch_idx];
+            let arr: &[f32; 4] = unsafe { &*(&vec_val as *const _ as *const [f32; 4]) };
+            arr[lane_idx]
+        };
+
+        for i in 0..num_batches {
+            let start_idx = i * simd_width;
+            
+            for f_idx in 0..num_features_usize {
+                let batch = wide::f32x4::new([
+                    get_feature_val(((start_idx as f64) * step).round() as usize, f_idx),
+                    get_feature_val((((start_idx + 1) as f64) * step).round() as usize, f_idx),
+                    get_feature_val((((start_idx + 2) as f64) * step).round() as usize, f_idx),
+                    get_feature_val((((start_idx + 3) as f64) * step).round() as usize, f_idx),
+                ]);
+                feature_flat.push(batch);
+            }
+
+            let target_batch = wide::f32x4::new([
+                get_target_val(((start_idx as f64) * step).round() as usize),
+                get_target_val((((start_idx + 1) as f64) * step).round() as usize),
+                get_target_val((((start_idx + 2) as f64) * step).round() as usize),
+                get_target_val((((start_idx + 3) as f64) * step).round() as usize),
+            ]);
+            target_batches.push(target_batch);
+        }
+
+        Self {
+            feature_flat,
+            target_batches,
+            num_features: self.num_features,
+            num_batches,
+            num_samples: samples,
+            feature_means: self.feature_means.clone(),
+            feature_std_devs: self.feature_std_devs.clone(),
+            target_mean: self.target_mean,
+            target_std_dev: self.target_std_dev,
+            is_normalized: self.is_normalized,
+            feature_types: self.feature_types.clone(),
+        }
     }
 }
