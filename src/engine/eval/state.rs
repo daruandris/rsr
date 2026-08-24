@@ -1,7 +1,7 @@
 //! Virtual Machine states for evaluation and automatic differentiation.
 
 use crate::engine::eval::autodiff::DualSimd;
-use wide::f32x4;
+use wide::f32x8;
 
 /// The execution context for the SIMD virtual machine.
 ///
@@ -11,27 +11,27 @@ use wide::f32x4;
 /// in a single CPU instruction set loop.
 pub struct VmState {
     /// The evaluation stack for scalar float batches.
-    pub stack_f: [f32x4; 32],
+    pub stack_f: [f32x8; 32],
     /// The stack pointer for the float stack.
     pub sp_f: usize,
 
     /// The evaluation stack for 2D vectors.
-    pub stack_v2: [[f32x4; 2]; 32],
+    pub stack_v2: [[f32x8; 2]; 32],
     /// The stack pointer for the 2D vector stack.
     pub sp_v2: usize,
 
     /// The evaluation stack for 3D vectors.
-    pub stack_v3: [[f32x4; 3]; 32],
+    pub stack_v3: [[f32x8; 3]; 32],
     /// The stack pointer for the 3D vector stack.
     pub sp_v3: usize,
 
     /// The evaluation stack for 2x2 matrices.
-    pub stack_m2: [[f32x4; 4]; 32],
+    pub stack_m2: [[f32x8; 4]; 32],
     /// The stack pointer for the 2x2 matrix stack.
     pub sp_m2: usize,
 
     /// The evaluation stack for 3x3 matrices.
-    pub stack_m3: [[f32x4; 9]; 32],
+    pub stack_m3: [[f32x8; 9]; 32],
     /// The stack pointer for the 3x3 matrix stack.
     pub sp_m3: usize,
 }

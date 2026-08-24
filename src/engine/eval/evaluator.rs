@@ -10,14 +10,14 @@ use crate::engine::eval::scalar::Scalar;
 use crate::engine::eval::state::{DualVmState, VmState};
 use crate::engine::expr::program::Program;
 use crate::engine::optimize::Parameterized;
-use wide::f32x4;
+use wide::f32x8;
 
 /// Evaluates a compiled program on a single batch of SIMD features.
 ///
 /// This function acts as the main virtual machine loop, processing instructions
 /// sequentially and operating entirely on pre-allocated stacks.
 #[inline(always)]
-pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
+pub fn eval_simd(program: &Program, features: &[f32x8]) -> f32x8 {
     let mut ctx = VmState::new();
     let constants = &program.constants;
 
@@ -35,7 +35,7 @@ pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
             // bounds of the `constants` array. Stack capacity is guaranteed by AST structural limits.
             unsafe {
                 if let Scalar::Float(val) = constants.get_unchecked(*idx as usize) {
-                    *ctx.stack_f.get_unchecked_mut(ctx.sp_f) = f32x4::splat(*val);
+                    *ctx.stack_f.get_unchecked_mut(ctx.sp_f) = f32x8::splat(*val);
                 }
                 ctx.sp_f += 1;
             },
@@ -53,7 +53,7 @@ pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
             unsafe {
                 if let Scalar::Vec2(val) = constants.get_unchecked(*idx as usize) {
                     *ctx.stack_v2.get_unchecked_mut(ctx.sp_v2) =
-                        [f32x4::splat(val[0]), f32x4::splat(val[1])];
+                        [f32x8::splat(val[0]), f32x8::splat(val[1])];
                 }
                 ctx.sp_v2 += 1;
             },
@@ -73,9 +73,9 @@ pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
             unsafe {
                 if let Scalar::Vec3(val) = constants.get_unchecked(*idx as usize) {
                     *ctx.stack_v3.get_unchecked_mut(ctx.sp_v3) = [
-                        f32x4::splat(val[0]),
-                        f32x4::splat(val[1]),
-                        f32x4::splat(val[2]),
+                        f32x8::splat(val[0]),
+                        f32x8::splat(val[1]),
+                        f32x8::splat(val[2]),
                     ];
                 }
                 ctx.sp_v3 += 1;
@@ -97,10 +97,10 @@ pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
             unsafe {
                 if let Scalar::Mat2(val) = constants.get_unchecked(*idx as usize) {
                     *ctx.stack_m2.get_unchecked_mut(ctx.sp_m2) = [
-                        f32x4::splat(val[0]),
-                        f32x4::splat(val[1]),
-                        f32x4::splat(val[2]),
-                        f32x4::splat(val[3]),
+                        f32x8::splat(val[0]),
+                        f32x8::splat(val[1]),
+                        f32x8::splat(val[2]),
+                        f32x8::splat(val[3]),
                     ];
                 }
                 ctx.sp_m2 += 1;
@@ -127,15 +127,15 @@ pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
             unsafe {
                 if let Scalar::Mat3(val) = constants.get_unchecked(*idx as usize) {
                     *ctx.stack_m3.get_unchecked_mut(ctx.sp_m3) = [
-                        f32x4::splat(val[0]),
-                        f32x4::splat(val[1]),
-                        f32x4::splat(val[2]),
-                        f32x4::splat(val[3]),
-                        f32x4::splat(val[4]),
-                        f32x4::splat(val[5]),
-                        f32x4::splat(val[6]),
-                        f32x4::splat(val[7]),
-                        f32x4::splat(val[8]),
+                        f32x8::splat(val[0]),
+                        f32x8::splat(val[1]),
+                        f32x8::splat(val[2]),
+                        f32x8::splat(val[3]),
+                        f32x8::splat(val[4]),
+                        f32x8::splat(val[5]),
+                        f32x8::splat(val[6]),
+                        f32x8::splat(val[7]),
+                        f32x8::splat(val[8]),
                     ];
                 }
                 ctx.sp_m3 += 1;
@@ -151,7 +151,7 @@ pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
 
 /// Computes the Mean Squared Error (MSE) of a program over the entire dataset.
 pub fn compute_mse(program: &Program, dataset: &Dataset) -> f32 {
-    let mut sum_squared_error = f32x4::splat(0.0);
+    let mut sum_squared_error = f32x8::splat(0.0);
     let num_features = dataset.num_features as usize;
     let flat_features = &dataset.feature_flat;
     let targets = &dataset.target_batches;
@@ -175,8 +175,8 @@ pub fn compute_mse(program: &Program, dataset: &Dataset) -> f32 {
 
 /// Computes both the MSE and the gradient of the MSE with respect to the program's constants.
 pub fn compute_mse_with_gradient(program: &Program, dataset: &Dataset) -> (f32, [f32; 32]) {
-    let mut sum_squared_error = f32x4::splat(0.0);
-    let mut grad_sum = [f32x4::splat(0.0); 32];
+    let mut sum_squared_error = f32x8::splat(0.0);
+    let mut grad_sum = [f32x8::splat(0.0); 32];
 
     let num_features = dataset.num_features as usize;
     let flat_features = &dataset.feature_flat;
@@ -195,7 +195,7 @@ pub fn compute_mse_with_gradient(program: &Program, dataset: &Dataset) -> (f32, 
         let input_batch = unsafe { flat_features.get_unchecked(start..start + num_features) };
         let target = unsafe { *targets.get_unchecked(i) };
 
-        let mut diff = f32x4::splat(0.0);
+        let mut diff = f32x8::splat(0.0);
 
         for (k, item) in grad_sum.iter_mut().enumerate().take(active_params_count) {
             let dual_result = eval_simd_dual(program, input_batch, k);
@@ -204,7 +204,7 @@ pub fn compute_mse_with_gradient(program: &Program, dataset: &Dataset) -> (f32, 
                 diff = dual_result.val - target;
                 sum_squared_error += diff * diff;
             }
-            *item += f32x4::splat(2.0) * diff * dual_result.grad;
+            *item += f32x8::splat(2.0) * diff * dual_result.grad;
         }
     }
 
@@ -225,7 +225,7 @@ pub fn compute_mse_with_gradient(program: &Program, dataset: &Dataset) -> (f32, 
 
 /// Evaluates a compiled program using forward-mode automatic differentiation.
 #[inline(always)]
-pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: usize) -> DualSimd {
+pub fn eval_simd_dual(program: &Program, features: &[f32x8], active_const_idx: usize) -> DualSimd {
     let mut ctx = DualVmState::new();
     let constants = &program.constants;
 
@@ -244,11 +244,11 @@ pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: u
         flat_idx
     };
 
-    let get_grad = |flat_idx: usize| -> f32x4 {
+    let get_grad = |flat_idx: usize| -> f32x8 {
         if flat_idx == active_const_idx {
-            f32x4::splat(1.0)
+            f32x8::splat(1.0)
         } else {
-            f32x4::splat(0.0)
+            f32x8::splat(0.0)
         }
     };
 
@@ -267,7 +267,7 @@ pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: u
                 if let Scalar::Float(val) = constants.get_unchecked(*idx as usize) {
                     let flat_idx = get_flat_start_idx(*idx as usize);
                     *ctx.stack_f.get_unchecked_mut(ctx.sp_f) =
-                        DualSimd::new(f32x4::splat(*val), get_grad(flat_idx));
+                        DualSimd::new(f32x8::splat(*val), get_grad(flat_idx));
                 }
                 ctx.sp_f += 1;
             },
@@ -287,8 +287,8 @@ pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: u
                 if let Scalar::Vec2(val) = constants.get_unchecked(*idx as usize) {
                     let flat_idx = get_flat_start_idx(*idx as usize);
                     *ctx.stack_v2.get_unchecked_mut(ctx.sp_v2) = [
-                        DualSimd::new(f32x4::splat(val[0]), get_grad(flat_idx)),
-                        DualSimd::new(f32x4::splat(val[1]), get_grad(flat_idx + 1)),
+                        DualSimd::new(f32x8::splat(val[0]), get_grad(flat_idx)),
+                        DualSimd::new(f32x8::splat(val[1]), get_grad(flat_idx + 1)),
                     ];
                 }
                 ctx.sp_v2 += 1;
@@ -310,9 +310,9 @@ pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: u
                 if let Scalar::Vec3(val) = constants.get_unchecked(*idx as usize) {
                     let flat_idx = get_flat_start_idx(*idx as usize);
                     *ctx.stack_v3.get_unchecked_mut(ctx.sp_v3) = [
-                        DualSimd::new(f32x4::splat(val[0]), get_grad(flat_idx)),
-                        DualSimd::new(f32x4::splat(val[1]), get_grad(flat_idx + 1)),
-                        DualSimd::new(f32x4::splat(val[2]), get_grad(flat_idx + 2)),
+                        DualSimd::new(f32x8::splat(val[0]), get_grad(flat_idx)),
+                        DualSimd::new(f32x8::splat(val[1]), get_grad(flat_idx + 1)),
+                        DualSimd::new(f32x8::splat(val[2]), get_grad(flat_idx + 2)),
                     ];
                 }
                 ctx.sp_v3 += 1;
@@ -335,10 +335,10 @@ pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: u
                 if let Scalar::Mat2(val) = constants.get_unchecked(*idx as usize) {
                     let flat_idx = get_flat_start_idx(*idx as usize);
                     *ctx.stack_m2.get_unchecked_mut(ctx.sp_m2) = [
-                        DualSimd::new(f32x4::splat(val[0]), get_grad(flat_idx)),
-                        DualSimd::new(f32x4::splat(val[1]), get_grad(flat_idx + 1)),
-                        DualSimd::new(f32x4::splat(val[2]), get_grad(flat_idx + 2)),
-                        DualSimd::new(f32x4::splat(val[3]), get_grad(flat_idx + 3)),
+                        DualSimd::new(f32x8::splat(val[0]), get_grad(flat_idx)),
+                        DualSimd::new(f32x8::splat(val[1]), get_grad(flat_idx + 1)),
+                        DualSimd::new(f32x8::splat(val[2]), get_grad(flat_idx + 2)),
+                        DualSimd::new(f32x8::splat(val[3]), get_grad(flat_idx + 3)),
                     ];
                 }
                 ctx.sp_m2 += 1;
@@ -366,15 +366,15 @@ pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: u
                 if let Scalar::Mat3(val) = constants.get_unchecked(*idx as usize) {
                     let flat_idx = get_flat_start_idx(*idx as usize);
                     *ctx.stack_m3.get_unchecked_mut(ctx.sp_m3) = [
-                        DualSimd::new(f32x4::splat(val[0]), get_grad(flat_idx)),
-                        DualSimd::new(f32x4::splat(val[1]), get_grad(flat_idx + 1)),
-                        DualSimd::new(f32x4::splat(val[2]), get_grad(flat_idx + 2)),
-                        DualSimd::new(f32x4::splat(val[3]), get_grad(flat_idx + 3)),
-                        DualSimd::new(f32x4::splat(val[4]), get_grad(flat_idx + 4)),
-                        DualSimd::new(f32x4::splat(val[5]), get_grad(flat_idx + 5)),
-                        DualSimd::new(f32x4::splat(val[6]), get_grad(flat_idx + 6)),
-                        DualSimd::new(f32x4::splat(val[7]), get_grad(flat_idx + 7)),
-                        DualSimd::new(f32x4::splat(val[8]), get_grad(flat_idx + 8)),
+                        DualSimd::new(f32x8::splat(val[0]), get_grad(flat_idx)),
+                        DualSimd::new(f32x8::splat(val[1]), get_grad(flat_idx + 1)),
+                        DualSimd::new(f32x8::splat(val[2]), get_grad(flat_idx + 2)),
+                        DualSimd::new(f32x8::splat(val[3]), get_grad(flat_idx + 3)),
+                        DualSimd::new(f32x8::splat(val[4]), get_grad(flat_idx + 4)),
+                        DualSimd::new(f32x8::splat(val[5]), get_grad(flat_idx + 5)),
+                        DualSimd::new(f32x8::splat(val[6]), get_grad(flat_idx + 6)),
+                        DualSimd::new(f32x8::splat(val[7]), get_grad(flat_idx + 7)),
+                        DualSimd::new(f32x8::splat(val[8]), get_grad(flat_idx + 8)),
                     ];
                 }
                 ctx.sp_m3 += 1;

@@ -1,4 +1,6 @@
+use crate::engine::eval::scalar::Scalar;
 use crate::engine::eval::types::ValueType;
+use crate::engine::expr::node::Node;
 use crate::engine::search::individual::Individual;
 use rand::RngExt;
 
@@ -34,11 +36,26 @@ pub fn crossover(
     }
 
     let mut child_nodes = Vec::with_capacity(new_len);
-    child_nodes.extend_from_slice(&parent_a.nodes[..start_a]);
-    child_nodes.extend_from_slice(&parent_b.nodes[start_b..=end_b]);
-    child_nodes.extend_from_slice(&parent_a.nodes[end_a + 1..]);
+    let mut child_constants = Vec::new();
 
-    Individual::new(child_nodes)
+    let mut append_nodes = |source_nodes: &[Node], source_constants: &[Scalar]| {
+        for &node in source_nodes {
+            match node {
+                Node::Constant(idx, t) => {
+                    let new_idx = child_constants.len() as u16;
+                    child_constants.push(source_constants[idx as usize]);
+                    child_nodes.push(Node::Constant(new_idx, t));
+                }
+                other => child_nodes.push(other),
+            }
+        }
+    };
+
+    append_nodes(&parent_a.nodes[..start_a], &parent_a.constants);
+    append_nodes(&parent_b.nodes[start_b..=end_b], &parent_b.constants);
+    append_nodes(&parent_a.nodes[end_a + 1..], &parent_a.constants);
+
+    Individual::new(child_nodes, child_constants)
 }
 
 fn select_node_index(

@@ -34,7 +34,9 @@ pub fn point_mutation(
                     let chosen = valid_vars[rng.random_range(0..valid_vars.len())];
                     ind.nodes[idx] = Node::Variable(chosen.1, target_type);
                 } else {
-                    ind.nodes[idx] = Node::Constant(c, target_type);
+                    let c_idx = ind.constants.len() as u16;
+                    ind.constants.push(c);
+                    ind.nodes[idx] = Node::Constant(c_idx, target_type);
                 }
             }
             (true, None) => {
@@ -42,7 +44,9 @@ pub fn point_mutation(
                 ind.nodes[idx] = Node::Variable(chosen.1, target_type);
             }
             (false, Some(c)) => {
-                ind.nodes[idx] = Node::Constant(c, target_type);
+                let const_idx = ind.constants.len() as u16;
+                ind.constants.push(c);
+                ind.nodes[idx] = Node::Constant(const_idx, target_type);
             }
             (false, None) => {}
         }
@@ -69,9 +73,9 @@ pub fn constant_perturbation(ind: &mut Individual, rng: &mut impl RngExt) {
     }
 
     if let Some(idx) = target_idx
-        && let Node::Constant(ref mut val, _) = ind.nodes[idx]
+        && let Node::Constant(c_idx, _) = ind.nodes[idx]
     {
-        perturb_constant(val, rng);
+        perturb_constant(&mut ind.constants[c_idx as usize], rng);
         ind.invalidate();
     }
 }
@@ -135,17 +139,22 @@ pub fn subtree_mutation(
         return;
     }
 
-    let new_subtree = generate_random_ast(
+    let (mut new_subtree, new_consts) = generate_random_ast(
         required_type,
         mutation_max_depth,
         rng,
         variables,
         allowed_ops,
     );
-    if new_subtree.len() > allowed_new_len {
-        return;
+    
+    let const_offset = ind.constants.len() as u16;
+    for node in &mut new_subtree {
+        if let Node::Constant(idx, _) = node {
+            *idx += const_offset;
+        }
     }
-
+    
+    ind.constants.extend(new_consts);
     ind.nodes.splice(start..=end, new_subtree);
     ind.invalidate();
 }

@@ -1,12 +1,11 @@
 use crate::Instruction;
-use crate::engine::eval::scalar::Scalar;
 use crate::engine::eval::types::ValueType;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Node {
     Operator(Instruction),
     Variable(u8, ValueType),
-    Constant(Scalar, ValueType),
+    Constant(u16, ValueType),
 }
 
 impl Node {

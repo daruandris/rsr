@@ -5,26 +5,26 @@
 //! gradients during constant optimization.
 #![allow(unsafe_op_in_unsafe_fn)]
 use std::ops::{Add, Div, Mul, Sub};
-use wide::{CmpLt, f32x4};
+use wide::{CmpLt, f32x8};
 
 /// Represents a dual number for forward-mode AD using SIMD vectors.
 #[derive(Clone, Copy, Debug)]
 pub struct DualSimd {
-    pub val: f32x4,
-    pub grad: f32x4,
+    pub val: f32x8,
+    pub grad: f32x8,
 }
 
 impl DualSimd {
     #[inline(always)]
-    pub fn new(val: f32x4, grad: f32x4) -> Self {
+    pub fn new(val: f32x8, grad: f32x8) -> Self {
         Self { val, grad }
     }
 
     #[inline(always)]
-    pub fn constant(val: f32x4) -> Self {
+    pub fn constant(val: f32x8) -> Self {
         Self {
             val,
-            grad: f32x4::splat(0.0),
+            grad: f32x8::splat(0.0),
         }
     }
 
@@ -57,7 +57,7 @@ impl DualSimd {
     pub fn sqr(self) -> Self {
         Self {
             val: self.val * self.val,
-            grad: f32x4::splat(2.0) * self.val * self.grad,
+            grad: f32x8::splat(2.0) * self.val * self.grad,
         }
     }
 
@@ -66,7 +66,7 @@ impl DualSimd {
         let s = self.val.sqrt();
         Self {
             val: s,
-            grad: self.grad / (f32x4::splat(2.0) * s),
+            grad: self.grad / (f32x8::splat(2.0) * s),
         }
     }
 
@@ -138,8 +138,8 @@ pub fn dual_norm_v3(v: &[DualSimd; 3]) -> DualSimd {
     let norm_p = dot_p.sqrt();
 
     let safe_norm = norm_p
-        .simd_lt(f32x4::splat(1e-9))
-        .blend(f32x4::splat(1.0), norm_p);
+        .simd_lt(f32x8::splat(1e-9))
+        .blend(f32x8::splat(1.0), norm_p);
     let dot_pd = (v[0].val * v[0].grad) + (v[1].val * v[1].grad) + (v[2].val * v[2].grad);
     let grad = dot_pd / safe_norm;
 
@@ -169,7 +169,7 @@ pub fn dual_cross_v3(a: &[DualSimd; 3], b: &[DualSimd; 3]) -> [DualSimd; 3] {
 
 #[inline(always)]
 pub fn dual_mul_m2(a: &[DualSimd; 4], b: &[DualSimd; 4]) -> [DualSimd; 4] {
-    let mut out = [DualSimd::constant(f32x4::splat(0.0)); 4];
+    let mut out = [DualSimd::constant(f32x8::splat(0.0)); 4];
     out[0].val = a[0].val * b[0].val + a[2].val * b[1].val;
     out[1].val = a[1].val * b[0].val + a[3].val * b[1].val;
     out[2].val = a[0].val * b[2].val + a[2].val * b[3].val;
@@ -188,23 +188,23 @@ pub fn dual_mul_m2(a: &[DualSimd; 4], b: &[DualSimd; 4]) -> [DualSimd; 4] {
 #[inline(always)]
 pub fn dual_inverse_m2(m: &[DualSimd; 4]) -> [DualSimd; 4] {
     let det_p = (m[0].val * m[3].val) - (m[1].val * m[2].val);
-    let is_singular = det_p.abs().simd_lt(f32x4::splat(1e-9));
-    let safe_det = is_singular.blend(f32x4::splat(1.0), det_p);
-    let inv_d = f32x4::splat(1.0) / safe_det;
+    let is_singular = det_p.abs().simd_lt(f32x8::splat(1e-9));
+    let safe_det = is_singular.blend(f32x8::splat(1.0), det_p);
+    let inv_d = f32x8::splat(1.0) / safe_det;
 
-    let mut inv_p = [f32x4::splat(0.0); 4];
-    inv_p[0] = is_singular.blend(f32x4::splat(1.0), m[3].val * inv_d);
-    inv_p[1] = is_singular.blend(f32x4::splat(0.0), -m[1].val * inv_d);
-    inv_p[2] = is_singular.blend(f32x4::splat(0.0), -m[2].val * inv_d);
-    inv_p[3] = is_singular.blend(f32x4::splat(1.0), m[0].val * inv_d);
+    let mut inv_p = [f32x8::splat(0.0); 4];
+    inv_p[0] = is_singular.blend(f32x8::splat(1.0), m[3].val * inv_d);
+    inv_p[1] = is_singular.blend(f32x8::splat(0.0), -m[1].val * inv_d);
+    inv_p[2] = is_singular.blend(f32x8::splat(0.0), -m[2].val * inv_d);
+    inv_p[3] = is_singular.blend(f32x8::splat(1.0), m[0].val * inv_d);
 
-    let mut temp = [f32x4::splat(0.0); 4];
+    let mut temp = [f32x8::splat(0.0); 4];
     temp[0] = inv_p[0] * m[0].grad + inv_p[2] * m[1].grad;
     temp[1] = inv_p[1] * m[0].grad + inv_p[3] * m[1].grad;
     temp[2] = inv_p[0] * m[2].grad + inv_p[2] * m[3].grad;
     temp[3] = inv_p[1] * m[2].grad + inv_p[3] * m[3].grad;
 
-    let mut out = [DualSimd::constant(f32x4::splat(0.0)); 4];
+    let mut out = [DualSimd::constant(f32x8::splat(0.0)); 4];
     out[0].val = inv_p[0];
     out[1].val = inv_p[1];
     out[2].val = inv_p[2];

@@ -5,21 +5,21 @@ use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
-use wide::f32x4;
+use wide::f32x8;
 
 /// A heavily optimized data container designed for SIMD execution.
 ///
 /// The `Dataset` takes raw tabular data (from arrays, CSV, or JSON) and restructures
-/// it into a vectorized format (`f32x4`). This allows the genetic engine's Virtual Machine
+/// it into a vectorized format (`f32x8`). This allows the genetic engine's Virtual Machine
 /// to evaluate 4 data points simultaneously in a single CPU cycle.
 ///
 /// It also handles transparent Z-score standardization (normalization) and denormalization.
 #[derive(Clone)]
 pub struct Dataset {
     /// Flattened and SIMD-aligned input features.
-    pub feature_flat: Vec<f32x4>,
+    pub feature_flat: Vec<f32x8>,
     /// SIMD-aligned target values (Y).
-    pub target_batches: Vec<f32x4>,
+    pub target_batches: Vec<f32x8>,
     pub num_features: u8,
     pub num_batches: usize,
     pub num_samples: usize,
@@ -93,7 +93,7 @@ impl Dataset {
             };
         }
 
-        let simd_width = 4;
+        let simd_width = 8;
         let remainder = num_samples % simd_width;
         let padding = if remainder == 0 {
             0
@@ -127,20 +127,28 @@ impl Dataset {
         for i in 0..num_batches {
             let start_idx = i * simd_width;
             for f_idx in 0..num_features_usize {
-                let batch = f32x4::new([
+                let batch = f32x8::new([
                     get_norm_sample(start_idx, f_idx),
                     get_norm_sample(start_idx + 1, f_idx),
                     get_norm_sample(start_idx + 2, f_idx),
                     get_norm_sample(start_idx + 3, f_idx),
+                    get_norm_sample(start_idx + 4, f_idx),
+                    get_norm_sample(start_idx + 5, f_idx),
+                    get_norm_sample(start_idx + 6, f_idx),
+                    get_norm_sample(start_idx + 7, f_idx),
                 ]);
                 feature_flat.push(batch);
             }
 
-            let target_batch = f32x4::new([
+            let target_batch = f32x8::new([
                 get_norm_target(start_idx),
                 get_norm_target(start_idx + 1),
                 get_norm_target(start_idx + 2),
                 get_norm_target(start_idx + 3),
+                get_norm_target(start_idx + 4),
+                get_norm_target(start_idx + 5),
+                get_norm_target(start_idx + 6),
+                get_norm_target(start_idx + 7),
             ]);
             target_batches.push(target_batch);
         }
@@ -179,10 +187,10 @@ impl Dataset {
     }
 
     #[inline(always)]
-    pub fn denormalize_target_simd(&self, normalized_batch: f32x4) -> f32x4 {
+    pub fn denormalize_target_simd(&self, normalized_batch: f32x8) -> f32x8 {
         if self.is_normalized {
-            let std = f32x4::splat(self.target_std_dev);
-            let mean = f32x4::splat(self.target_mean);
+            let std = f32x8::splat(self.target_std_dev);
+            let mean = f32x8::splat(self.target_mean);
             normalized_batch * std + mean
         } else {
             normalized_batch
@@ -355,7 +363,7 @@ impl Dataset {
             return self.clone();
         }
 
-        let simd_width = 4;
+        let simd_width = 8;
         let padding = if samples % simd_width == 0 {
             0
         } else {
@@ -373,11 +381,11 @@ impl Dataset {
             if orig_idx >= self.num_samples {
                 return 0.0;
             }
-            let batch_idx = orig_idx / 4;
-            let lane_idx = orig_idx % 4;
+            let batch_idx = orig_idx / 8;
+            let lane_idx = orig_idx % 8;
 
             let vec_val = self.feature_flat[batch_idx * num_features_usize + f_idx];
-            let arr: &[f32; 4] = unsafe { &*(&vec_val as *const _ as *const [f32; 4]) };
+            let arr: &[f32; 8] = unsafe { &*(&vec_val as *const _ as *const [f32; 8]) };
             arr[lane_idx]
         };
 
@@ -385,11 +393,11 @@ impl Dataset {
             if orig_idx >= self.num_samples {
                 return 0.0;
             }
-            let batch_idx = orig_idx / 4;
-            let lane_idx = orig_idx % 4;
+            let batch_idx = orig_idx / 8;
+            let lane_idx = orig_idx % 8;
 
             let vec_val = self.target_batches[batch_idx];
-            let arr: &[f32; 4] = unsafe { &*(&vec_val as *const _ as *const [f32; 4]) };
+            let arr: &[f32; 8] = unsafe { &*(&vec_val as *const _ as *const [f32; 8]) };
             arr[lane_idx]
         };
 
@@ -397,20 +405,28 @@ impl Dataset {
             let start_idx = i * simd_width;
 
             for f_idx in 0..num_features_usize {
-                let batch = wide::f32x4::new([
+                let batch = wide::f32x8::new([
                     get_feature_val(((start_idx as f64) * step).round() as usize, f_idx),
                     get_feature_val((((start_idx + 1) as f64) * step).round() as usize, f_idx),
                     get_feature_val((((start_idx + 2) as f64) * step).round() as usize, f_idx),
                     get_feature_val((((start_idx + 3) as f64) * step).round() as usize, f_idx),
+                    get_feature_val((((start_idx + 4) as f64) * step).round() as usize, f_idx),
+                    get_feature_val((((start_idx + 5) as f64) * step).round() as usize, f_idx),
+                    get_feature_val((((start_idx + 6) as f64) * step).round() as usize, f_idx),
+                    get_feature_val((((start_idx + 7) as f64) * step).round() as usize, f_idx),
                 ]);
                 feature_flat.push(batch);
             }
 
-            let target_batch = wide::f32x4::new([
+            let target_batch = wide::f32x8::new([
                 get_target_val(((start_idx as f64) * step).round() as usize),
                 get_target_val((((start_idx + 1) as f64) * step).round() as usize),
                 get_target_val((((start_idx + 2) as f64) * step).round() as usize),
                 get_target_val((((start_idx + 3) as f64) * step).round() as usize),
+                get_target_val((((start_idx + 4) as f64) * step).round() as usize),
+                get_target_val((((start_idx + 5) as f64) * step).round() as usize),
+                get_target_val((((start_idx + 6) as f64) * step).round() as usize),
+                get_target_val((((start_idx + 7) as f64) * step).round() as usize),
             ]);
             target_batches.push(target_batch);
         }

@@ -31,7 +31,7 @@ impl Program {
     /// # Arguments
     ///
     /// * `nodes` - A slice of [`crate::engine::expr::node::Node`] representing the expression tree.
-    pub fn from_nodes(nodes: &[Node]) -> Self {
+    pub fn from_nodes(nodes: &[Node], ind_constants: &[Scalar]) -> Self {
         let mut code = Vec::with_capacity(nodes.len());
         let mut constants = Vec::new();
 
@@ -40,9 +40,9 @@ impl Program {
                 Node::Variable(idx, type_id) => {
                     code.push(Self::load_var_instruction(*idx, *type_id));
                 }
-                Node::Constant(val, type_id) => {
+                Node::Constant(idx, type_id) => {
                     let c_idx = constants.len();
-                    constants.push(*val);
+                    constants.push(ind_constants[*idx as usize]);
                     code.push(Self::load_const_instruction(c_idx as u16, *type_id));
                 }
                 Node::Operator(op) => {

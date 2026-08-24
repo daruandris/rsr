@@ -1,3 +1,5 @@
+// src/engine/search/operators/generator.rs
+
 use crate::Instruction;
 use crate::engine::eval::scalar::Scalar;
 use crate::engine::eval::types::ValueType;
@@ -10,11 +12,14 @@ pub fn generate_random_ast(
     rng: &mut impl RngExt,
     variables: &[(ValueType, u8)],
     allowed_ops: &[Instruction],
-) -> Vec<Node> {
+) -> (Vec<Node>, Vec<Scalar>) {
     let cap = 1 << (max_depth.min(6));
     let mut nodes = Vec::with_capacity(cap);
+    let mut constants = Vec::new();
+    
     build_ast_recursive(
         &mut nodes,
+        &mut constants,
         target_type,
         0,
         max_depth,
@@ -23,11 +28,13 @@ pub fn generate_random_ast(
         allowed_ops,
         None,
     );
-    nodes
+    
+    (nodes, constants)
 }
 
 fn build_ast_recursive(
     nodes: &mut Vec<Node>,
+    constants: &mut Vec<Scalar>,
     target_type: ValueType,
     current_depth: usize,
     max_depth: usize,
@@ -50,17 +57,24 @@ fn build_ast_recursive(
                     let chosen = valid_vars[rng.random_range(0..valid_vars.len())];
                     nodes.push(Node::Variable(chosen.1, target_type));
                 } else {
-                    nodes.push(Node::Constant(c, target_type));
+                    let idx = constants.len() as u16;
+                    constants.push(c);
+                    nodes.push(Node::Constant(idx, target_type));
                 }
             }
             (true, None) => {
                 let chosen = valid_vars[rng.random_range(0..valid_vars.len())];
                 nodes.push(Node::Variable(chosen.1, target_type));
             }
-            (false, Some(c)) => nodes.push(Node::Constant(c, target_type)),
+            (false, Some(c)) => {
+                let idx = constants.len() as u16;
+                constants.push(c);
+                nodes.push(Node::Constant(idx, target_type));
+            }
             (false, None) => {
                 add_operator_node(
                     nodes,
+                    constants,
                     target_type,
                     current_depth,
                     max_depth,
@@ -74,6 +88,7 @@ fn build_ast_recursive(
     } else {
         add_operator_node(
             nodes,
+            constants,
             target_type,
             current_depth,
             max_depth,
@@ -87,6 +102,7 @@ fn build_ast_recursive(
 
 fn add_operator_node(
     nodes: &mut Vec<Node>,
+    constants: &mut Vec<Scalar>,
     target_type: ValueType,
     current_depth: usize,
     max_depth: usize,
@@ -100,6 +116,7 @@ fn add_operator_node(
         for &child_type in expected_children_types {
             build_ast_recursive(
                 nodes,
+                constants,
                 child_type,
                 current_depth + 1,
                 max_depth,
@@ -120,7 +137,9 @@ fn add_operator_node(
                     let chosen = valid_vars[rng.random_range(0..valid_vars.len())];
                     nodes.push(Node::Variable(chosen.1, target_type));
                 } else {
-                    nodes.push(Node::Constant(c, target_type));
+                    let idx = constants.len() as u16;
+                    constants.push(c);
+                    nodes.push(Node::Constant(idx, target_type));
                 }
             }
             (true, None) => {
@@ -128,7 +147,9 @@ fn add_operator_node(
                 nodes.push(Node::Variable(chosen.1, target_type));
             }
             (false, Some(c)) => {
-                nodes.push(Node::Constant(c, target_type));
+                let idx = constants.len() as u16;
+                constants.push(c);
+                nodes.push(Node::Constant(idx, target_type));
             }
             (false, None) => {
                 panic!(

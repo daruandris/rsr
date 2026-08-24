@@ -152,17 +152,14 @@ pub fn run_nelder_mead(ind: &mut Individual, dataset: &Dataset, max_iterations: 
     for (j, &idx) in opt_indices.iter().enumerate().take(n) {
         program.constants[idx] = Scalar::Float(simplex[0].2[j]);
     }
-
-    let best_consts = &program.constants;
+    ind.fitness = simplex[0].1;
     let mut const_idx = 0;
-
-    for node in ind.nodes.iter_mut() {
-        if let crate::engine::expr::node::Node::Constant(val, _) = node
-            && const_idx < best_consts.len()
-        {
-            *val = best_consts[const_idx];
-            const_idx += 1;
+    for node in ind.nodes.iter() {
+        if let crate::engine::expr::node::Node::Constant(idx, _) = node {
+            if const_idx < program.constants.len() {
+                ind.constants[*idx as usize] = program.constants[const_idx];
+                const_idx += 1;
+            }
         }
     }
-    ind.fitness = simplex[0].1;
 }

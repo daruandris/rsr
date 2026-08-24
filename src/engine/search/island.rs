@@ -42,14 +42,14 @@ impl<S: Strategy> Island<S> {
         let mut individuals = Vec::with_capacity(size);
 
         for _ in 0..size {
-            let ast = generate_random_ast(
+            let (ast, constants) = generate_random_ast(
                 ValueType::Float,
                 5,
                 &mut rng,
                 &variable_registry,
                 &allowed_ops,
             );
-            let mut ind = Individual::new(ast);
+            let mut ind = Individual::new(ast, constants);
             ind.simplify();
             individuals.push(ind);
         }
@@ -68,15 +68,15 @@ impl<S: Strategy> Island<S> {
         }
     }
 
-    pub fn step_generation(&mut self, dataset: &Dataset) {
+    pub fn step_generation(&mut self, dataset: &Dataset, mini_batch: &Dataset) {
         let old_best_fitness = self.best_individual.fitness;
         for ind in self.individuals.iter_mut() {
             ind.age += 1;
         }
         assign_rank_and_crowding_distance(&mut self.individuals);
 
-        self.fill_next_generation(dataset);
-        self.evaluate_buffer(dataset);
+        self.fill_next_generation(mini_batch);
+        self.evaluate_buffer(dataset, mini_batch);
         mem::swap(&mut self.individuals, &mut self.next_gen_buffer);
 
         let improvement = old_best_fitness - self.best_individual.fitness;
@@ -94,7 +94,7 @@ impl<S: Strategy> Island<S> {
         }
     }
 
-    fn fill_next_generation(&mut self, dataset: &Dataset) {
+    fn fill_next_generation(&mut self, mini_batch: &Dataset) {
         self.next_gen_buffer.clear();
         let pop_size = self.individuals.capacity();
 
@@ -107,14 +107,14 @@ impl<S: Strategy> Island<S> {
             if self.next_gen_buffer.len() >= pop_size {
                 break;
             }
-            let ast = generate_random_ast(
+            let (ast, constants) = generate_random_ast(
                 ValueType::Float,
                 5,
                 &mut self.rng,
                 &self.variable_registry,
                 &self.allowed_ops,
             );
-            let mut ind = Individual::new(ast);
+            let mut ind = Individual::new(ast, constants);
             ind.simplify();
             self.next_gen_buffer.push(ind);
         }
@@ -147,7 +147,7 @@ impl<S: Strategy> Island<S> {
                     tournament_selection_pareto(&self.individuals, tourn_size, &mut self.rng)
                         .clone();
                 if candidate.fitness == f32::MAX {
-                    candidate.fitness = candidate.calculate_mse(dataset);
+                    candidate.fitness = candidate.calculate_mse(mini_batch);
                 }
                 let mut current_fitness = candidate.fitness;
 
@@ -172,7 +172,7 @@ impl<S: Strategy> Island<S> {
                     }
                     mutated_candidate.simplify();
                     if !mutated_candidate.has_forbidden_patterns() {
-                        let new_mse = mutated_candidate.calculate_mse(dataset);
+                        let new_mse = mutated_candidate.calculate_mse(mini_batch);
                         if new_mse < current_fitness {
                             candidate = mutated_candidate;
                             current_fitness = new_mse;
@@ -191,14 +191,14 @@ impl<S: Strategy> Island<S> {
         self.individuals.push(self.best_individual.clone());
 
         for _ in 1..pop_size {
-            let ast = generate_random_ast(
+            let (ast, constants) = generate_random_ast(
                 ValueType::Float,
                 5,
                 &mut self.rng,
                 &self.variable_registry,
                 &self.allowed_ops,
             );
-            let mut new_ind = Individual::new(ast);
+            let mut new_ind = Individual::new(ast, constants);
             new_ind.simplify();
 
             let mse = new_ind.calculate_mse(dataset);
@@ -211,28 +211,44 @@ impl<S: Strategy> Island<S> {
         self.stagnation_counter = 0;
     }
 
-    fn evaluate_buffer(&mut self, dataset: &Dataset) {
+    fn evaluate_buffer(&mut self, dataset: &Dataset, mini_batch: &Dataset) {
+        let mut best_clone = self.best_individual.clone();
+        let baseline_mini_mse = best_clone.calculate_mse(mini_batch);
+
         for ind in self.next_gen_buffer.iter_mut() {
-            if self.rng.random::<f32>() < self.strategy.opt_prob() {
-                ind.optimize_constants(dataset, self.strategy.opt_iterations());
-                if ind.program.is_none() {
-                    ind.compile();
-                }
+            let mini_mse = ind.calculate_mse(mini_batch);
+            let mut is_promising = mini_mse < (baseline_mini_mse * 2.0);
+            if !is_promising && self.rng.random::<f32>() < 0.05 {
+                is_promising = true;
             }
 
-            let mse = ind.calculate_mse(dataset);
-            if mse.is_finite() {
+            let mut final_mse = mini_mse;
+
+            if is_promising {
+                final_mse = ind.calculate_mse(dataset);
+                let is_potential_elite = final_mse < self.best_individual.fitness;
+                let random_opt = self.rng.random::<f32>() < self.strategy.opt_prob();
+
+                if (is_potential_elite || random_opt) && final_mse.is_finite() {
+                    ind.optimize_constants(dataset, self.strategy.opt_iterations());
+                    if ind.program.is_none() {
+                        ind.compile();
+                    }
+                    final_mse = ind.calculate_mse(dataset);
+                }
+            }
+            if final_mse.is_finite() {
                 let complexity = ind.complexity();
                 let is_new_best = match self.local_hof.get(&complexity) {
-                    Some(&(best_mse, _)) => mse < best_mse,
+                    Some(&(best_mse, _)) => final_mse < best_mse,
                     None => true,
                 };
                 if is_new_best {
-                    self.local_hof.insert(complexity, (mse, ind.clone()));
+                    self.local_hof.insert(complexity, (final_mse, ind.clone()));
                 }
 
                 let complexity_penalty = (complexity as f32) * self.strategy.parsimony_penalty();
-                ind.fitness = mse + complexity_penalty;
+                ind.fitness = final_mse + complexity_penalty;
             } else {
                 ind.fitness = f32::MAX;
             }

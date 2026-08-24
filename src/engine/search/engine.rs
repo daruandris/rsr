@@ -45,9 +45,12 @@ impl<S: Strategy> Engine<S> {
         let migration_interval = self.global_strategy.migration_interval();
         let verbose = self.global_strategy.verbose();
 
+        let mini_batch_size = self.global_strategy.mini_batch_size();
+        let mini_batch = dataset.subset(mini_batch_size);
+
         for generation in 0..max_generations {
             self.islands.par_iter_mut().for_each(|island| {
-                island.step_generation(dataset);
+                island.step_generation(dataset, &mini_batch);
             });
 
             for island in &self.islands {

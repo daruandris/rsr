@@ -2,7 +2,7 @@ use crate::Instruction;
 use crate::domains::basic::BasicOpCode;
 use crate::domains::linalg::LinalgOpCode;
 use crate::engine::data::dataset::Dataset;
-use crate::engine::eval::evaluator;
+use crate::engine::eval::{evaluator};
 use crate::engine::eval::scalar::Scalar;
 use crate::engine::expr::format::format_ast;
 use crate::engine::expr::node::Node;
@@ -14,6 +14,7 @@ use std::fmt;
 #[derive(Clone)]
 pub struct Individual {
     pub nodes: Vec<Node>,
+    pub constants: Vec<Scalar>,
     pub fitness: f32,
     pub age: usize,
     pub program: Option<Program>,
@@ -22,9 +23,10 @@ pub struct Individual {
 }
 
 impl Individual {
-    pub fn new(nodes: Vec<Node>) -> Self {
+    pub fn new(nodes: Vec<Node>, constants: Vec<Scalar>) -> Self {
         Self {
             nodes,
+            constants,
             fitness: f32::MAX,
             age: 0,
             program: None,
@@ -35,7 +37,7 @@ impl Individual {
 
     pub fn compile(&mut self) {
         if self.program.is_none() {
-            self.program = Some(Program::from_nodes(&self.nodes));
+            self.program = Some(Program::from_nodes(&self.nodes, &self.constants));
         }
     }
 
@@ -52,28 +54,11 @@ impl Individual {
     }
 
     pub fn get_constants(&self) -> Vec<Scalar> {
-        self.nodes
-            .iter()
-            .filter_map(|node| {
-                if let Node::Constant(c, _) = node {
-                    Some(*c)
-                } else {
-                    None
-                }
-            })
-            .collect()
+        self.constants.clone()
     }
 
     pub fn set_constants(&mut self, new_constants: &[Scalar]) {
-        let mut const_idx = 0;
-        for node in self.nodes.iter_mut() {
-            if let Node::Constant(c, _) = node
-                && const_idx < new_constants.len()
-            {
-                *c = new_constants[const_idx];
-                const_idx += 1;
-            }
-        }
+        self.constants.copy_from_slice(new_constants);
         self.invalidate();
     }
 
@@ -93,7 +78,9 @@ impl Individual {
         if self.nodes.is_empty() {
             return;
         }
-        self.nodes = simplify_ast(&self.nodes);
+        let (new_nodes, new_consts) = simplify_ast(&self.nodes, &self.constants);
+        self.nodes = new_nodes;
+        self.constants = new_consts;
         self.invalidate();
     }
 

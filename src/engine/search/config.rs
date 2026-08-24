@@ -33,6 +33,7 @@ pub struct Config {
     pub custom_ops: Vec<Instruction>,
     pub excluded_ops: Vec<Instruction>,
     pub subset_size: Option<usize>,
+    pub mini_batch_size: usize,
 }
 
 impl Config {
@@ -45,7 +46,7 @@ impl Config {
             tournament_size: 2,
             migration_interval: 25,
             parsimony_penalty: 0.000005,
-            opt_prob: 0.2,
+            opt_prob: 0.01,
             opt_iterations: 100,
             final_opt_iterations: 4000,
             stagnation_threshold: 1000,
@@ -55,12 +56,13 @@ impl Config {
             min_random_injection: 2,
             max_tree_size: 32,
             mutation_max_depth: 4,
-            mutation_cycles: 5,
+            mutation_cycles: 2,
             verbose: true,
             allowed_modules,
             custom_ops: vec![],
             excluded_ops: vec![],
             subset_size: Some(400),
+            mini_batch_size: 64,
         }
     }
 
@@ -119,6 +121,11 @@ impl Config {
 
     pub fn parsimony_penalty(mut self, penalty: f32) -> Self {
         self.parsimony_penalty = penalty;
+        self
+    }
+
+    pub fn mini_batch_size(mut self, size: usize) -> Self {
+        self.mini_batch_size = size;
         self
     }
 }

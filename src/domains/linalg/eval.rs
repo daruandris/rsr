@@ -1,12 +1,12 @@
 #![allow(unsafe_op_in_unsafe_fn)]
-use wide::{CmpLt, f32x4};
+use wide::{CmpLt, f32x8};
 
 #[inline(always)]
 pub unsafe fn eval_make_vec2(
     sp_f: &mut usize,
-    stack_f: &[f32x4; 32],
+    stack_f: &[f32x8; 32],
     sp_v2: &mut usize,
-    stack_v2: &mut [[f32x4; 2]; 32],
+    stack_v2: &mut [[f32x8; 2]; 32],
 ) {
     *sp_f -= 2;
     *stack_v2.get_unchecked_mut(*sp_v2) = [
@@ -18,9 +18,9 @@ pub unsafe fn eval_make_vec2(
 #[inline(always)]
 pub unsafe fn eval_make_vec3(
     sp_f: &mut usize,
-    stack_f: &[f32x4; 32],
+    stack_f: &[f32x8; 32],
     sp_v3: &mut usize,
-    stack_v3: &mut [[f32x4; 3]; 32],
+    stack_v3: &mut [[f32x8; 3]; 32],
 ) {
     *sp_f -= 3;
     *stack_v3.get_unchecked_mut(*sp_v3) = [
@@ -33,9 +33,9 @@ pub unsafe fn eval_make_vec3(
 #[inline(always)]
 pub unsafe fn eval_get_x_v2(
     sp_f: &mut usize,
-    stack_f: &mut [f32x4; 32],
+    stack_f: &mut [f32x8; 32],
     sp_v2: &mut usize,
-    stack_v2: &[[f32x4; 2]; 32],
+    stack_v2: &[[f32x8; 2]; 32],
 ) {
     *sp_v2 -= 1;
     *stack_f.get_unchecked_mut(*sp_f) = stack_v2.get_unchecked(*sp_v2)[0];
@@ -44,9 +44,9 @@ pub unsafe fn eval_get_x_v2(
 #[inline(always)]
 pub unsafe fn eval_get_y_v2(
     sp_f: &mut usize,
-    stack_f: &mut [f32x4; 32],
+    stack_f: &mut [f32x8; 32],
     sp_v2: &mut usize,
-    stack_v2: &[[f32x4; 2]; 32],
+    stack_v2: &[[f32x8; 2]; 32],
 ) {
     *sp_v2 -= 1;
     *stack_f.get_unchecked_mut(*sp_f) = stack_v2.get_unchecked(*sp_v2)[1];
@@ -55,9 +55,9 @@ pub unsafe fn eval_get_y_v2(
 #[inline(always)]
 pub unsafe fn eval_get_x_v3(
     sp_f: &mut usize,
-    stack_f: &mut [f32x4; 32],
+    stack_f: &mut [f32x8; 32],
     sp_v3: &mut usize,
-    stack_v3: &[[f32x4; 3]; 32],
+    stack_v3: &[[f32x8; 3]; 32],
 ) {
     *sp_v3 -= 1;
     *stack_f.get_unchecked_mut(*sp_f) = stack_v3.get_unchecked(*sp_v3)[0];
@@ -66,9 +66,9 @@ pub unsafe fn eval_get_x_v3(
 #[inline(always)]
 pub unsafe fn eval_get_y_v3(
     sp_f: &mut usize,
-    stack_f: &mut [f32x4; 32],
+    stack_f: &mut [f32x8; 32],
     sp_v3: &mut usize,
-    stack_v3: &[[f32x4; 3]; 32],
+    stack_v3: &[[f32x8; 3]; 32],
 ) {
     *sp_v3 -= 1;
     *stack_f.get_unchecked_mut(*sp_f) = stack_v3.get_unchecked(*sp_v3)[1];
@@ -77,9 +77,9 @@ pub unsafe fn eval_get_y_v3(
 #[inline(always)]
 pub unsafe fn eval_get_z_v3(
     sp_f: &mut usize,
-    stack_f: &mut [f32x4; 32],
+    stack_f: &mut [f32x8; 32],
     sp_v3: &mut usize,
-    stack_v3: &[[f32x4; 3]; 32],
+    stack_v3: &[[f32x8; 3]; 32],
 ) {
     *sp_v3 -= 1;
     *stack_f.get_unchecked_mut(*sp_f) = stack_v3.get_unchecked(*sp_v3)[2];
@@ -87,7 +87,7 @@ pub unsafe fn eval_get_z_v3(
 }
 
 #[inline(always)]
-pub unsafe fn eval_add_v2(sp_v2: &mut usize, stack_v2: &mut [[f32x4; 2]; 32]) {
+pub unsafe fn eval_add_v2(sp_v2: &mut usize, stack_v2: &mut [[f32x8; 2]; 32]) {
     *sp_v2 -= 2;
     let a = *stack_v2.get_unchecked(*sp_v2);
     let b = *stack_v2.get_unchecked(*sp_v2 + 1);
@@ -95,7 +95,7 @@ pub unsafe fn eval_add_v2(sp_v2: &mut usize, stack_v2: &mut [[f32x4; 2]; 32]) {
     *sp_v2 += 1;
 }
 #[inline(always)]
-pub unsafe fn eval_sub_v2(sp_v2: &mut usize, stack_v2: &mut [[f32x4; 2]; 32]) {
+pub unsafe fn eval_sub_v2(sp_v2: &mut usize, stack_v2: &mut [[f32x8; 2]; 32]) {
     *sp_v2 -= 2;
     let a = *stack_v2.get_unchecked(*sp_v2);
     let b = *stack_v2.get_unchecked(*sp_v2 + 1);
@@ -105,9 +105,9 @@ pub unsafe fn eval_sub_v2(sp_v2: &mut usize, stack_v2: &mut [[f32x4; 2]; 32]) {
 #[inline(always)]
 pub unsafe fn eval_scale_v2(
     sp_f: &mut usize,
-    stack_f: &[f32x4; 32],
+    stack_f: &[f32x8; 32],
     sp_v2: &mut usize,
-    stack_v2: &mut [[f32x4; 2]; 32],
+    stack_v2: &mut [[f32x8; 2]; 32],
 ) {
     *sp_f -= 1;
     *sp_v2 -= 1;
@@ -119,9 +119,9 @@ pub unsafe fn eval_scale_v2(
 #[inline(always)]
 pub unsafe fn eval_dot_v2(
     sp_f: &mut usize,
-    stack_f: &mut [f32x4; 32],
+    stack_f: &mut [f32x8; 32],
     sp_v2: &mut usize,
-    stack_v2: &[[f32x4; 2]; 32],
+    stack_v2: &[[f32x8; 2]; 32],
 ) {
     *sp_v2 -= 2;
     let a = *stack_v2.get_unchecked(*sp_v2);
@@ -132,9 +132,9 @@ pub unsafe fn eval_dot_v2(
 #[inline(always)]
 pub unsafe fn eval_norm_v2(
     sp_f: &mut usize,
-    stack_f: &mut [f32x4; 32],
+    stack_f: &mut [f32x8; 32],
     sp_v2: &mut usize,
-    stack_v2: &[[f32x4; 2]; 32],
+    stack_v2: &[[f32x8; 2]; 32],
 ) {
     let idx = *sp_v2 - 1;
     let v = *stack_v2.get_unchecked(idx);
@@ -144,7 +144,7 @@ pub unsafe fn eval_norm_v2(
 }
 
 #[inline(always)]
-pub unsafe fn eval_add_v3(sp_v3: &mut usize, stack_v3: &mut [[f32x4; 3]; 32]) {
+pub unsafe fn eval_add_v3(sp_v3: &mut usize, stack_v3: &mut [[f32x8; 3]; 32]) {
     *sp_v3 -= 2;
     let a = *stack_v3.get_unchecked(*sp_v3);
     let b = *stack_v3.get_unchecked(*sp_v3 + 1);
@@ -152,7 +152,7 @@ pub unsafe fn eval_add_v3(sp_v3: &mut usize, stack_v3: &mut [[f32x4; 3]; 32]) {
     *sp_v3 += 1;
 }
 #[inline(always)]
-pub unsafe fn eval_sub_v3(sp_v3: &mut usize, stack_v3: &mut [[f32x4; 3]; 32]) {
+pub unsafe fn eval_sub_v3(sp_v3: &mut usize, stack_v3: &mut [[f32x8; 3]; 32]) {
     *sp_v3 -= 2;
     let a = *stack_v3.get_unchecked(*sp_v3);
     let b = *stack_v3.get_unchecked(*sp_v3 + 1);
@@ -162,9 +162,9 @@ pub unsafe fn eval_sub_v3(sp_v3: &mut usize, stack_v3: &mut [[f32x4; 3]; 32]) {
 #[inline(always)]
 pub unsafe fn eval_scale_v3(
     sp_f: &mut usize,
-    stack_f: &[f32x4; 32],
+    stack_f: &[f32x8; 32],
     sp_v3: &mut usize,
-    stack_v3: &mut [[f32x4; 3]; 32],
+    stack_v3: &mut [[f32x8; 3]; 32],
 ) {
     *sp_f -= 1;
     *sp_v3 -= 1;
@@ -176,9 +176,9 @@ pub unsafe fn eval_scale_v3(
 #[inline(always)]
 pub unsafe fn eval_dot_v3(
     sp_f: &mut usize,
-    stack_f: &mut [f32x4; 32],
+    stack_f: &mut [f32x8; 32],
     sp_v3: &mut usize,
-    stack_v3: &[[f32x4; 3]; 32],
+    stack_v3: &[[f32x8; 3]; 32],
 ) {
     *sp_v3 -= 2;
     let a = *stack_v3.get_unchecked(*sp_v3);
@@ -189,9 +189,9 @@ pub unsafe fn eval_dot_v3(
 #[inline(always)]
 pub unsafe fn eval_norm_v3(
     sp_f: &mut usize,
-    stack_f: &mut [f32x4; 32],
+    stack_f: &mut [f32x8; 32],
     sp_v3: &mut usize,
-    stack_v3: &[[f32x4; 3]; 32],
+    stack_v3: &[[f32x8; 3]; 32],
 ) {
     let idx = *sp_v3 - 1;
     let v = *stack_v3.get_unchecked(idx);
@@ -200,7 +200,7 @@ pub unsafe fn eval_norm_v3(
     *sp_v3 -= 1;
 }
 #[inline(always)]
-pub unsafe fn eval_cross_v3(sp_v3: &mut usize, stack_v3: &mut [[f32x4; 3]; 32]) {
+pub unsafe fn eval_cross_v3(sp_v3: &mut usize, stack_v3: &mut [[f32x8; 3]; 32]) {
     *sp_v3 -= 2;
     let a = *stack_v3.get_unchecked(*sp_v3);
     let b = *stack_v3.get_unchecked(*sp_v3 + 1);
@@ -215,9 +215,9 @@ pub unsafe fn eval_cross_v3(sp_v3: &mut usize, stack_v3: &mut [[f32x4; 3]; 32]) 
 #[inline(always)]
 pub unsafe fn eval_make_mat2(
     sp_v2: &mut usize,
-    stack_v2: &[[f32x4; 2]; 32],
+    stack_v2: &[[f32x8; 2]; 32],
     sp_m2: &mut usize,
-    stack_m2: &mut [[f32x4; 4]; 32],
+    stack_m2: &mut [[f32x8; 4]; 32],
 ) {
     *sp_v2 -= 2;
     let c0 = *stack_v2.get_unchecked(*sp_v2);
@@ -226,7 +226,7 @@ pub unsafe fn eval_make_mat2(
     *sp_m2 += 1;
 }
 #[inline(always)]
-pub unsafe fn eval_add_m2(sp_m2: &mut usize, stack_m2: &mut [[f32x4; 4]; 32]) {
+pub unsafe fn eval_add_m2(sp_m2: &mut usize, stack_m2: &mut [[f32x8; 4]; 32]) {
     *sp_m2 -= 2;
     let a = *stack_m2.get_unchecked(*sp_m2);
     let b = *stack_m2.get_unchecked(*sp_m2 + 1);
@@ -234,7 +234,7 @@ pub unsafe fn eval_add_m2(sp_m2: &mut usize, stack_m2: &mut [[f32x4; 4]; 32]) {
     *sp_m2 += 1;
 }
 #[inline(always)]
-pub unsafe fn eval_sub_m2(sp_m2: &mut usize, stack_m2: &mut [[f32x4; 4]; 32]) {
+pub unsafe fn eval_sub_m2(sp_m2: &mut usize, stack_m2: &mut [[f32x8; 4]; 32]) {
     *sp_m2 -= 2;
     let a = *stack_m2.get_unchecked(*sp_m2);
     let b = *stack_m2.get_unchecked(*sp_m2 + 1);
@@ -244,9 +244,9 @@ pub unsafe fn eval_sub_m2(sp_m2: &mut usize, stack_m2: &mut [[f32x4; 4]; 32]) {
 #[inline(always)]
 pub unsafe fn eval_scale_m2(
     sp_f: &mut usize,
-    stack_f: &[f32x4; 32],
+    stack_f: &[f32x8; 32],
     sp_m2: &mut usize,
-    stack_m2: &mut [[f32x4; 4]; 32],
+    stack_m2: &mut [[f32x8; 4]; 32],
 ) {
     *sp_f -= 1;
     *sp_m2 -= 1;
@@ -256,7 +256,7 @@ pub unsafe fn eval_scale_m2(
     *sp_m2 += 1;
 }
 #[inline(always)]
-pub unsafe fn eval_mul_m2(sp_m2: &mut usize, stack_m2: &mut [[f32x4; 4]; 32]) {
+pub unsafe fn eval_mul_m2(sp_m2: &mut usize, stack_m2: &mut [[f32x8; 4]; 32]) {
     *sp_m2 -= 2;
     let a = *stack_m2.get_unchecked(*sp_m2);
     let b = *stack_m2.get_unchecked(*sp_m2 + 1);
@@ -271,9 +271,9 @@ pub unsafe fn eval_mul_m2(sp_m2: &mut usize, stack_m2: &mut [[f32x4; 4]; 32]) {
 #[inline(always)]
 pub unsafe fn eval_mul_m2v2(
     sp_m2: &mut usize,
-    stack_m2: &[[f32x4; 4]; 32],
+    stack_m2: &[[f32x8; 4]; 32],
     sp_v2: &mut usize,
-    stack_v2: &mut [[f32x4; 2]; 32],
+    stack_v2: &mut [[f32x8; 2]; 32],
 ) {
     *sp_m2 -= 1;
     *sp_v2 -= 1;
@@ -285,9 +285,9 @@ pub unsafe fn eval_mul_m2v2(
 #[inline(always)]
 pub unsafe fn eval_det_m2(
     sp_f: &mut usize,
-    stack_f: &mut [f32x4; 32],
+    stack_f: &mut [f32x8; 32],
     sp_m2: &mut usize,
-    stack_m2: &[[f32x4; 4]; 32],
+    stack_m2: &[[f32x8; 4]; 32],
 ) {
     *sp_m2 -= 1;
     let m = *stack_m2.get_unchecked(*sp_m2);
@@ -297,9 +297,9 @@ pub unsafe fn eval_det_m2(
 #[inline(always)]
 pub unsafe fn eval_trace_m2(
     sp_f: &mut usize,
-    stack_f: &mut [f32x4; 32],
+    stack_f: &mut [f32x8; 32],
     sp_m2: &mut usize,
-    stack_m2: &[[f32x4; 4]; 32],
+    stack_m2: &[[f32x8; 4]; 32],
 ) {
     *sp_m2 -= 1;
     let m = *stack_m2.get_unchecked(*sp_m2);
@@ -307,33 +307,33 @@ pub unsafe fn eval_trace_m2(
     *sp_f += 1;
 }
 #[inline(always)]
-pub unsafe fn eval_transpose_m2(sp_m2: &mut usize, stack_m2: &mut [[f32x4; 4]; 32]) {
+pub unsafe fn eval_transpose_m2(sp_m2: &mut usize, stack_m2: &mut [[f32x8; 4]; 32]) {
     let idx = *sp_m2 - 1;
     let m = *stack_m2.get_unchecked(idx);
     *stack_m2.get_unchecked_mut(idx) = [m[0], m[2], m[1], m[3]];
 }
 #[inline(always)]
-pub unsafe fn eval_inverse_m2(sp_m2: &mut usize, stack_m2: &mut [[f32x4; 4]; 32]) {
+pub unsafe fn eval_inverse_m2(sp_m2: &mut usize, stack_m2: &mut [[f32x8; 4]; 32]) {
     let idx = *sp_m2 - 1;
     let m = *stack_m2.get_unchecked(idx);
     let det = (m[0] * m[3]) - (m[1] * m[2]);
-    let is_singular = det.abs().simd_lt(f32x4::splat(1e-9));
-    let safe_det = is_singular.blend(f32x4::splat(1.0), det);
-    let inv_d = f32x4::splat(1.0) / safe_det;
+    let is_singular = det.abs().simd_lt(f32x8::splat(1e-9));
+    let safe_det = is_singular.blend(f32x8::splat(1.0), det);
+    let inv_d = f32x8::splat(1.0) / safe_det;
     *stack_m2.get_unchecked_mut(idx) = [
-        is_singular.blend(f32x4::splat(1.0), m[3] * inv_d),
-        is_singular.blend(f32x4::splat(0.0), -m[1] * inv_d),
-        is_singular.blend(f32x4::splat(0.0), -m[2] * inv_d),
-        is_singular.blend(f32x4::splat(1.0), m[0] * inv_d),
+        is_singular.blend(f32x8::splat(1.0), m[3] * inv_d),
+        is_singular.blend(f32x8::splat(0.0), -m[1] * inv_d),
+        is_singular.blend(f32x8::splat(0.0), -m[2] * inv_d),
+        is_singular.blend(f32x8::splat(1.0), m[0] * inv_d),
     ];
 }
 
 #[inline(always)]
 pub unsafe fn eval_make_mat3(
     sp_v3: &mut usize,
-    stack_v3: &[[f32x4; 3]; 32],
+    stack_v3: &[[f32x8; 3]; 32],
     sp_m3: &mut usize,
-    stack_m3: &mut [[f32x4; 9]; 32],
+    stack_m3: &mut [[f32x8; 9]; 32],
 ) {
     *sp_v3 -= 3;
     let c0 = *stack_v3.get_unchecked(*sp_v3);
@@ -345,7 +345,7 @@ pub unsafe fn eval_make_mat3(
     *sp_m3 += 1;
 }
 #[inline(always)]
-pub unsafe fn eval_add_m3(sp_m3: &mut usize, stack_m3: &mut [[f32x4; 9]; 32]) {
+pub unsafe fn eval_add_m3(sp_m3: &mut usize, stack_m3: &mut [[f32x8; 9]; 32]) {
     *sp_m3 -= 2;
     let a = *stack_m3.get_unchecked(*sp_m3);
     let b = *stack_m3.get_unchecked(*sp_m3 + 1);
@@ -363,7 +363,7 @@ pub unsafe fn eval_add_m3(sp_m3: &mut usize, stack_m3: &mut [[f32x4; 9]; 32]) {
     *sp_m3 += 1;
 }
 #[inline(always)]
-pub unsafe fn eval_sub_m3(sp_m3: &mut usize, stack_m3: &mut [[f32x4; 9]; 32]) {
+pub unsafe fn eval_sub_m3(sp_m3: &mut usize, stack_m3: &mut [[f32x8; 9]; 32]) {
     *sp_m3 -= 2;
     let a = *stack_m3.get_unchecked(*sp_m3);
     let b = *stack_m3.get_unchecked(*sp_m3 + 1);
@@ -383,9 +383,9 @@ pub unsafe fn eval_sub_m3(sp_m3: &mut usize, stack_m3: &mut [[f32x4; 9]; 32]) {
 #[inline(always)]
 pub unsafe fn eval_scale_m3(
     sp_f: &mut usize,
-    stack_f: &[f32x4; 32],
+    stack_f: &[f32x8; 32],
     sp_m3: &mut usize,
-    stack_m3: &mut [[f32x4; 9]; 32],
+    stack_m3: &mut [[f32x8; 9]; 32],
 ) {
     *sp_f -= 1;
     *sp_m3 -= 1;
@@ -405,7 +405,7 @@ pub unsafe fn eval_scale_m3(
     *sp_m3 += 1;
 }
 #[inline(always)]
-pub unsafe fn eval_mul_m3(sp_m3: &mut usize, stack_m3: &mut [[f32x4; 9]; 32]) {
+pub unsafe fn eval_mul_m3(sp_m3: &mut usize, stack_m3: &mut [[f32x8; 9]; 32]) {
     *sp_m3 -= 2;
     let a = *stack_m3.get_unchecked(*sp_m3);
     let b = *stack_m3.get_unchecked(*sp_m3 + 1);
@@ -425,9 +425,9 @@ pub unsafe fn eval_mul_m3(sp_m3: &mut usize, stack_m3: &mut [[f32x4; 9]; 32]) {
 #[inline(always)]
 pub unsafe fn eval_mul_m3v3(
     sp_m3: &mut usize,
-    stack_m3: &[[f32x4; 9]; 32],
+    stack_m3: &[[f32x8; 9]; 32],
     sp_v3: &mut usize,
-    stack_v3: &mut [[f32x4; 3]; 32],
+    stack_v3: &mut [[f32x8; 3]; 32],
 ) {
     *sp_m3 -= 1;
     *sp_v3 -= 1;
@@ -443,9 +443,9 @@ pub unsafe fn eval_mul_m3v3(
 #[inline(always)]
 pub unsafe fn eval_trace_m3(
     sp_f: &mut usize,
-    stack_f: &mut [f32x4; 32],
+    stack_f: &mut [f32x8; 32],
     sp_m3: &mut usize,
-    stack_m3: &[[f32x4; 9]; 32],
+    stack_m3: &[[f32x8; 9]; 32],
 ) {
     *sp_m3 -= 1;
     let m = *stack_m3.get_unchecked(*sp_m3);
@@ -453,7 +453,7 @@ pub unsafe fn eval_trace_m3(
     *sp_f += 1;
 }
 #[inline(always)]
-pub unsafe fn eval_transpose_m3(sp_m3: &mut usize, stack_m3: &mut [[f32x4; 9]; 32]) {
+pub unsafe fn eval_transpose_m3(sp_m3: &mut usize, stack_m3: &mut [[f32x8; 9]; 32]) {
     let idx = *sp_m3 - 1;
     let m = *stack_m3.get_unchecked(idx);
     *stack_m3.get_unchecked_mut(idx) = [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]];
@@ -461,9 +461,9 @@ pub unsafe fn eval_transpose_m3(sp_m3: &mut usize, stack_m3: &mut [[f32x4; 9]; 3
 #[inline(always)]
 pub unsafe fn eval_det_m3(
     sp_f: &mut usize,
-    stack_f: &mut [f32x4; 32],
+    stack_f: &mut [f32x8; 32],
     sp_m3: &mut usize,
-    stack_m3: &[[f32x4; 9]; 32],
+    stack_m3: &[[f32x8; 9]; 32],
 ) {
     *sp_m3 -= 1;
     let m = *stack_m3.get_unchecked(*sp_m3);
@@ -473,14 +473,14 @@ pub unsafe fn eval_det_m3(
     *sp_f += 1;
 }
 #[inline(always)]
-pub unsafe fn eval_inverse_m3(sp_m3: &mut usize, stack_m3: &mut [[f32x4; 9]; 32]) {
+pub unsafe fn eval_inverse_m3(sp_m3: &mut usize, stack_m3: &mut [[f32x8; 9]; 32]) {
     let idx = *sp_m3 - 1;
     let m = *stack_m3.get_unchecked(idx);
     let det = m[0] * (m[4] * m[8] - m[5] * m[7]) - m[3] * (m[1] * m[8] - m[2] * m[7])
         + m[6] * (m[1] * m[5] - m[2] * m[4]);
-    let is_singular = det.abs().simd_lt(f32x4::splat(1e-9));
-    let safe_det = is_singular.blend(f32x4::splat(1.0), det);
-    let inv_d = f32x4::splat(1.0) / safe_det;
+    let is_singular = det.abs().simd_lt(f32x8::splat(1e-9));
+    let safe_det = is_singular.blend(f32x8::splat(1.0), det);
+    let inv_d = f32x8::splat(1.0) / safe_det;
     let adj = [
         (m[4] * m[8] - m[5] * m[7]) * inv_d,
         -(m[1] * m[8] - m[2] * m[7]) * inv_d,
@@ -493,14 +493,14 @@ pub unsafe fn eval_inverse_m3(sp_m3: &mut usize, stack_m3: &mut [[f32x4; 9]; 32]
         (m[0] * m[4] - m[1] * m[3]) * inv_d,
     ];
     *stack_m3.get_unchecked_mut(idx) = [
-        is_singular.blend(f32x4::splat(1.0), adj[0]),
-        is_singular.blend(f32x4::splat(0.0), adj[1]),
-        is_singular.blend(f32x4::splat(0.0), adj[2]),
-        is_singular.blend(f32x4::splat(0.0), adj[3]),
-        is_singular.blend(f32x4::splat(1.0), adj[4]),
-        is_singular.blend(f32x4::splat(0.0), adj[5]),
-        is_singular.blend(f32x4::splat(0.0), adj[6]),
-        is_singular.blend(f32x4::splat(0.0), adj[7]),
-        is_singular.blend(f32x4::splat(1.0), adj[8]),
+        is_singular.blend(f32x8::splat(1.0), adj[0]),
+        is_singular.blend(f32x8::splat(0.0), adj[1]),
+        is_singular.blend(f32x8::splat(0.0), adj[2]),
+        is_singular.blend(f32x8::splat(0.0), adj[3]),
+        is_singular.blend(f32x8::splat(1.0), adj[4]),
+        is_singular.blend(f32x8::splat(0.0), adj[5]),
+        is_singular.blend(f32x8::splat(0.0), adj[6]),
+        is_singular.blend(f32x8::splat(0.0), adj[7]),
+        is_singular.blend(f32x8::splat(1.0), adj[8]),
     ];
 }

@@ -23,6 +23,7 @@ pub trait Strategy: Clone + Send + Sync {
     fn stagnation_threshold(&self) -> usize;
     fn min_improvement(&self) -> f32;
     fn verbose(&self) -> bool;
+    fn mini_batch_size(&self) -> usize;
 
     fn get_allowed_operators(&self) -> Vec<Instruction>;
     fn on_generation_end(&mut self, _best_mse: f32, _stagnation_counter: usize) {}
@@ -116,6 +117,11 @@ impl Strategy for StaticStrategy {
     #[inline(always)]
     fn verbose(&self) -> bool {
         self.config.verbose
+    }
+
+    #[inline(always)]
+    fn mini_batch_size(&self) -> usize {
+        self.config.mini_batch_size
     }
 
     fn get_allowed_operators(&self) -> Vec<Instruction> {

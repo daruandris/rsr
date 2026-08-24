@@ -180,14 +180,13 @@ pub fn run_cma_es(ind: &mut Individual, dataset: &Dataset, max_iterations: usize
 
     program.unflatten_params(&best_overall_point);
     ind.fitness = best_overall_mse;
-
     let mut const_idx = 0;
-    for node in ind.nodes.iter_mut() {
-        if let crate::engine::expr::node::Node::Constant(val, _) = node
-            && const_idx < program.constants.len()
-        {
-            *val = program.constants[const_idx];
-            const_idx += 1;
+    for node in ind.nodes.iter() {
+        if let crate::engine::expr::node::Node::Constant(idx, _) = node {
+            if const_idx < program.constants.len() {
+                ind.constants[*idx as usize] = program.constants[const_idx];
+                const_idx += 1;
+            }
         }
     }
 }
