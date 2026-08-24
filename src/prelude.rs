@@ -1,11 +1,13 @@
-pub use crate::data::dataset::Dataset;
-pub use crate::eval::op::Op;
-pub use crate::eval::scalar::Scalar;
-pub use crate::eval::types::ValueType;
-pub use crate::expr::node::Node;
-pub use crate::expr::program::Program;
-pub use crate::expr::simplify::simplify_ast;
-pub use crate::search::config::{Config, OpModule};
-pub use crate::search::engine::Engine;
-pub use crate::search::individual::Individual;
-pub use crate::search::strategy::{StaticStrategy, Strategy};
+//! The RSR prelude.
+//!
+//! This module re-exports the most commonly used types required for configuring
+//! and running the symbolic regressor.
+
+pub use crate::api::{FitResult, SymbolicRegressor};
+pub use crate::engine::data::dataset::Dataset;
+pub use crate::engine::data::schema::Schema;
+pub use crate::engine::eval::types::ValueType;
+pub use crate::engine::search::config::{Config, OpModule};
+
+// Ezt meghagyjuk, mert a konfigurációnál (custom_ops, excluded_ops) szükség van rá
+pub use crate::Instruction;

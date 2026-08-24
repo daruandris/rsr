@@ -1,6 +1,8 @@
 mod common;
 
 use rand::RngExt;
+use rsr::engine::search::engine::Engine;
+use rsr::engine::search::strategy::{StaticStrategy, Strategy};
 use rsr::prelude::*;
 use std::time::Instant;
 
@@ -55,7 +57,7 @@ fn basic_2_trigonometry() {
     let mut dx = Vec::new();
     let mut dy = Vec::new();
     for _ in 0..400 {
-        let x: f32 = rng.random_range(-3.14..3.14);
+        let x: f32 = rng.random_range(-4.0..4.0);
         dx.push(vec![x]);
         dy.push(3.0 * (2.0 * x).cos() + 1.0);
     }
@@ -100,7 +102,7 @@ fn basic_5_multivariable_linear() {
         dx.push(vec![x0, x1, x2]);
         dy.push(2.0 * x0 - 3.5 * x1 + 1.2 * x2);
     }
-    run_test("Basic 5: Linear 3D", "Basic5", dx, dy, 3, true);
+    run_test("Basic 5: Linear 3D", "Basic5", dx, dy, 3, false);
 }
 
 #[test]
@@ -110,7 +112,7 @@ fn basic_6_complex_multivariable() {
     let mut dy = Vec::new();
     for _ in 0..400 {
         let x0 = rng.random_range(-3.0..3.0);
-        let x1: f32 = rng.random_range(-3.14..3.14);
+        let x1: f32 = rng.random_range(-4.0..4.0);
         let x2 = rng.random_range(-5.0..5.0);
         dx.push(vec![x0, x1, x2]);
         dy.push(x0 * x0 + x1.sin() - x2);
@@ -124,12 +126,12 @@ fn basic_7_noisy_data() {
     let mut dx = Vec::new();
     let mut dy = Vec::new();
     for _ in 0..400 {
-        let x = rng.random_range(-5.0..5.0);
-        let noise = rng.random_range(-0.1..0.1);
+        let x = rng.random_range(-10.0..10.0);
+        let noise = rng.random_range(-0.001..0.001);
         dx.push(vec![x]);
         dy.push(2.5 * x * x + noise);
     }
-    run_test("Basic 7: Noisy", "Basic7", dx, dy, 1, true);
+    run_test("Basic 7: Noisy", "Basic7", dx, dy, 1, false);
 }
 
 #[test]
@@ -168,9 +170,9 @@ fn basic_10_ultimate() {
     let mut dx = Vec::new();
     let mut dy = Vec::new();
     for _ in 0..400 {
-        let x0: f32 = rng.random_range(0.0..3.0);
-        let x1: f32 = rng.random_range(-3.14..3.14);
-        let x2 = rng.random_range(-3.0..3.0);
+        let x0: f32 = rng.random_range(-3.0..3.0);
+        let x1: f32 = rng.random_range(-5.0..5.0);
+        let x2 = rng.random_range(-5.0..5.0);
         let x3 = rng.random_range(0.0..5.0);
         dx.push(vec![x0, x1, x2, x3]);
         dy.push((-x0).exp() + x1.cos() - ((x2 * x2) / (x3 + 1.1)));

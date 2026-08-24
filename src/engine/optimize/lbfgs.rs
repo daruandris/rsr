@@ -1,0 +1,166 @@
+use crate::engine::data::dataset::Dataset;
+use crate::engine::eval::evaluator;
+use crate::engine::optimize::Parameterized;
+use crate::engine::search::individual::Individual;
+
+const MAX_PARAMS: usize = 32;
+const M: usize = 6;
+
+pub fn run_lbfgs(ind: &mut Individual, dataset: &Dataset, max_iterations: usize) {
+    if ind.program.is_none() {
+        ind.compile();
+    }
+    let program = match ind.program.as_mut() {
+        Some(p) => p,
+        None => return,
+    };
+
+    let n = program.param_count().min(MAX_PARAMS);
+    if n == 0 {
+        return;
+    }
+
+    let mut x = [0.0f32; MAX_PARAMS];
+    program.flatten_params(&mut x);
+
+    let mut s = [[0.0f32; MAX_PARAMS]; M];
+    let mut y = [[0.0f32; MAX_PARAMS]; M];
+    let mut rho = [0.0f32; M];
+    let mut alpha = [0.0f32; M];
+    let mut q = [0.0f32; MAX_PARAMS];
+
+    let (mut current_mse, mut current_grad) =
+        evaluator::compute_mse_with_gradient(program, dataset);
+
+    let mut history_size = 0;
+    let mut head = 0;
+
+    for _iter in 0..max_iterations {
+        let mut grad_norm_sq: f32 = 0.0;
+        for item in current_grad.iter().take(n) {
+            grad_norm_sq += item * item;
+        }
+        if grad_norm_sq.sqrt() < 1e-5 {
+            break;
+        }
+
+        q[..n].copy_from_slice(&current_grad[..n]);
+
+        let mut curr_idx = head;
+        for _ in 0..history_size {
+            curr_idx = if curr_idx == 0 { M - 1 } else { curr_idx - 1 };
+            let mut dot_sq = 0.0;
+            for j in 0..n {
+                dot_sq += s[curr_idx][j] * q[j];
+            }
+            alpha[curr_idx] = rho[curr_idx] * dot_sq;
+            for j in 0..n {
+                q[j] -= alpha[curr_idx] * y[curr_idx][j];
+            }
+        }
+
+        let mut gamma = 1.0;
+        if history_size > 0 {
+            let last_idx = if head == 0 { M - 1 } else { head - 1 };
+            let mut dot_sy = 0.0;
+            let mut dot_yy = 0.0;
+            for j in 0..n {
+                dot_sy += s[last_idx][j] * y[last_idx][j];
+                dot_yy += y[last_idx][j] * y[last_idx][j];
+            }
+            if dot_yy > 1e-10 {
+                gamma = dot_sy / dot_yy;
+            }
+        }
+
+        for q_val in q.iter_mut().take(n) {
+            *q_val *= gamma;
+        }
+
+        curr_idx = if history_size < M { 0 } else { head };
+        for _ in 0..history_size {
+            let mut dot_yq = 0.0;
+            for j in 0..n {
+                dot_yq += y[curr_idx][j] * q[j];
+            }
+            let beta = rho[curr_idx] * dot_yq;
+            for j in 0..n {
+                q[j] += s[curr_idx][j] * (alpha[curr_idx] - beta);
+            }
+            curr_idx = (curr_idx + 1) % M;
+        }
+
+        let mut p = [0.0f32; MAX_PARAMS];
+        let mut dir_dot_grad = 0.0;
+        for j in 0..n {
+            p[j] = -q[j];
+            dir_dot_grad += p[j] * current_grad[j];
+        }
+
+        if dir_dot_grad > -1e-8 {
+            for j in 0..n {
+                p[j] = -current_grad[j];
+            }
+            dir_dot_grad = -grad_norm_sq;
+            history_size = 0;
+        }
+
+        let mut step_size = 1.0f32;
+        let c1 = 1e-4;
+        let mut next_x = [0.0f32; MAX_PARAMS];
+
+        let mut ls_iters = 0;
+        let next_mse = loop {
+            for j in 0..n {
+                next_x[j] = x[j] + step_size * p[j];
+            }
+            program.unflatten_params(&next_x);
+            let mse = evaluator::compute_mse(program, dataset);
+
+            if mse <= current_mse + c1 * step_size * dir_dot_grad || ls_iters > 10 {
+                break mse;
+            }
+            step_size *= 0.5;
+            ls_iters += 1;
+        };
+
+        let (_, next_grad) = evaluator::compute_mse_with_gradient(program, dataset);
+
+        let mut s_new = [0.0f32; MAX_PARAMS];
+        let mut y_new = [0.0f32; MAX_PARAMS];
+        let mut dot_sy = 0.0;
+
+        for j in 0..n {
+            s_new[j] = next_x[j] - x[j];
+            y_new[j] = next_grad[j] - current_grad[j];
+            dot_sy += s_new[j] * y_new[j];
+        }
+
+        if dot_sy > 1e-10 {
+            s[head][..n].copy_from_slice(&s_new[..n]);
+            y[head][..n].copy_from_slice(&y_new[..n]);
+            rho[head] = 1.0 / dot_sy;
+            head = (head + 1) % M;
+            if history_size < M {
+                history_size += 1;
+            }
+        }
+
+        x[..n].copy_from_slice(&next_x[..n]);
+        current_mse = next_mse;
+        current_grad = next_grad;
+    }
+
+    program.unflatten_params(&x);
+    ind.fitness = current_mse;
+
+    let mut const_idx = 0;
+    for node in ind.nodes.iter_mut() {
+        if let crate::engine::expr::node::Node::Constant(val, _) = node
+            && const_idx < program.constants.len()
+        {
+            *val = program.constants[const_idx];
+            const_idx += 1;
+        }
+    }
+}

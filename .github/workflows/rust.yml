@@ -30,5 +30,4 @@ jobs:
       run: cargo fmt --all -- --check
 
     - name: Lint
-      continue-on-error: true # temporary
       run: cargo clippy --all-targets --all-features
