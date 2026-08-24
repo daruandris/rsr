@@ -1,5 +1,6 @@
 use crate::Instruction;
 use crate::domains::basic::BasicOpCode;
+use crate::domains::linalg::LinalgOpCode;
 use crate::engine::data::dataset::Dataset;
 use crate::engine::eval::evaluator;
 use crate::engine::eval::scalar::Scalar;
@@ -122,51 +123,70 @@ impl Individual {
     }
 
     pub fn has_forbidden_patterns(&self) -> bool {
-        const FLAG_TRIG: u8  = 1 << 0;
-        const FLAG_EXP: u8   = 1 << 1;
-        const FLAG_LN: u8    = 1 << 2;
-        const FLAG_POWER: u8 = 1 << 3;
+        const FLAG_TRIG: u16      = 1 << 0;
+        const FLAG_EXP: u16       = 1 << 1;
+        const FLAG_LN: u16        = 1 << 2;
+        const FLAG_POWER: u16     = 1 << 3;
+        const FLAG_TRANSPOSE: u16 = 1 << 4;
+        const FLAG_INVERSE: u16   = 1 << 5;
+        const FLAG_DET: u16       = 1 << 6;
 
-        let mut stack: Vec<u8> = Vec::with_capacity(32);
+        let mut stack: Vec<u16> = Vec::with_capacity(32);
 
         for node in &self.nodes {
             match node {
                 Node::Variable(_, _) | Node::Constant(_, _) => {
-                    stack.push(0);
+                    stack.push(0); 
                 }
                 Node::Operator(op) => {
                     let arity = op.arity();
-                    if stack.len() < arity { return true; }
+                    if stack.len() < arity { return true; } 
 
                     let mut child_flags = 0;
                     for _ in 0..arity {
                         child_flags |= stack.pop().unwrap();
                     }
 
-                    if let Instruction::Basic(basic_op) = op {
-                        match basic_op {
-                            BasicOpCode::AddF | BasicOpCode::SubF | BasicOpCode::MulF | BasicOpCode::DivF => {
-                                stack.push(child_flags);
-                            }
-                            BasicOpCode::SinF | BasicOpCode::CosF => {
-                                if (child_flags & (FLAG_TRIG | FLAG_EXP | FLAG_LN)) != 0 { return true; }
-                                stack.push(child_flags | FLAG_TRIG);
-                            }
-                            BasicOpCode::ExpF => {
-                                if (child_flags & (FLAG_TRIG | FLAG_EXP | FLAG_LN | FLAG_POWER)) != 0 { return true; }
-                                stack.push(child_flags | FLAG_EXP);
-                            }
-                            BasicOpCode::LnF => {
-                                if (child_flags & (FLAG_TRIG | FLAG_EXP | FLAG_LN)) != 0 { return true; }
-                                stack.push(child_flags | FLAG_LN);
-                            }
-                            BasicOpCode::SqrtF | BasicOpCode::SqrF => {
-                                if (child_flags & (FLAG_POWER | FLAG_TRIG | FLAG_LN | FLAG_EXP)) != 0 { return true; }
-                                stack.push(child_flags | FLAG_POWER);
+                    match op {
+                        Instruction::Basic(basic_op) => {
+                            match basic_op {
+                                BasicOpCode::SinF | BasicOpCode::CosF => {
+                                    if (child_flags & (FLAG_TRIG | FLAG_EXP | FLAG_LN)) != 0 { return true; }
+                                    stack.push(child_flags | FLAG_TRIG);
+                                }
+                                BasicOpCode::ExpF => {
+                                    if (child_flags & (FLAG_TRIG | FLAG_EXP | FLAG_LN | FLAG_POWER)) != 0 { return true; }
+                                    stack.push(child_flags | FLAG_EXP);
+                                }
+                                BasicOpCode::LnF => {
+                                    if (child_flags & (FLAG_TRIG | FLAG_EXP | FLAG_LN)) != 0 { return true; }
+                                    stack.push(child_flags | FLAG_LN);
+                                }
+                                BasicOpCode::SqrtF | BasicOpCode::SqrF => {
+                                    if (child_flags & (FLAG_POWER | FLAG_TRIG | FLAG_LN | FLAG_EXP)) != 0 { return true; }
+                                    stack.push(child_flags | FLAG_POWER);
+                                }
+                                _ => stack.push(child_flags),
                             }
                         }
-                    } else {
-                        stack.push(child_flags);
+                        Instruction::Linalg(linalg_op) => {
+                            match linalg_op {
+                                LinalgOpCode::TransposeM2 | LinalgOpCode::TransposeM3 => {
+                                    if (child_flags & FLAG_TRANSPOSE) != 0 { return true; }
+                                    stack.push(child_flags | FLAG_TRANSPOSE);
+                                }
+                                LinalgOpCode::InverseM2 | LinalgOpCode::InverseM3 => {
+                                    if (child_flags & FLAG_INVERSE) != 0 { return true; }
+                                    stack.push(child_flags | FLAG_INVERSE);
+                                }
+                                LinalgOpCode::DetM2 | LinalgOpCode::DetM3 => {
+                                    if (child_flags & FLAG_DET) != 0 { return true; }
+                                    stack.push(child_flags | FLAG_DET);
+                                }
+                                _ => stack.push(child_flags),
+                            }
+                        }
+                        _ => stack.push(child_flags),
                     }
                 }
             }
