@@ -176,10 +176,20 @@ impl Domain for BasicDomain {
                     | BasicOpCode::SqrF
                     | BasicOpCode::LnF
             ),
-            BasicOpCode::SqrtF => matches!(child, BasicOpCode::SqrtF | BasicOpCode::SqrF | BasicOpCode::SinF | BasicOpCode::CosF
-                | BasicOpCode::LnF | BasicOpCode::ExpF),
+            BasicOpCode::SqrtF => matches!(
+                child,
+                BasicOpCode::SqrtF
+                    | BasicOpCode::SqrF
+                    | BasicOpCode::SinF
+                    | BasicOpCode::CosF
+                    | BasicOpCode::LnF
+                    | BasicOpCode::ExpF
+            ),
             BasicOpCode::SqrF => matches!(child, BasicOpCode::SqrF | BasicOpCode::SqrtF),
-            BasicOpCode::LnF => matches!(child, BasicOpCode::LnF | BasicOpCode::ExpF | BasicOpCode::SinF | BasicOpCode::CosF),
+            BasicOpCode::LnF => matches!(
+                child,
+                BasicOpCode::LnF | BasicOpCode::ExpF | BasicOpCode::SinF | BasicOpCode::CosF
+            ),
             _ => false,
         }
     }

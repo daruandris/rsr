@@ -3,9 +3,9 @@ mod common;
 use rand::RngExt;
 use rsr::Instruction;
 use rsr::domains::basic::BasicOpCode;
-use rsr::prelude::*;
-use rsr::engine::search::strategy::{Strategy,StaticStrategy};
 use rsr::engine::search::engine::Engine;
+use rsr::engine::search::strategy::{StaticStrategy, Strategy};
+use rsr::prelude::*;
 use std::time::Instant;
 
 fn run_linalg_test(

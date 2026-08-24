@@ -8,11 +8,11 @@ use crate::engine::optimize::Parameterized;
 
 // A flattened, compiled version of an AST.
 ///
-/// While the genetic algorithm operates on tree structures (see [`crate::engine::expr::node::Node`]), 
+/// While the genetic algorithm operates on tree structures (see [`crate::engine::expr::node::Node`]),
 /// the evaluation engine requires a linear sequence of instructions for maximum performance.
-/// 
+///
 /// `Program` separates the structural operations (`code`) from the numerical parameters (`constants`).
-/// This architecture makes it incredibly fast to evaluate, and allows continuous optimizers 
+/// This architecture makes it incredibly fast to evaluate, and allows continuous optimizers
 /// (like L-BFGS or CMA-ES) to update the weights in-place without rebuilding the expression tree.
 #[derive(Clone, Debug)]
 pub struct Program {
@@ -25,7 +25,7 @@ pub struct Program {
 impl Program {
     /// Compiles a hierarchical AST into a linear executable program.
     ///
-    /// This method traverses the provided nodes, extracting constants into a separate buffer 
+    /// This method traverses the provided nodes, extracting constants into a separate buffer
     /// and converting variables and operators into direct virtual machine instructions.
     ///
     /// # Arguments

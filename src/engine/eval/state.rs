@@ -5,9 +5,9 @@ use wide::f32x4;
 
 /// The execution context for the SIMD virtual machine.
 ///
-/// `VmState` provides pre-allocated, fixed-size stacks for different data types 
-/// (floats, vectors, matrices) to ensure zero-cost evaluation without heap allocations. 
-/// It operates on `f32x4` SIMD vectors, meaning it processes 4 data rows simultaneously 
+/// `VmState` provides pre-allocated, fixed-size stacks for different data types
+/// (floats, vectors, matrices) to ensure zero-cost evaluation without heap allocations.
+/// It operates on `f32x4` SIMD vectors, meaning it processes 4 data rows simultaneously
 /// in a single CPU instruction set loop.
 pub struct VmState {
     /// The evaluation stack for scalar float batches.
@@ -25,7 +25,7 @@ pub struct VmState {
     /// The stack pointer for the 3D vector stack.
     pub sp_v3: usize,
 
-   /// The evaluation stack for 2x2 matrices.
+    /// The evaluation stack for 2x2 matrices.
     pub stack_m2: [[f32x4; 4]; 32],
     /// The stack pointer for the 2x2 matrix stack.
     pub sp_m2: usize,
@@ -51,7 +51,7 @@ impl VmState {
 /// The execution context for the SIMD virtual machine with Dual numbers.
 ///
 /// Similar to [`VmState`], but operates on [`DualSimd`] values instead of primitive floats.
-/// This state is used internally during forward-mode Automatic Differentiation (AD) 
+/// This state is used internally during forward-mode Automatic Differentiation (AD)
 /// to compute exact gradients alongside the Mean Squared Error.
 pub struct DualVmState {
     pub stack_f: [DualSimd; 32],

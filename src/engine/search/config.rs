@@ -60,7 +60,7 @@ impl Config {
             allowed_modules,
             custom_ops: vec![],
             excluded_ops: vec![],
-            subset_size: Some(400)
+            subset_size: Some(400),
         }
     }
 
@@ -117,7 +117,7 @@ impl Config {
         self
     }
 
-    pub fn parsimony_penalty(mut self, penalty: f32) -> Self{
+    pub fn parsimony_penalty(mut self, penalty: f32) -> Self {
         self.parsimony_penalty = penalty;
         self
     }

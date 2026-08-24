@@ -4,8 +4,8 @@ use crate::engine::eval::types::ValueType;
 
 /// Defines the layout and preprocessing rules for a [`Dataset`](crate::engine::data::dataset::Dataset).
 ///
-/// A `Schema` tells the engine what data types to expect for each feature 
-/// (e.g., scalars, vectors, matrices), which column contains the target variable, 
+/// A `Schema` tells the engine what data types to expect for each feature
+/// (e.g., scalars, vectors, matrices), which column contains the target variable,
 /// and whether the data should be automatically standardized (mean 0, variance 1).
 ///
 /// # Examples
@@ -31,7 +31,7 @@ pub struct Schema {
 impl Schema {
     /// Creates a new schema with the specified feature types.
     ///
-    /// By default, `normalize` is set to `false`, and `target_col_index` is `None` 
+    /// By default, `normalize` is set to `false`, and `target_col_index` is `None`
     /// (meaning the last column is treated as the target).
     pub fn new(feature_types: Vec<ValueType>) -> Self {
         Self {

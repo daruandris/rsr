@@ -1,6 +1,6 @@
 use std::{time::Instant, vec};
 
-use rsr::{prelude::*};
+use rsr::prelude::*;
 
 pub fn test() {
     // 6 bemenet: az első 3 az első Vec3, a második 3 a második Vec3
@@ -8,7 +8,7 @@ pub fn test() {
         ValueType::Float,
         ValueType::Float,
         ValueType::Float,
-        ValueType::Float
+        ValueType::Float,
     ])
     .with_normalization(false); // Fontos kikapcsolni a tiszta fizikai képlethez
 
@@ -17,8 +17,10 @@ pub fn test() {
 
     // LinalgDomain bekapcsolva, felesleges műveletek (pl. Sin, Cos) nélkül
     let config = Config::default(vec![OpModule::Basic]).parsimony_penalty(0.0005);
-    let regressor = SymbolicRegressor::new(config).train_subset_size(400).generations(5000);
-    
+    let regressor = SymbolicRegressor::new(config)
+        .train_subset_size(400)
+        .generations(5000);
+
     println!(">>> Keresés indítása a Feynman I.29.16 (3D távolság) adathalmazon...");
     let start_time = Instant::now();
     let result = regressor.fit(&dataset);

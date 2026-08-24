@@ -1,7 +1,7 @@
 //! Forward-mode automatic differentiation using Dual numbers.
 //!
 //! Dual numbers simultaneously compute both the value and the derivative of an expression.
-//! This is heavily leveraged by continuous optimizers (like L-BFGS) to calculate exact 
+//! This is heavily leveraged by continuous optimizers (like L-BFGS) to calculate exact
 //! gradients during constant optimization.
 #![allow(unsafe_op_in_unsafe_fn)]
 use std::ops::{Add, Div, Mul, Sub};
@@ -219,7 +219,7 @@ pub fn dual_inverse_m2(m: &[DualSimd; 4]) -> [DualSimd; 4] {
 // ---------------- Dual SIMD in-place Evaluation Functions ----------------
 
 /// # Safety
-/// The caller must ensure that `*sp_f >= 2` to prevent underflow, and that all memory accesses 
+/// The caller must ensure that `*sp_f >= 2` to prevent underflow, and that all memory accesses
 /// via `get_unchecked` remain strictly within the bounds of `stack_f` and `stack_v2` (0..32).
 #[inline(always)]
 pub unsafe fn eval_make_dual_vec2(
@@ -237,7 +237,7 @@ pub unsafe fn eval_make_dual_vec2(
 }
 
 /// # Safety
-/// The caller must ensure that `*sp_f >= 3` to prevent underflow, and that all memory accesses 
+/// The caller must ensure that `*sp_f >= 3` to prevent underflow, and that all memory accesses
 /// via `get_unchecked` remain strictly within the bounds of `stack_f` and `stack_v3` (0..32).
 #[inline(always)]
 pub unsafe fn eval_make_dual_vec3(

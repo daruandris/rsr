@@ -136,7 +136,7 @@ impl<S: Strategy> Island<S> {
                     self.strategy.max_tree_size(),
                 );
                 if child.has_forbidden_patterns() {
-                    child = parent1.clone(); 
+                    child = parent1.clone();
                 }
                 child.age = parent1.age.max(parent2.age);
                 child.simplify();

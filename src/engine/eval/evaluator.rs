@@ -1,6 +1,6 @@
 //! The core execution engine for evaluating compiled programs.
 //!
-//! This module provides the functions to execute `Program` instances over SIMD-aligned 
+//! This module provides the functions to execute `Program` instances over SIMD-aligned
 //! datasets, calculating both predictions and exact gradients using forward-mode AD.
 use crate::Instruction;
 use crate::SymbolicEngine;
@@ -14,7 +14,7 @@ use wide::f32x4;
 
 /// Evaluates a compiled program on a single batch of SIMD features.
 ///
-/// This function acts as the main virtual machine loop, processing instructions 
+/// This function acts as the main virtual machine loop, processing instructions
 /// sequentially and operating entirely on pre-allocated stacks.
 #[inline(always)]
 pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
@@ -23,15 +23,15 @@ pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
 
     for op in &program.code {
         match op {
-            Instruction::LoadVarF(idx) => 
-            // SAFETY: The AST compiler ensures that `idx` is strictly less than the number 
+            Instruction::LoadVarF(idx) =>
+            // SAFETY: The AST compiler ensures that `idx` is strictly less than the number
             // of features. It also guarantees `ctx.sp_f` will not exceed the stack capacity (32).
             unsafe {
                 *ctx.stack_f.get_unchecked_mut(ctx.sp_f) = *features.get_unchecked(*idx as usize);
                 ctx.sp_f += 1;
             },
-            Instruction::LoadConstF(idx) => 
-            // SAFETY: The compilation phase registers all constants, ensuring `idx` is within 
+            Instruction::LoadConstF(idx) =>
+            // SAFETY: The compilation phase registers all constants, ensuring `idx` is within
             // bounds of the `constants` array. Stack capacity is guaranteed by AST structural limits.
             unsafe {
                 if let Scalar::Float(val) = constants.get_unchecked(*idx as usize) {
@@ -39,8 +39,8 @@ pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
                 }
                 ctx.sp_f += 1;
             },
-            Instruction::LoadVarV2(idx) => 
-            // SAFETY: Index `i` and `i+1` are bounds-checked during schema validation. 
+            Instruction::LoadVarV2(idx) =>
+            // SAFETY: Index `i` and `i+1` are bounds-checked during schema validation.
             // Stack capacity prevents overflow.
             unsafe {
                 let i = *idx as usize;
@@ -48,7 +48,7 @@ pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
                     [*features.get_unchecked(i), *features.get_unchecked(i + 1)];
                 ctx.sp_v2 += 1;
             },
-            Instruction::LoadConstV2(idx) => 
+            Instruction::LoadConstV2(idx) =>
             // SAFETY: Constant arrays are pre-filled, index bound is guaranteed by compiler.
             unsafe {
                 if let Scalar::Vec2(val) = constants.get_unchecked(*idx as usize) {
@@ -57,7 +57,7 @@ pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
                 }
                 ctx.sp_v2 += 1;
             },
-            Instruction::LoadVarV3(idx) => 
+            Instruction::LoadVarV3(idx) =>
             // SAFETY: Feature boundaries and stack capacity are strictly preserved by compilation.
             unsafe {
                 let i = *idx as usize;
@@ -68,7 +68,7 @@ pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
                 ];
                 ctx.sp_v3 += 1;
             },
-            Instruction::LoadConstV3(idx) => 
+            Instruction::LoadConstV3(idx) =>
             // SAFETY: Constant loading respects the `constants` vector bounds.
             unsafe {
                 if let Scalar::Vec3(val) = constants.get_unchecked(*idx as usize) {
@@ -80,7 +80,7 @@ pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
                 }
                 ctx.sp_v3 += 1;
             },
-            Instruction::LoadVarM2(idx) => 
+            Instruction::LoadVarM2(idx) =>
             // SAFETY: Memory layout for Mat2 features guarantees up to `i+3` is safe.
             unsafe {
                 let i = *idx as usize;
@@ -92,7 +92,7 @@ pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
                 ];
                 ctx.sp_m2 += 1;
             },
-            Instruction::LoadConstM2(idx) => 
+            Instruction::LoadConstM2(idx) =>
             // SAFETY: Verified constant load.
             unsafe {
                 if let Scalar::Mat2(val) = constants.get_unchecked(*idx as usize) {
@@ -105,7 +105,7 @@ pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
                 }
                 ctx.sp_m2 += 1;
             },
-            Instruction::LoadVarM3(idx) => 
+            Instruction::LoadVarM3(idx) =>
             // SAFETY: Memory layout for Mat3 features guarantees up to `i+8` is safe.
             unsafe {
                 let i = *idx as usize;
@@ -122,7 +122,7 @@ pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
                 ];
                 ctx.sp_m3 += 1;
             },
-            Instruction::LoadConstM3(idx) => 
+            Instruction::LoadConstM3(idx) =>
             // SAFETY: Verified constant load.
             unsafe {
                 if let Scalar::Mat3(val) = constants.get_unchecked(*idx as usize) {
@@ -144,7 +144,7 @@ pub fn eval_simd(program: &Program, features: &[f32x4]) -> f32x4 {
             _ => SymbolicEngine::eval_single(*op, &mut ctx),
         }
     }
-    // SAFETY: The expression tree structure guarantees that exactly one scalar result 
+    // SAFETY: The expression tree structure guarantees that exactly one scalar result
     // remains on the float stack at index 0 upon completion.
     unsafe { *ctx.stack_f.get_unchecked(0) }
 }
@@ -254,14 +254,14 @@ pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: u
 
     for op in &program.code {
         match op {
-            Instruction::LoadVarF(idx) => 
+            Instruction::LoadVarF(idx) =>
             // SAFETY: AST guarantees `idx` is within dataset bounds.
             unsafe {
                 *ctx.stack_f.get_unchecked_mut(ctx.sp_f) =
                     DualSimd::constant(*features.get_unchecked(*idx as usize));
                 ctx.sp_f += 1;
             },
-            Instruction::LoadConstF(idx) => 
+            Instruction::LoadConstF(idx) =>
             // SAFETY: Constant loading respects bounds checked at compile time.
             unsafe {
                 if let Scalar::Float(val) = constants.get_unchecked(*idx as usize) {
@@ -271,7 +271,7 @@ pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: u
                 }
                 ctx.sp_f += 1;
             },
-            Instruction::LoadVarV2(idx) => 
+            Instruction::LoadVarV2(idx) =>
             // SAFETY: Layout is ensured by feature vector limits.
             unsafe {
                 let i = *idx as usize;
@@ -281,7 +281,7 @@ pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: u
                 ];
                 ctx.sp_v2 += 1;
             },
-            Instruction::LoadConstV2(idx) => 
+            Instruction::LoadConstV2(idx) =>
             // SAFETY: Layout is ensured by constant array mapping.
             unsafe {
                 if let Scalar::Vec2(val) = constants.get_unchecked(*idx as usize) {
@@ -293,7 +293,7 @@ pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: u
                 }
                 ctx.sp_v2 += 1;
             },
-            Instruction::LoadVarV3(idx) => 
+            Instruction::LoadVarV3(idx) =>
             // SAFETY: Stack and dataset boundary checks verified during AST load.
             unsafe {
                 let i = *idx as usize;
@@ -304,7 +304,7 @@ pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: u
                 ];
                 ctx.sp_v3 += 1;
             },
-            Instruction::LoadConstV3(idx) => 
+            Instruction::LoadConstV3(idx) =>
             // SAFETY: Verifed continuous block load for constant components.
             unsafe {
                 if let Scalar::Vec3(val) = constants.get_unchecked(*idx as usize) {
@@ -317,7 +317,7 @@ pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: u
                 }
                 ctx.sp_v3 += 1;
             },
-            Instruction::LoadVarM2(idx) => 
+            Instruction::LoadVarM2(idx) =>
             // SAFETY: Linear dataset boundaries allow for safe matrix data fetch.
             unsafe {
                 let i = *idx as usize;
@@ -329,7 +329,7 @@ pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: u
                 ];
                 ctx.sp_m2 += 1;
             },
-            Instruction::LoadConstM2(idx) => 
+            Instruction::LoadConstM2(idx) =>
             // SAFETY: Verified contiguous fetch from registered constants.
             unsafe {
                 if let Scalar::Mat2(val) = constants.get_unchecked(*idx as usize) {
@@ -343,7 +343,7 @@ pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: u
                 }
                 ctx.sp_m2 += 1;
             },
-            Instruction::LoadVarM3(idx) => 
+            Instruction::LoadVarM3(idx) =>
             // SAFETY: Bounds verified before structural compilation.
             unsafe {
                 let i = *idx as usize;
@@ -360,7 +360,7 @@ pub fn eval_simd_dual(program: &Program, features: &[f32x4], active_const_idx: u
                 ];
                 ctx.sp_m3 += 1;
             },
-            Instruction::LoadConstM3(idx) => 
+            Instruction::LoadConstM3(idx) =>
             // SAFETY: Valid bounds mapping to scalar flattened arrays.
             unsafe {
                 if let Scalar::Mat3(val) = constants.get_unchecked(*idx as usize) {

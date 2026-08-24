@@ -9,8 +9,8 @@ use wide::f32x4;
 
 /// A heavily optimized data container designed for SIMD execution.
 ///
-/// The `Dataset` takes raw tabular data (from arrays, CSV, or JSON) and restructures 
-/// it into a vectorized format (`f32x4`). This allows the genetic engine's Virtual Machine 
+/// The `Dataset` takes raw tabular data (from arrays, CSV, or JSON) and restructures
+/// it into a vectorized format (`f32x4`). This allows the genetic engine's Virtual Machine
 /// to evaluate 4 data points simultaneously in a single CPU cycle.
 ///
 /// It also handles transparent Z-score standardization (normalization) and denormalization.
@@ -212,7 +212,7 @@ impl Dataset {
         }
         registry
     }
-    
+
     /// Loads a dataset directly from in-memory Rust arrays.
     ///
     /// # Arguments
@@ -231,8 +231,8 @@ impl Dataset {
 
     /// Loads a dataset from a JSON file based on the provided schema.
     ///
-    /// The JSON file must contain a top-level array of objects. Each object must 
-    /// explicitly define an `"x"` field (an array of floating-point numbers representing the features) 
+    /// The JSON file must contain a top-level array of objects. Each object must
+    /// explicitly define an `"x"` field (an array of floating-point numbers representing the features)
     /// and a `"y"` field (a single floating-point number representing the target).
     ///
     /// # Expected JSON Format
@@ -283,7 +283,7 @@ impl Dataset {
 
     /// Loads a dataset from a CSV file based on the provided schema.
     ///
-    /// The CSV must have a header row. If `target_col_index` is not set in the schema, 
+    /// The CSV must have a header row. If `target_col_index` is not set in the schema,
     /// the last column is assumed to be the target variable.
     ///
     /// # Errors
@@ -356,7 +356,11 @@ impl Dataset {
         }
 
         let simd_width = 4;
-        let padding = if samples % simd_width == 0 { 0 } else { simd_width - (samples % simd_width) };
+        let padding = if samples % simd_width == 0 {
+            0
+        } else {
+            simd_width - (samples % simd_width)
+        };
         let num_batches = (samples + padding) / simd_width;
 
         let num_features_usize = self.num_features as usize;
@@ -366,20 +370,24 @@ impl Dataset {
         let step = (self.num_samples as f64 - 1.0) / (samples as f64 - 1.0).max(1.0);
 
         let get_feature_val = |orig_idx: usize, f_idx: usize| -> f32 {
-            if orig_idx >= self.num_samples { return 0.0; }
+            if orig_idx >= self.num_samples {
+                return 0.0;
+            }
             let batch_idx = orig_idx / 4;
             let lane_idx = orig_idx % 4;
-            
+
             let vec_val = self.feature_flat[batch_idx * num_features_usize + f_idx];
             let arr: &[f32; 4] = unsafe { &*(&vec_val as *const _ as *const [f32; 4]) };
             arr[lane_idx]
         };
 
         let get_target_val = |orig_idx: usize| -> f32 {
-            if orig_idx >= self.num_samples { return 0.0; }
+            if orig_idx >= self.num_samples {
+                return 0.0;
+            }
             let batch_idx = orig_idx / 4;
             let lane_idx = orig_idx % 4;
-            
+
             let vec_val = self.target_batches[batch_idx];
             let arr: &[f32; 4] = unsafe { &*(&vec_val as *const _ as *const [f32; 4]) };
             arr[lane_idx]
@@ -387,7 +395,7 @@ impl Dataset {
 
         for i in 0..num_batches {
             let start_idx = i * simd_width;
-            
+
             for f_idx in 0..num_features_usize {
                 let batch = wide::f32x4::new([
                     get_feature_val(((start_idx as f64) * step).round() as usize, f_idx),

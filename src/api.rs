@@ -97,7 +97,7 @@ impl SymbolicRegressor {
 
     /// Executes the symbolic regression process on the provided dataset.
     ///
-    /// This method initializes the genetic [`Engine`], runs the evolutionary loop 
+    /// This method initializes the genetic [`Engine`], runs the evolutionary loop
     /// (including periodic continuous optimization), and returns the best equation found.
     ///
     /// # Arguments
@@ -114,7 +114,7 @@ impl SymbolicRegressor {
         let train_data = if let Some(size) = self.config.subset_size {
             full_dataset.subset(size)
         } else {
-            full_dataset.clone() 
+            full_dataset.clone()
         };
 
         let mut engine = Engine::new(strategy, train_data.get_variable_registry(), allowed_ops);
