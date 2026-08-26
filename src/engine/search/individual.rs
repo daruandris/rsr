@@ -200,6 +200,6 @@ impl Individual {
 
 impl fmt::Display for Individual {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", format_ast(&self.nodes))
+        write!(f, "{}", format_ast(&self.nodes, &self.constants))
     }
 }

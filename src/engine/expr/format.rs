@@ -1,11 +1,19 @@
 use super::node::Node;
+use crate::engine::eval::scalar::Scalar;
 
-pub fn format_ast(nodes: &[Node]) -> String {
+pub fn format_ast(nodes: &[Node], constants: &[Scalar]) -> String {
     let mut stack: Vec<String> = Vec::with_capacity(32);
 
     for node in nodes {
         match node {
-            Node::Constant(c, _) => stack.push(format!("{}", c)),
+            Node::Constant(c, _) => {
+                let idx = *c as usize;
+                if idx < constants.len() {
+                    stack.push(format!("{}", constants[idx]));
+                } else {
+                    stack.push(format!("C[{}]", idx));
+                }
+            }
             Node::Variable(v, type_id) => stack.push(format!("X{}_{:?}", v, type_id)),
             Node::Operator(op) => {
                 let arity = op.arity();
