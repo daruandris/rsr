@@ -93,6 +93,13 @@ impl<S: Strategy> Engine<S> {
         let final_opt_iters = self.global_strategy.final_opt_iterations();
         let mut final_best = self.get_global_best().clone();
         final_best.optimize_constants(dataset, final_opt_iters);
+
+        let penalty = (final_best.complexity() as f32) * self.global_strategy.parsimony_penalty();
+        final_best.fitness = final_best.calculate_mse(dataset) + penalty;
+        
+        if let Some(island) = self.islands.first_mut() {
+            island.best_individual = final_best;
+        }
     }
 
     fn migrate_individuals(&mut self) {

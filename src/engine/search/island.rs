@@ -186,6 +186,7 @@ impl<S: Strategy> Island<S> {
     }
 
     pub fn nuke(&mut self, dataset: &Dataset) {
+        println!("NUKE");
         let pop_size = self.individuals.capacity();
         self.individuals.clear();
         self.individuals.push(self.best_individual.clone());

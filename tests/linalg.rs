@@ -3,8 +3,6 @@ mod common;
 use rand::RngExt;
 use rsr::Instruction;
 use rsr::domains::basic::BasicOpCode;
-use rsr::engine::search::engine::Engine;
-use rsr::engine::search::strategy::{StaticStrategy, Strategy};
 use rsr::prelude::*;
 use std::time::Instant;
 
@@ -30,22 +28,16 @@ fn run_linalg_test(
     config.mutation_max_depth = 7;
     config.parsimony_penalty = 0.0;
 
-    let strategy = StaticStrategy::new(config);
-    let allowed_ops = strategy.get_allowed_operators();
-    let var_registry = dataset.get_variable_registry();
-    let mut engine = Engine::new(strategy, var_registry, allowed_ops);
+    let regressor = SymbolicRegressor::new(config);
 
     let start_time = Instant::now();
-    engine.run(&dataset);
+    let result = regressor.fit(&dataset);
     let time_ms = start_time.elapsed().as_millis() as u64;
 
-    let best_ind = engine.get_global_best();
-    let best_mse = best_ind.fitness;
-
-    common::update_history(category, best_mse, time_ms);
+    common::update_history(category, result.mse, time_ms);
     println!(
-        "Result {}: MSE = {}, Time = {}ms",
-        category, best_mse, time_ms
+        "Result {}: MSE = {}, Time = {}ms\nEquation: {}",
+        category, result.mse, time_ms, result.equation
     );
 }
 
