@@ -110,16 +110,24 @@ impl SymbolicRegressor {
     ///
     /// A [`FitResult`] containing the simplified equation string, its final MSE, and complexity.
     pub fn fit(&self, full_dataset: &Dataset) -> FitResult {
-        if full_dataset.num_samples % 8 != 0 {
-            warn!("The full dataset size ({}) is not a multiple of 8. Padding applied. (Slight performance hit)", full_dataset.num_samples);
+        if !full_dataset.num_samples.is_multiple_of(8) {
+            warn!(
+                "The full dataset size ({}) is not a multiple of 8. Padding applied. (Slight performance hit)",
+                full_dataset.num_samples
+            );
         }
-        if let Some(size) = self.config.subset_size {
-            if size % 8 != 0 {
-                warn!("The config.subset_size ({}) is not a multiple of 8. Padding applied.", size);
+        if let Some(size) = self.config.subset_size
+            && size % 8 != 0 {
+                warn!(
+                    "The config.subset_size ({}) is not a multiple of 8. Padding applied.",
+                    size
+                );
             }
-        }
-        if self.config.mini_batch_size % 8 != 0 {
-            warn!("The config.mini_batch_size ({}) is not a multiple of 8. Padding applied.", self.config.mini_batch_size);
+        if !self.config.mini_batch_size.is_multiple_of(8) {
+            warn!(
+                "The config.mini_batch_size ({}) is not a multiple of 8. Padding applied.",
+                self.config.mini_batch_size
+            );
         }
         let strategy = StaticStrategy::new(self.config.clone());
         let allowed_ops = strategy.get_allowed_operators();

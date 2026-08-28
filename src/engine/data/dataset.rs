@@ -364,7 +364,7 @@ impl Dataset {
         }
 
         let simd_width = 8;
-        let padding = if samples % simd_width == 0 {
+        let padding = if samples.is_multiple_of(simd_width) {
             0
         } else {
             simd_width - (samples % simd_width)

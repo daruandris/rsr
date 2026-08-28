@@ -146,14 +146,14 @@ pub fn subtree_mutation(
         variables,
         allowed_ops,
     );
-    
+
     let const_offset = ind.constants.len() as u16;
     for node in &mut new_subtree {
         if let Node::Constant(idx, _) = node {
             *idx += const_offset;
         }
     }
-    
+
     ind.constants.extend(new_consts);
     ind.nodes.splice(start..=end, new_subtree);
     ind.invalidate();

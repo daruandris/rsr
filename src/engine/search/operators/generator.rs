@@ -16,7 +16,7 @@ pub fn generate_random_ast(
     let cap = 1 << (max_depth.min(6));
     let mut nodes = Vec::with_capacity(cap);
     let mut constants = Vec::new();
-    
+
     build_ast_recursive(
         &mut nodes,
         &mut constants,
@@ -28,7 +28,7 @@ pub fn generate_random_ast(
         allowed_ops,
         None,
     );
-    
+
     (nodes, constants)
 }
 

@@ -2,7 +2,7 @@ use crate::Instruction;
 use crate::domains::basic::BasicOpCode;
 use crate::domains::linalg::LinalgOpCode;
 use crate::engine::data::dataset::Dataset;
-use crate::engine::eval::{evaluator};
+use crate::engine::eval::evaluator;
 use crate::engine::eval::scalar::Scalar;
 use crate::engine::expr::format::format_ast;
 use crate::engine::expr::node::Node;
@@ -161,7 +161,7 @@ impl Individual {
                                     stack.push(child_flags | FLAG_SOLID_OTHER);
                                 }
                             }
-                        },
+                        }
                         Instruction::Basic(basic_op) => match basic_op {
                             BasicOpCode::SinF | BasicOpCode::CosF => {
                                 if (child_flags & (FLAG_TRIG | FLAG_EXP | FLAG_LN)) != 0 {

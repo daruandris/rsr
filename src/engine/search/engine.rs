@@ -96,7 +96,7 @@ impl<S: Strategy> Engine<S> {
 
         let penalty = (final_best.complexity() as f32) * self.global_strategy.parsimony_penalty();
         final_best.fitness = final_best.calculate_mse(dataset) + penalty;
-        
+
         if let Some(island) = self.islands.first_mut() {
             island.best_individual = final_best;
         }

@@ -181,14 +181,14 @@ impl Strategy for StaticStrategy {
                     Instruction::Linalg(LinalgOpCode::TransposeM3),
                     Instruction::Linalg(LinalgOpCode::InverseM3),
                 ]),
-                OpModule::Logic => { /* Boolean domain will go here later */ },
+                OpModule::Logic => { /* Boolean domain will go here later */ }
                 OpModule::Solid => ops.extend_from_slice(&[
                     Instruction::Solid(SolidOpCode::RightCauchyGreenM3),
                     Instruction::Solid(SolidOpCode::LeftCauchyGreenM3),
                     Instruction::Solid(SolidOpCode::Invariant2M3),
                     Instruction::Solid(SolidOpCode::CofactorM3),
                     Instruction::Solid(SolidOpCode::GreenLagrangeStrainM3),
-                    Instruction::Solid(SolidOpCode::IsochoricInvariant1), 
+                    Instruction::Solid(SolidOpCode::IsochoricInvariant1),
                     Instruction::Solid(SolidOpCode::IsochoricInvariant2),
                 ]),
             }

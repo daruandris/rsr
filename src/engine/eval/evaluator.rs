@@ -168,14 +168,14 @@ pub fn compute_mse(program: &Program, dataset: &Dataset) -> f32 {
 
         let mut diff = prediction - target;
         if i == dataset.num_batches - 1 && remainder != 0 {
-        let mut mask = [1.0f32; 8];
-        for j in remainder..8 {
-            mask[j] = 0.0;
+            let mut mask = [1.0f32; 8];
+            for j in remainder..8 {
+                mask[j] = 0.0;
+            }
+            diff *= wide::f32x8::new(mask);
         }
-        diff = diff * wide::f32x8::new(mask);
-    }
 
-    sum_squared_error += diff * diff;
+        sum_squared_error += diff * diff;
     }
 
     let mse = sum_squared_error.reduce_add() / (dataset.num_samples as f32);
@@ -218,7 +218,7 @@ pub fn compute_mse_with_gradient(program: &Program, dataset: &Dataset) -> (f32, 
                     for j in remainder..8 {
                         mask[j] = 0.0;
                     }
-                    diff = diff * wide::f32x8::new(mask);
+                    diff *= wide::f32x8::new(mask);
                 }
 
                 sum_squared_error += diff * diff;

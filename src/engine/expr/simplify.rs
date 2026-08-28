@@ -11,7 +11,9 @@ struct ExprInfo {
 }
 
 pub fn simplify_ast(nodes: &[Node], constants: &[Scalar]) -> (Vec<Node>, Vec<Scalar>) {
-    if nodes.is_empty() { return (vec![], vec![]); }
+    if nodes.is_empty() {
+        return (vec![], vec![]);
+    }
 
     let mut output = Vec::with_capacity(nodes.len());
     let mut output_constants = Vec::new();
@@ -19,14 +21,17 @@ pub fn simplify_ast(nodes: &[Node], constants: &[Scalar]) -> (Vec<Node>, Vec<Sca
 
     for &node in nodes {
         match node {
-           Node::Constant(idx, type_id) => {
+            Node::Constant(idx, type_id) => {
                 let val = constants[idx as usize];
                 let new_idx = output_constants.len() as u16;
                 output_constants.push(val);
-                
+
                 let start_idx = output.len();
                 output.push(Node::Constant(new_idx, type_id));
-                stack.push(ExprInfo { start_idx, const_val: Some(val) });
+                stack.push(ExprInfo {
+                    start_idx,
+                    const_val: Some(val),
+                });
             }
             Node::Variable(_, _) => {
                 let start_idx = output.len();
@@ -67,17 +72,21 @@ pub fn simplify_ast(nodes: &[Node], constants: &[Scalar]) -> (Vec<Node>, Vec<Sca
                 for i in 0..arity {
                     const_vals[i] = args[i].const_val;
                 }
-                let action = crate::SymbolicEngine::try_simplify(op, &const_vals[..arity], args_equal);
+                let action =
+                    crate::SymbolicEngine::try_simplify(op, &const_vals[..arity], args_equal);
 
                 match action {
                     SimplifyAction::ReplaceWithConstant(val) => {
                         output.truncate(args[0].start_idx);
                         let new_idx = output_constants.len() as u16;
                         output_constants.push(val);
-                        
+
                         let new_start = output.len();
                         output.push(Node::Constant(new_idx, op.return_type()));
-                        stack.push(ExprInfo { start_idx: new_start, const_val: Some(val) });
+                        stack.push(ExprInfo {
+                            start_idx: new_start,
+                            const_val: Some(val),
+                        });
                     }
                     SimplifyAction::KeepArg(idx) => {
                         let target_arg = &args[idx];
