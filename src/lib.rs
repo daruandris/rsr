@@ -44,7 +44,8 @@ pub mod prelude;
 crate::compose_engine!(
     SymbolicEngine,
     Basic => crate::domains::basic::BasicDomain,
-    Linalg => crate::domains::linalg::LinalgDomain
+    Linalg => crate::domains::linalg::LinalgDomain,
+    Solid => crate::domains::solid::SolidDomain
 );
 
 pub use api::*;

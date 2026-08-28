@@ -5,6 +5,7 @@ pub enum OpModule {
     Basic,
     Linalg,
     Logic,
+    Solid,
 }
 
 #[derive(Clone, Debug)]
