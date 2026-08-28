@@ -155,6 +155,7 @@ pub fn compute_mse(program: &Program, dataset: &Dataset) -> f32 {
     let num_features = dataset.num_features as usize;
     let flat_features = &dataset.feature_flat;
     let targets = &dataset.target_batches;
+    let remainder = dataset.num_samples % 8;
 
     for i in 0..dataset.num_batches {
         let start = i * num_features;
@@ -165,8 +166,16 @@ pub fn compute_mse(program: &Program, dataset: &Dataset) -> f32 {
         let prediction = eval_simd(program, input_batch);
         let target = unsafe { *targets.get_unchecked(i) };
 
-        let diff = prediction - target;
-        sum_squared_error += diff * diff;
+        let mut diff = prediction - target;
+        if i == dataset.num_batches - 1 && remainder != 0 {
+        let mut mask = [1.0f32; 8];
+        for j in remainder..8 {
+            mask[j] = 0.0;
+        }
+        diff = diff * wide::f32x8::new(mask);
+    }
+
+    sum_squared_error += diff * diff;
     }
 
     let mse = sum_squared_error.reduce_add() / (dataset.num_samples as f32);
@@ -188,6 +197,8 @@ pub fn compute_mse_with_gradient(program: &Program, dataset: &Dataset) -> (f32, 
         return (compute_mse(program, dataset), [0.0; 32]);
     }
 
+    let remainder = dataset.num_samples % 8;
+
     for i in 0..dataset.num_batches {
         let start = i * num_features;
 
@@ -202,6 +213,14 @@ pub fn compute_mse_with_gradient(program: &Program, dataset: &Dataset) -> (f32, 
 
             if k == 0 {
                 diff = dual_result.val - target;
+                if i == dataset.num_batches - 1 && remainder != 0 {
+                    let mut mask = [1.0f32; 8];
+                    for j in remainder..8 {
+                        mask[j] = 0.0;
+                    }
+                    diff = diff * wide::f32x8::new(mask);
+                }
+
                 sum_squared_error += diff * diff;
             }
             *item += f32x8::splat(2.0) * diff * dual_result.grad;

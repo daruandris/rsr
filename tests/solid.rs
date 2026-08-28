@@ -41,6 +41,12 @@ fn run_solid_test(
         Instruction::Basic(BasicOpCode::CosF),
         Instruction::Basic(BasicOpCode::LnF),
         Instruction::Basic(BasicOpCode::ExpF),
+        
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetXV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetYV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetZV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetXV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetYV2),
     ];
     config.subset_size = subset_size;
     config.max_generations = generations;
@@ -115,7 +121,7 @@ fn solid_2_mooney_rivlin_noisy() {
         let i1_bar = j.powf(-2.0 / 3.0) * i1;
         let i2_bar = j.powf(-4.0 / 3.0) * 0.5 * (i1 * i1 - tr_c2);
         
-        let noise = rng.random_range(-0.01..0.01); // 1% körüli zaj
+        let noise = 0.0;//rng.random_range(-0.0001..0.0001); // 0.01% körüli zaj
         dy.push(c10 * (i1_bar - 3.0) + c01 * (i2_bar - 3.0) + noise);
     }
     

@@ -691,8 +691,8 @@ impl Domain for LinalgDomain {
 
     fn format_op(op: Self::OpCode, args: &[String]) -> String {
         match op {
-            LinalgOpCode::MakeVec2 => format!("({}, {})", args[0], args[1]),
-            LinalgOpCode::MakeVec3 => format!("({}, {}, {})", args[0], args[1], args[2]),
+            LinalgOpCode::MakeVec2 => format!("[{}, {}]", args[0], args[1]),
+            LinalgOpCode::MakeVec3 => format!("[{}, {}, {}]", args[0], args[1], args[2]),
             LinalgOpCode::GetXV2 | LinalgOpCode::GetXV3 => format!("{}.x", args[0]),
             LinalgOpCode::GetYV2 | LinalgOpCode::GetYV3 => format!("{}.y", args[0]),
             LinalgOpCode::GetZV3 => format!("{}.z", args[0]),

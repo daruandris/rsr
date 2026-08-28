@@ -64,7 +64,7 @@ impl Individual {
 
     pub fn optimize_constants(&mut self, dataset: &Dataset, iterations: usize) {
         optimize_individual_constants(self, dataset, iterations);
-        let threshold = 0.05;
+        let threshold = 1e-5;
         let mut constants = self.get_constants();
         for c in constants.iter_mut() {
             c.apply_threshold(threshold);
@@ -117,6 +117,8 @@ impl Individual {
         const FLAG_TRANSPOSE: u16 = 1 << 4;
         const FLAG_INVERSE: u16 = 1 << 5;
         const FLAG_DET: u16 = 1 << 6;
+        const FLAG_SOLID_CB: u16 = 1 << 7;
+        const FLAG_SOLID_OTHER: u16 = 1 << 8;
 
         let mut stack: Vec<u16> = Vec::with_capacity(32);
 
@@ -137,6 +139,29 @@ impl Individual {
                     }
 
                     match op {
+                        Instruction::Solid(solid_op) => {
+                            use crate::domains::solid::SolidOpCode::*;
+                            match solid_op {
+                                RightCauchyGreenM3 | LeftCauchyGreenM3 => {
+                                    if (child_flags & (FLAG_SOLID_CB | FLAG_SOLID_OTHER)) != 0 {
+                                        return true;
+                                    }
+                                    stack.push(child_flags | FLAG_SOLID_CB);
+                                }
+                                Invariant2M3 => {
+                                    if (child_flags & FLAG_SOLID_OTHER) != 0 {
+                                        return true;
+                                    }
+                                    stack.push(child_flags | FLAG_SOLID_OTHER);
+                                }
+                                _ => {
+                                    if (child_flags & (FLAG_SOLID_CB | FLAG_SOLID_OTHER)) != 0 {
+                                        return true;
+                                    }
+                                    stack.push(child_flags | FLAG_SOLID_OTHER);
+                                }
+                            }
+                        },
                         Instruction::Basic(basic_op) => match basic_op {
                             BasicOpCode::SinF | BasicOpCode::CosF => {
                                 if (child_flags & (FLAG_TRIG | FLAG_EXP | FLAG_LN)) != 0 {
