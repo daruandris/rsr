@@ -37,24 +37,23 @@ fn run_solid_test(
     feature_types: Vec<ValueType>,
     subset_size: Option<usize>,
     generations: usize,
+    extra_excluded_ops: Vec<Instruction>,
 ) {
     println!(">>> RUNNING {} <<<", name);
     let dataset = Dataset::new(&data_x, &data_y, feature_types, false);
 
-    let mut config =
-        common::get_test_config(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
-    // A hiperelaszticitáshoz ritkán kell szinusz vagy logaritmus (kivéve a motoron belüli J-hez, amit mi intézünk)
-    config.excluded_ops = vec![
+    let mut config = common::get_test_config(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
+    
+    let mut excluded = vec![
         Instruction::Basic(BasicOpCode::SinF),
         Instruction::Basic(BasicOpCode::CosF),
         Instruction::Basic(BasicOpCode::LnF),
         Instruction::Basic(BasicOpCode::ExpF),
-        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetXV3),
-        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetYV3),
-        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetZV3),
-        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetXV2),
-        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetYV2),
     ];
+    
+    excluded.extend(extra_excluded_ops);
+    config.excluded_ops = excluded;
+    
     config.subset_size = subset_size;
     config.max_generations = generations;
 
@@ -91,6 +90,19 @@ fn solid_1_neo_hookean() {
         dy.push(c10 * (i1_bar - 3.0));
     }
 
+    let vector_exclusions = vec![
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::MakeVec2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::MakeVec3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::DotV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::DotV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::CrossV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetXV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetYV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetZV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetXV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetYV2),
+    ];
+
     run_solid_test(
         "Solid 1: Neo-Hookean Energy (Easy, Clean)",
         "Solid1",
@@ -99,6 +111,7 @@ fn solid_1_neo_hookean() {
         vec![ValueType::Mat3],
         Some(240),
         2000,
+        vector_exclusions
     );
 }
 
@@ -145,6 +158,18 @@ fn solid_2_mooney_rivlin_noisy() {
         dy.push(c10 * (i1_bar - 3.0) + c01 * (i2_bar - 3.0) + noise);
     }
 
+    let vector_exclusions = vec![
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::MakeVec2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::MakeVec3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::DotV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::DotV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::CrossV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetXV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetYV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetZV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetXV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetYV2),
+    ];
     run_solid_test(
         "Solid 2: Mooney-Rivlin (Medium, Noisy)",
         "Solid2",
@@ -153,6 +178,7 @@ fn solid_2_mooney_rivlin_noisy() {
         vec![ValueType::Mat3],
         Some(400),
         3000,
+        vector_exclusions
     );
 }
 
@@ -202,6 +228,7 @@ fn solid_3_nanson_formula() {
         vec![ValueType::Mat3, ValueType::Vec3],
         Some(280),
         4000,
+        vec![]
     );
 }
 
@@ -245,6 +272,19 @@ fn solid_4_st_venant_kirchhoff() {
         dy.push(w);
     }
 
+    let vector_exclusions = vec![
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::MakeVec2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::MakeVec3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::DotV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::DotV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::CrossV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetXV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetYV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetZV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetXV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetYV2),
+    ];
+
     run_solid_test(
         "Solid 4: St. Venant-Kirchhoff (Large dataset, Very Hard)",
         "Solid4",
@@ -253,6 +293,7 @@ fn solid_4_st_venant_kirchhoff() {
         vec![ValueType::Mat3],
         Some(600),
         5000,
+        vector_exclusions
     );
 }
 
@@ -280,6 +321,19 @@ fn solid_5_yeoh_3rd_order() {
         dy.push(c1 * diff + c2 * diff * diff + c3 * diff * diff * diff);
     }
 
+    let vector_exclusions = vec![
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::MakeVec2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::MakeVec3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::DotV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::DotV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::CrossV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetXV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetYV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetZV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetXV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetYV2),
+    ];
+
     run_solid_test(
         "Solid 5: Yeoh 3rd Order (Massive Dataset, Deep Polynomial)",
         "Solid5",
@@ -288,5 +342,6 @@ fn solid_5_yeoh_3rd_order() {
         vec![ValueType::Mat3],
         Some(800),
         4000,
+        vector_exclusions
     );
 }
