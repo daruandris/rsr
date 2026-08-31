@@ -72,7 +72,7 @@ impl SymbolicRegressor {
     /// If the engine finds an equation with an MSE less than or equal to this target,
     /// it will stop the evolutionary search early.
     pub fn target_mse(mut self, target: f32) -> Self {
-        self.config.target_mse = target;
+        self.config.base_target_mse = target;
         self
     }
 
@@ -110,6 +110,22 @@ impl SymbolicRegressor {
     ///
     /// A [`FitResult`] containing the simplified equation string, its final MSE, and complexity.
     pub fn fit(&self, full_dataset: &Dataset) -> FitResult {
+        if !full_dataset.is_normalized && full_dataset.num_features > 1 {
+            let mut min_var = f32::MAX;
+            let mut max_var = f32::MIN;
+            for &std in &full_dataset.feature_std_devs {
+                let var = std * std;
+                if var < min_var { min_var = var; }
+                if var > max_var { max_var = var; }
+            }
+            if min_var > 0.0 && (max_var / min_var) > 100.0 {
+                warn!(
+                    "Large scale differences detected between input features (Max Var / Min Var > 100). \
+                    Continuous optimizers (L-BFGS, CMA-ES) may become numerically unstable. \
+                    Consider using `Schema::with_normalization(true)`."
+                );
+            }
+        }
         if !full_dataset.num_samples.is_multiple_of(8) {
             warn!(
                 "The full dataset size ({}) is not a multiple of 8. Padding applied. (Slight performance hit)",
@@ -129,7 +145,7 @@ impl SymbolicRegressor {
                 self.config.mini_batch_size
             );
         }
-        let strategy = StaticStrategy::new(self.config.clone());
+        let strategy = StaticStrategy::new(self.config.clone(), full_dataset.target_variance);
         let allowed_ops = strategy.get_allowed_operators();
 
         let train_data = if let Some(size) = self.config.subset_size {

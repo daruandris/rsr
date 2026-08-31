@@ -154,7 +154,7 @@ fn solid_2_mooney_rivlin_noisy() {
         let i1_bar = j.powf(-2.0 / 3.0) * i1;
         let i2_bar = j.powf(-4.0 / 3.0) * 0.5 * (i1 * i1 - tr_c2);
 
-        let noise = 0.0; //rng.random_range(-0.0001..0.0001); // 0.01% körüli zaj
+        let noise = 0.0;//rng.random_range(-0.01..0.01); // 1% körüli zaj
         dy.push(c10 * (i1_bar - 3.0) + c01 * (i2_bar - 3.0) + noise);
     }
 

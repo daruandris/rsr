@@ -203,9 +203,16 @@ impl<S: Strategy> Island<S> {
             new_ind.simplify();
 
             let mse = new_ind.calculate_mse(dataset);
-            let penalty = (new_ind.complexity() as f32) * self.strategy.parsimony_penalty();
+
             if mse.is_finite() {
+                let mse_floor = dataset.target_variance * 0.01;
+                let dynamic_penalty_rate = self.strategy.parsimony_penalty() * 
+                    mse.max(mse_floor).max(self.strategy.target_mse());
+                
+                let penalty = (new_ind.complexity() as f32) * dynamic_penalty_rate;
                 new_ind.fitness = mse + penalty;
+            } else {
+                new_ind.fitness = f32::MAX;
             }
             self.individuals.push(new_ind);
         }
@@ -227,7 +234,9 @@ impl<S: Strategy> Island<S> {
 
             if is_promising {
                 final_mse = ind.calculate_mse(dataset);
-                let is_potential_elite = final_mse < self.best_individual.fitness;
+                let required_improvement = (self.best_individual.fitness * 0.005)
+                    .max(self.strategy.min_improvement());
+                let is_potential_elite = final_mse < (self.best_individual.fitness - required_improvement);
                 let random_opt = self.rng.random::<f32>() < self.strategy.opt_prob();
 
                 if (is_potential_elite || random_opt) && final_mse.is_finite() {
@@ -247,8 +256,12 @@ impl<S: Strategy> Island<S> {
                 if is_new_best {
                     self.local_hof.insert(complexity, (final_mse, ind.clone()));
                 }
-
-                let complexity_penalty = (complexity as f32) * self.strategy.parsimony_penalty();
+                
+                let mse_floor = dataset.target_variance * 0.01;
+                let dynamic_penalty_rate = self.strategy.parsimony_penalty() * 
+                    final_mse.max(mse_floor).max(self.strategy.target_mse());
+                
+                let complexity_penalty = (complexity as f32) * dynamic_penalty_rate;
                 ind.fitness = final_mse + complexity_penalty;
             } else {
                 ind.fitness = f32::MAX;

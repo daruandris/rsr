@@ -93,9 +93,15 @@ impl<S: Strategy> Engine<S> {
         let final_opt_iters = self.global_strategy.final_opt_iterations();
         let mut final_best = self.get_global_best().clone();
         final_best.optimize_constants(dataset, final_opt_iters);
+        
+        let final_mse = final_best.calculate_mse(dataset);
 
-        let penalty = (final_best.complexity() as f32) * self.global_strategy.parsimony_penalty();
-        final_best.fitness = final_best.calculate_mse(dataset) + penalty;
+        let mse_floor = dataset.target_variance * 0.01;
+        let dynamic_penalty_rate = self.global_strategy.parsimony_penalty() * 
+            final_mse.max(mse_floor).max(self.global_strategy.target_mse());
+        
+        let penalty = (final_best.complexity() as f32) * dynamic_penalty_rate;
+        final_best.fitness = final_mse + penalty;
 
         if let Some(island) = self.islands.first_mut() {
             island.best_individual = final_best;

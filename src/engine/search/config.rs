@@ -16,12 +16,12 @@ pub struct Config {
     pub crossover_rate: f32,
     pub tournament_size: usize,
     pub migration_interval: usize,
-    pub parsimony_penalty: f32,
+    pub base_parsimony_penalty: f32,
     pub opt_prob: f32,
     pub opt_iterations: usize,
     pub final_opt_iterations: usize,
     pub stagnation_threshold: usize,
-    pub target_mse: f32,
+    pub base_target_mse: f32,
     pub min_improvement: f32,
     pub random_injection_rate: f32,
     pub min_random_injection: usize,
@@ -46,12 +46,12 @@ impl Config {
             crossover_rate: 0.10,
             tournament_size: 2,
             migration_interval: 25,
-            parsimony_penalty: 0.000005,
+            base_parsimony_penalty: 0.005,
             opt_prob: 0.01,
             opt_iterations: 100,
             final_opt_iterations: 4000,
             stagnation_threshold: 1000,
-            target_mse: 1e-7,
+            base_target_mse: 1e-7,
             min_improvement: 1e-6,
             random_injection_rate: 0.10,
             min_random_injection: 2,
@@ -120,8 +120,8 @@ impl Config {
         self
     }
 
-    pub fn parsimony_penalty(mut self, penalty: f32) -> Self {
-        self.parsimony_penalty = penalty;
+    pub fn base_parsimony_penalty(mut self, penalty: f32) -> Self {
+        self.base_parsimony_penalty = penalty;
         self
     }
 

@@ -26,7 +26,7 @@ fn run_linalg_test(
         Instruction::Basic(BasicOpCode::SqrF),
     ];
     config.mutation_max_depth = 7;
-    config.parsimony_penalty = 0.0;
+    config.base_parsimony_penalty = 0.0;
 
     let regressor = SymbolicRegressor::new(config);
 

@@ -28,6 +28,7 @@ pub struct Dataset {
     pub feature_std_devs: Vec<f32>,
     pub target_mean: f32,
     pub target_std_dev: f32,
+    pub target_variance: f32,
 
     pub is_normalized: bool,
     pub feature_types: Vec<ValueType>,
@@ -60,7 +61,21 @@ impl Dataset {
         let mut target_mean = 0.0;
         let mut target_std_dev = 1.0;
 
+        let target_sum: f32 = data_y.iter().sum();
+        let actual_target_mean = target_sum / num_samples as f32;
+        let mut target_variance: f32 = data_y
+            .iter()
+            .map(|&y| (y - actual_target_mean).powi(2))
+            .sum::<f32>()
+            / num_samples as f32;
+        if target_variance < 1e-9 {
+            target_variance = 1.0;
+        }
+
         if normalize {
+            target_mean = actual_target_mean;
+            target_std_dev = target_variance.sqrt();
+
             for f_idx in 0..num_features_usize {
                 let sum: f32 = data_x.iter().map(|row| row[f_idx]).sum();
                 let mean = sum / num_samples as f32;
@@ -77,20 +92,6 @@ impl Dataset {
                     variance.sqrt()
                 };
             }
-
-            let target_sum: f32 = data_y.iter().sum();
-            target_mean = target_sum / num_samples as f32;
-
-            let target_variance: f32 = data_y
-                .iter()
-                .map(|&y| (y - target_mean).powi(2))
-                .sum::<f32>()
-                / num_samples as f32;
-            target_std_dev = if target_variance < 1e-9 {
-                1.0
-            } else {
-                target_variance.sqrt()
-            };
         }
 
         let simd_width = 8;
@@ -163,6 +164,7 @@ impl Dataset {
             feature_std_devs,
             target_mean,
             target_std_dev,
+            target_variance,
             is_normalized: normalize,
             feature_types,
         }
@@ -441,6 +443,7 @@ impl Dataset {
             feature_std_devs: self.feature_std_devs.clone(),
             target_mean: self.target_mean,
             target_std_dev: self.target_std_dev,
+            target_variance: self.target_variance,
             is_normalized: self.is_normalized,
             feature_types: self.feature_types.clone(),
         }

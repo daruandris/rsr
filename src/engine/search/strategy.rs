@@ -34,11 +34,20 @@ pub trait Strategy: Clone + Send + Sync {
 #[derive(Clone)]
 pub struct StaticStrategy {
     pub config: Config,
+    pub effective_target_mse: f32,
+    pub effective_parsimony_penalty: f32,
 }
 
 impl StaticStrategy {
-    pub fn new(config: Config) -> Self {
-        Self { config }
+    pub fn new(config: Config, target_variance: f32) -> Self {
+        let effective_target_mse = config.base_target_mse * target_variance;
+        let effective_parsimony_penalty = config.base_parsimony_penalty;
+        
+        Self { 
+            config,
+            effective_target_mse,
+            effective_parsimony_penalty,
+        }
     }
 }
 
@@ -57,7 +66,7 @@ impl Strategy for StaticStrategy {
     }
     #[inline(always)]
     fn target_mse(&self) -> f32 {
-        self.config.target_mse
+        self.effective_target_mse
     }
     #[inline(always)]
     fn crossover_rate(&self) -> f32 {
@@ -73,7 +82,7 @@ impl Strategy for StaticStrategy {
     }
     #[inline(always)]
     fn parsimony_penalty(&self) -> f32 {
-        self.config.parsimony_penalty
+        self.effective_parsimony_penalty
     }
     #[inline(always)]
     fn random_injection_rate(&self) -> f32 {

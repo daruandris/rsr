@@ -17,7 +17,7 @@ pub fn test() {
 
     // LinalgDomain bekapcsolva, felesleges műveletek (pl. Sin, Cos) nélkül
     let config =
-        Config::default(vec![OpModule::Basic, OpModule::Linalg]).parsimony_penalty(0.00005);
+        Config::default(vec![OpModule::Basic, OpModule::Linalg]).base_parsimony_penalty(0.00005);
     let regressor = SymbolicRegressor::new(config)
         .train_subset_size(400)
         .generations(5000);
