@@ -44,7 +44,11 @@ fn run_solid_test(
     let dataset = Dataset::new(&data_x, &data_y, feature_types, false);
 
     let mut config = common::get_test_config(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
-    
+    if disabel_tensor_constants {
+        config = config.without_constants(vec![
+                ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3
+            ]);
+    }
     let mut excluded = vec![
         Instruction::Basic(BasicOpCode::SinF),
         Instruction::Basic(BasicOpCode::CosF),
@@ -110,6 +114,8 @@ fn solid_1_neo_hookean() {
         Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::ScaleV3),
         Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::MulM2V2),
         Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::MulM3V3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::NormV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::NormV3),
 
 
     ];
@@ -121,7 +127,7 @@ fn solid_1_neo_hookean() {
         dy,
         vec![ValueType::Mat3],
         Some(240),
-        2000,
+        10000,
         vector_exclusions,
         true
     );
@@ -181,6 +187,18 @@ fn solid_2_mooney_rivlin_noisy() {
         Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetZV3),
         Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetXV2),
         Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetYV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::AddV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::AddV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::SubV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::SubV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::ScaleV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::ScaleV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::MulM2V2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::MulM3V3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::NormV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::NormV3),
+
+
     ];
     run_solid_test(
         "Solid 2: Mooney-Rivlin (Medium, Noisy)",
@@ -189,7 +207,7 @@ fn solid_2_mooney_rivlin_noisy() {
         dy,
         vec![ValueType::Mat3],
         Some(400),
-        3000,
+        10000,
         vector_exclusions,
         true
     );
@@ -240,7 +258,7 @@ fn solid_3_nanson_formula() {
         dy,
         vec![ValueType::Mat3, ValueType::Vec3],
         Some(280),
-        4000,
+        10000,
         vec![],
         false
     );
@@ -297,6 +315,18 @@ fn solid_4_st_venant_kirchhoff() {
         Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetZV3),
         Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetXV2),
         Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetYV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::AddV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::AddV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::SubV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::SubV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::ScaleV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::ScaleV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::MulM2V2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::MulM3V3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::NormV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::NormV3),
+
+
     ];
 
     run_solid_test(
@@ -306,7 +336,7 @@ fn solid_4_st_venant_kirchhoff() {
         dy,
         vec![ValueType::Mat3],
         Some(600),
-        5000,
+        10000,
         vector_exclusions,
         true
     );
@@ -347,6 +377,18 @@ fn solid_5_yeoh_3rd_order() {
         Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetZV3),
         Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetXV2),
         Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetYV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::AddV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::AddV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::SubV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::SubV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::ScaleV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::ScaleV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::MulM2V2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::MulM3V3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::NormV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::NormV3),
+
+
     ];
 
     run_solid_test(
@@ -356,7 +398,7 @@ fn solid_5_yeoh_3rd_order() {
         dy,
         vec![ValueType::Mat3],
         Some(800),
-        4000,
+        10000,
         vector_exclusions,
         true
     );

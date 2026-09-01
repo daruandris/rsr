@@ -1,10 +1,15 @@
-// src/engine/search/operators/generator.rs
-
 use crate::Instruction;
 use crate::engine::eval::scalar::Scalar;
 use crate::engine::eval::types::ValueType;
 use crate::engine::expr::node::Node;
 use rand::RngExt;
+
+#[derive(Clone, Copy)]
+enum Choice {
+    Var(u8),
+    Const,
+    Op(Instruction),
+}
 
 pub fn generate_random_ast(
     target_type: ValueType,
@@ -12,24 +17,46 @@ pub fn generate_random_ast(
     rng: &mut impl RngExt,
     variables: &[(ValueType, u8)],
     allowed_ops: &[Instruction],
+    disabled_constants: &[ValueType],
 ) -> (Vec<Node>, Vec<Scalar>) {
     let cap = 1 << (max_depth.min(6));
     let mut nodes = Vec::with_capacity(cap);
     let mut constants = Vec::new();
 
-    build_ast_recursive(
-        &mut nodes,
-        &mut constants,
-        target_type,
-        0,
-        max_depth,
-        rng,
-        variables,
-        allowed_ops,
-        None
-    );
+    for _ in 0..10 {
+        nodes.clear();
+        constants.clear();
+        if build_ast_recursive(
+            &mut nodes,
+            &mut constants,
+            target_type,
+            0,
+            max_depth,
+            rng,
+            variables,
+            allowed_ops,
+            None,
+            disabled_constants,
+        ) {
+            return (nodes, constants);
+        }
+    }
 
-    (nodes, constants)
+    nodes.clear();
+    constants.clear();
+    let valid_vars: Vec<_> = variables.iter().filter(|v| v.0 == target_type).collect();
+    if !valid_vars.is_empty() {
+        nodes.push(Node::Variable(valid_vars[0].1, target_type));
+        return (nodes, constants);
+    }
+    if !disabled_constants.contains(&target_type) {
+        if let Some(c) = random_constant(target_type, disabled_constants, rng) {
+            constants.push(c);
+            nodes.push(Node::Constant(0, target_type));
+            return (nodes, constants);
+        }
+    }
+    panic!("Nem sikerült AST-t generálni a {:?} típushoz. Nincs érvényes operátor, változó, és a konstansok is tiltva vannak!", target_type);
 }
 
 fn build_ast_recursive(
@@ -42,123 +69,92 @@ fn build_ast_recursive(
     variables: &[(ValueType, u8)],
     allowed_ops: &[Instruction],
     parent_op: Option<Instruction>,
-) {
-    let is_terminal =
-        current_depth >= max_depth || (current_depth > 0 && rng.random::<f32>() < 0.2);
+    disabled_constants: &[ValueType],
+) -> bool {
+    let prefer_terminal = current_depth >= max_depth || (current_depth > 0 && rng.random::<f32>() < 0.2);
 
-    if is_terminal {
-        let valid_vars: Vec<_> = variables.iter().filter(|v| v.0 == target_type).collect();
-        let is_var_valid = !valid_vars.is_empty();
-        let maybe_const = random_constant(target_type, rng);
-
-        match (is_var_valid, maybe_const) {
-            (true, Some(c)) => {
-                if rng.random::<bool>() {
-                    let chosen = valid_vars[rng.random_range(0..valid_vars.len())];
-                    nodes.push(Node::Variable(chosen.1, target_type));
-                } else {
-                    let idx = constants.len() as u16;
-                    constants.push(c);
-                    nodes.push(Node::Constant(idx, target_type));
-                }
-            }
-            (true, None) => {
-                let chosen = valid_vars[rng.random_range(0..valid_vars.len())];
-                nodes.push(Node::Variable(chosen.1, target_type));
-            }
-            (false, Some(c)) => {
-                let idx = constants.len() as u16;
-                constants.push(c);
-                nodes.push(Node::Constant(idx, target_type));
-            }
-            (false, None) => {
-                add_operator_node(
-                    nodes,
-                    constants,
-                    target_type,
-                    current_depth,
-                    max_depth,
-                    rng,
-                    variables,
-                    allowed_ops,
-                    parent_op,
-                );
-            }
-        }
-    } else {
-        add_operator_node(
-            nodes,
-            constants,
-            target_type,
-            current_depth,
-            max_depth,
-            rng,
-            variables,
-            allowed_ops,
-            parent_op,
-        );
+    let mut terminals = Vec::new();
+    if !disabled_constants.contains(&target_type) {
+        terminals.push(Choice::Const);
     }
-}
+    for v in variables.iter().filter(|v| v.0 == target_type) {
+        terminals.push(Choice::Var(v.1));
+    }
 
-fn add_operator_node(
-    nodes: &mut Vec<Node>,
-    constants: &mut Vec<Scalar>,
-    target_type: ValueType,
-    current_depth: usize,
-    max_depth: usize,
-    rng: &mut impl RngExt,
-    variables: &[(ValueType, u8)],
-    allowed_ops: &[Instruction],
-    parent_op: Option<Instruction>,
-) {
-    if let Some(chosen_op) = random_operator(target_type, allowed_ops, parent_op, rng) {
-        let expected_children_types = chosen_op.expected_types();
-        for &child_type in expected_children_types {
-            build_ast_recursive(
-                nodes,
-                constants,
-                child_type,
-                current_depth + 1,
-                max_depth,
-                rng,
-                variables,
-                allowed_ops,
-                Some(chosen_op),
-            );
-        }
-        nodes.push(Node::Operator(chosen_op));
-    } else {
-        let valid_vars: Vec<_> = variables.iter().filter(|v| v.0 == target_type).collect();
-        let maybe_const = random_constant(target_type, rng);
-
-        match (!valid_vars.is_empty(), maybe_const) {
-            (true, Some(c)) => {
-                if rng.random::<bool>() {
-                    let chosen = valid_vars[rng.random_range(0..valid_vars.len())];
-                    nodes.push(Node::Variable(chosen.1, target_type));
-                } else {
-                    let idx = constants.len() as u16;
-                    constants.push(c);
-                    nodes.push(Node::Constant(idx, target_type));
+    let mut ops = Vec::new();
+    if current_depth < max_depth {
+        for op in allowed_ops {
+            if op.return_type() == target_type {
+                let forbidden = parent_op.is_some_and(|p| p.is_forbidden_child(op));
+                if !forbidden {
+                    ops.push(Choice::Op(*op));
                 }
-            }
-            (true, None) => {
-                let chosen = valid_vars[rng.random_range(0..valid_vars.len())];
-                nodes.push(Node::Variable(chosen.1, target_type));
-            }
-            (false, Some(c)) => {
-                let idx = constants.len() as u16;
-                constants.push(c);
-                nodes.push(Node::Constant(idx, target_type));
-            }
-            (false, None) => {
-                panic!(
-                    "Error: No operator, variable or constant for {:?} type!",
-                    target_type
-                );
             }
         }
     }
+
+    let mut shuffle = |vec: &mut Vec<Choice>| {
+        if vec.is_empty() { return; }
+        for i in (1..vec.len()).rev() {
+            let j = rng.random_range(0..=i);
+            vec.swap(i, j);
+        }
+    };
+
+    shuffle(&mut terminals);
+    shuffle(&mut ops);
+
+    let mut choices = Vec::with_capacity(terminals.len() + ops.len());
+    if prefer_terminal && !terminals.is_empty() {
+        choices.extend(terminals);
+        choices.extend(ops);
+    } else {
+        choices.extend(ops);
+        choices.extend(terminals);
+    }
+
+    let saved_nodes_len = nodes.len();
+    let saved_consts_len = constants.len();
+
+    for choice in choices {
+        match choice {
+            Choice::Var(idx) => {
+                nodes.push(Node::Variable(idx, target_type));
+                return true;
+            }
+            Choice::Const => {
+                if let Some(c) = random_constant(target_type, disabled_constants, rng) {
+                    let idx = constants.len() as u16;
+                    constants.push(c);
+                    nodes.push(Node::Constant(idx, target_type));
+                    return true;
+                }
+            }
+            Choice::Op(op) => {
+                let expected_types = op.expected_types();
+                let mut success = true;
+
+                for &child_type in expected_types {
+                    if !build_ast_recursive(
+                        nodes, constants, child_type, current_depth + 1, max_depth,
+                        rng, variables, allowed_ops, Some(op), disabled_constants
+                    ) {
+                        success = false;
+                        break;
+                    }
+                }
+
+                if success {
+                    nodes.push(Node::Operator(op));
+                    return true;
+                } else {
+                    nodes.truncate(saved_nodes_len);
+                    constants.truncate(saved_consts_len);
+                }
+            }
+        }
+    }
+    false
 }
 
 pub fn random_operator(
@@ -188,7 +184,10 @@ pub fn random_operator(
     allowed_ops.iter().copied().filter(is_valid).nth(chosen_idx)
 }
 
-pub fn random_constant(target_type: ValueType, rng: &mut impl RngExt) -> Option<Scalar> {
+pub fn random_constant(target_type: ValueType, disabled_constants: &[ValueType], rng: &mut impl RngExt) -> Option<Scalar> {
+    if disabled_constants.contains(&target_type) {
+        return None;
+    }
     match target_type {
         ValueType::Float => Some(Scalar::Float(rng.random_range(-5.0..5.0))),
         ValueType::Vec2 => Some(Scalar::Vec2([

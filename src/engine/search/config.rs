@@ -1,4 +1,4 @@
-use crate::Instruction;
+use crate::{Instruction, ValueType};
 use crate::domains::basic::BasicOpCode;
 use crate::domains::linalg::LinalgOpCode;
 use crate::domains::solid::SolidOpCode;
@@ -38,6 +38,7 @@ pub struct Config {
     pub excluded_ops: Vec<Instruction>,
     pub subset_size: Option<usize>,
     pub mini_batch_size: usize,
+    pub disabled_constant_types: Vec<ValueType>,
 }
 
 impl Config {
@@ -67,6 +68,7 @@ impl Config {
             excluded_ops: vec![],
             subset_size: Some(400),
             mini_batch_size: 64,
+            disabled_constant_types: vec![],
         }
     }
 
@@ -133,6 +135,15 @@ impl Config {
         self
     }
 
+    pub fn without_constants(mut self, types: Vec<ValueType>) -> Self {
+    for t in types {
+        if !self.disabled_constant_types.contains(&t) {
+            self.disabled_constant_types.push(t);
+        }
+    }
+    self
+}
+
     // ==========================================
     // ANYAGCSALÁDOK SZERINTI PROFILOK
     // ==========================================
@@ -140,7 +151,9 @@ impl Config {
     /// Gumik, polimerek, elasztomerek, lágy szövetek (Nagy alakváltozás)
     pub fn hyperelastic_isotropic(mut self) -> Self {
         self.allowed_modules = vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid];
-        //should disable tensor constants
+        self.disabled_constant_types.extend(vec![
+            ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3
+        ]);
         let mut exclusions = vec![
             // Kis alakváltozási tenzor tiltása a modell objektivitása miatt
             Instruction::Solid(SolidOpCode::GreenLagrangeStrainM3),
@@ -175,7 +188,9 @@ impl Config {
     /// Fémek, merev műanyagok, kerámiák (Kis alakváltozás)
     pub fn linear_stiff_metals(mut self) -> Self {
         self.allowed_modules = vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid];
-         //should disable tensor constants
+        self.disabled_constant_types.extend(vec![
+            ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3
+        ]);
         self.excluded_ops.extend(vec![
             // C és B tenzorok, illetve isochor invariánsok tiltása
             Instruction::Solid(SolidOpCode::RightCauchyGreenM3),
@@ -198,7 +213,9 @@ impl Config {
         // Alapvetően a hiperelasztikus modellt vesszük alapul, de a vektoros
         // operátorokat (MakeVec3, DotV3, CrossV3) ENGEDÉLYEZZÜK az irányvektorok miatt.
         self.allowed_modules = vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid];
-         //should disable tensor constants
+        self.disabled_constant_types.extend(vec![
+            ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3
+        ]);
         let mut exclusions = vec![
             Instruction::Solid(SolidOpCode::GreenLagrangeStrainM3),
             Instruction::Basic(BasicOpCode::SinF),

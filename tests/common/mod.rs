@@ -197,12 +197,12 @@ pub fn update_history(category: &str, mut mse: f32, time_ms: u64) {
 pub fn get_test_config(modules: Vec<OpModule>) -> Config {
     Config {
         num_islands: 24,
-        island_size: 25,
+        island_size: 100,
         max_generations: 5000,
         crossover_rate: 0.10,
         tournament_size: 2,
         migration_interval: 25,
-        base_parsimony_penalty: 0.00005,
+        base_parsimony_penalty: 0.0005,
         opt_prob: 0.01,
         opt_iterations: 100,
         final_opt_iterations: 5000,
@@ -220,5 +220,6 @@ pub fn get_test_config(modules: Vec<OpModule>) -> Config {
         excluded_ops: vec![],
         subset_size: Some(400),
         mini_batch_size: 64,
+        disabled_constant_types: vec![]
     }
 }

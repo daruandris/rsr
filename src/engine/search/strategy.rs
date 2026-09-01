@@ -1,5 +1,5 @@
 use super::config::{Config, OpModule};
-use crate::Instruction;
+use crate::{Instruction, ValueType};
 use crate::domains::basic::BasicOpCode;
 use crate::domains::linalg::LinalgOpCode;
 use crate::domains::solid::SolidOpCode;
@@ -25,6 +25,7 @@ pub trait Strategy: Clone + Send + Sync {
     fn min_improvement(&self) -> f32;
     fn verbose(&self) -> bool;
     fn mini_batch_size(&self) -> usize;
+    fn disabled_constant_types(&self) -> &[ValueType];
 
     fn get_allowed_operators(&self) -> Vec<Instruction>;
     fn on_generation_end(&mut self, _best_mse: f32, _stagnation_counter: usize) {}
@@ -213,5 +214,10 @@ impl Strategy for StaticStrategy {
             }
         }
         final_ops
+    }
+
+    #[inline(always)]
+    fn disabled_constant_types(&self) -> &[ValueType] {
+        &self.config.disabled_constant_types
     }
 }

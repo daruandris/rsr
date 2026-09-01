@@ -47,6 +47,7 @@ impl<S: Strategy> Island<S> {
                 &mut rng,
                 &variable_registry,
                 &allowed_ops,
+                strategy.disabled_constant_types(),
             );
             let mut ind = Individual::new(ast, constants);
             ind.simplify();
@@ -111,6 +112,7 @@ impl<S: Strategy> Island<S> {
                 &mut self.rng,
                 &self.variable_registry,
                 &self.allowed_ops,
+                self.strategy.disabled_constant_types(),
             );
             let mut ind = Individual::new(ast, constants);
             ind.simplify();
@@ -153,6 +155,7 @@ impl<S: Strategy> Island<S> {
                             &mut self.rng,
                             &self.variable_registry,
                             &self.allowed_ops,
+                            self.strategy.disabled_constant_types(),
                         ),
                         1 => constant_perturbation(&mut mutated_candidate, &mut self.rng),
                         _ => subtree_mutation(
@@ -162,6 +165,7 @@ impl<S: Strategy> Island<S> {
                             self.strategy.max_tree_size(),
                             self.strategy.mutation_max_depth(),
                             &self.allowed_ops,
+                            self.strategy.disabled_constant_types(),
                         ),
                     }
                     mutated_candidate.simplify();
@@ -190,6 +194,7 @@ impl<S: Strategy> Island<S> {
                 &mut self.rng,
                 &self.variable_registry,
                 &self.allowed_ops,
+                self.strategy.disabled_constant_types(),
             );
             let mut new_ind = Individual::new(ast, constants);
             new_ind.simplify();

@@ -13,6 +13,7 @@ pub fn point_mutation(
     rng: &mut impl RngExt,
     variables: &[(ValueType, u8)],
     allowed_ops: &[Instruction],
+    disabled_constants: &[ValueType],
 ) {
     if ind.nodes.is_empty() {
         return;
@@ -26,7 +27,7 @@ pub fn point_mutation(
     if target_arity == 0 {
         let valid_vars: Vec<_> = variables.iter().filter(|v| v.0 == target_type).collect();
         let is_var_valid = !valid_vars.is_empty();
-        let maybe_const = random_constant(target_type, rng);
+        let maybe_const = random_constant(target_type, disabled_constants, rng);
 
         match (is_var_valid, maybe_const) {
             (true, Some(c)) => {
@@ -123,6 +124,7 @@ pub fn subtree_mutation(
     max_size: usize,
     mutation_max_depth: usize,
     allowed_ops: &[Instruction],
+    disabled_constants: &[ValueType],
 ) {
     if ind.nodes.is_empty() {
         return;
@@ -145,6 +147,7 @@ pub fn subtree_mutation(
         rng,
         variables,
         allowed_ops,
+        disabled_constants
     );
 
     let const_offset = ind.constants.len() as u16;
