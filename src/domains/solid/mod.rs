@@ -14,6 +14,8 @@ pub enum SolidOpCode {
     GreenLagrangeStrainM3,
     IsochoricInvariant1,
     IsochoricInvariant2,
+    TraceSqrM3,
+    DeviatoricM3,
 }
 
 pub struct SolidDomain;
@@ -25,36 +27,15 @@ impl Domain for SolidDomain {
     fn eval(op: Self::OpCode, ctx: &mut VmState) {
         unsafe {
             match op {
-                SolidOpCode::RightCauchyGreenM3 => {
-                    eval::eval_right_cauchy_green_m3(&mut ctx.sp_m3, &mut ctx.stack_m3)
-                }
-                SolidOpCode::LeftCauchyGreenM3 => {
-                    eval::eval_left_cauchy_green_m3(&mut ctx.sp_m3, &mut ctx.stack_m3)
-                }
-                SolidOpCode::GreenLagrangeStrainM3 => {
-                    eval::eval_green_lagrange_strain_m3(&mut ctx.sp_m3, &mut ctx.stack_m3)
-                }
-                SolidOpCode::IsochoricInvariant1 => eval::eval_isochoric_invariant1(
-                    &mut ctx.sp_f,
-                    &mut ctx.stack_f,
-                    &mut ctx.sp_m3,
-                    &ctx.stack_m3,
-                ),
-                SolidOpCode::IsochoricInvariant2 => eval::eval_isochoric_invariant2(
-                    &mut ctx.sp_f,
-                    &mut ctx.stack_f,
-                    &mut ctx.sp_m3,
-                    &ctx.stack_m3,
-                ),
-                SolidOpCode::Invariant2M3 => eval::eval_invariant2_m3(
-                    &mut ctx.sp_f,
-                    &mut ctx.stack_f,
-                    &mut ctx.sp_m3,
-                    &ctx.stack_m3,
-                ),
-                SolidOpCode::CofactorM3 => {
-                    eval::eval_cofactor_m3(&mut ctx.sp_m3, &mut ctx.stack_m3)
-                }
+                SolidOpCode::RightCauchyGreenM3 => eval::eval_right_cauchy_green_m3(&mut ctx.sp_m3, &mut ctx.stack_m3),
+                SolidOpCode::LeftCauchyGreenM3 => eval::eval_left_cauchy_green_m3(&mut ctx.sp_m3, &mut ctx.stack_m3),
+                SolidOpCode::GreenLagrangeStrainM3 => eval::eval_green_lagrange_strain_m3(&mut ctx.sp_m3, &mut ctx.stack_m3),
+                SolidOpCode::IsochoricInvariant1 => eval::eval_isochoric_invariant1(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3),
+                SolidOpCode::IsochoricInvariant2 => eval::eval_isochoric_invariant2(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3),
+                SolidOpCode::Invariant2M3 => eval::eval_invariant2_m3(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3),
+                SolidOpCode::CofactorM3 => eval::eval_cofactor_m3(&mut ctx.sp_m3, &mut ctx.stack_m3),
+                SolidOpCode::TraceSqrM3 => eval::eval_trace_sqr_m3(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3),
+                SolidOpCode::DeviatoricM3 => eval::eval_deviatoric_m3(&mut ctx.sp_m3, &mut ctx.stack_m3),
             }
         }
     }
@@ -63,36 +44,15 @@ impl Domain for SolidDomain {
     fn eval_dual(op: Self::OpCode, ctx: &mut DualVmState) {
         unsafe {
             match op {
-                SolidOpCode::RightCauchyGreenM3 => {
-                    eval::eval_dual_right_cauchy_green_m3(&mut ctx.sp_m3, &mut ctx.stack_m3)
-                }
-                SolidOpCode::LeftCauchyGreenM3 => {
-                    eval::eval_dual_left_cauchy_green_m3(&mut ctx.sp_m3, &mut ctx.stack_m3)
-                }
-                SolidOpCode::GreenLagrangeStrainM3 => {
-                    eval::eval_dual_green_lagrange_strain_m3(&mut ctx.sp_m3, &mut ctx.stack_m3)
-                }
-                SolidOpCode::IsochoricInvariant1 => eval::eval_dual_isochoric_invariant1(
-                    &mut ctx.sp_f,
-                    &mut ctx.stack_f,
-                    &mut ctx.sp_m3,
-                    &ctx.stack_m3,
-                ),
-                SolidOpCode::IsochoricInvariant2 => eval::eval_dual_isochoric_invariant2(
-                    &mut ctx.sp_f,
-                    &mut ctx.stack_f,
-                    &mut ctx.sp_m3,
-                    &ctx.stack_m3,
-                ),
-                SolidOpCode::Invariant2M3 => eval::eval_dual_invariant2_m3(
-                    &mut ctx.sp_f,
-                    &mut ctx.stack_f,
-                    &mut ctx.sp_m3,
-                    &ctx.stack_m3,
-                ),
-                SolidOpCode::CofactorM3 => {
-                    eval::eval_dual_cofactor_m3(&mut ctx.sp_m3, &mut ctx.stack_m3)
-                }
+                SolidOpCode::RightCauchyGreenM3 => eval::eval_dual_right_cauchy_green_m3(&mut ctx.sp_m3, &mut ctx.stack_m3),
+                SolidOpCode::LeftCauchyGreenM3 => eval::eval_dual_left_cauchy_green_m3(&mut ctx.sp_m3, &mut ctx.stack_m3),
+                SolidOpCode::GreenLagrangeStrainM3 => eval::eval_dual_green_lagrange_strain_m3(&mut ctx.sp_m3, &mut ctx.stack_m3),
+                SolidOpCode::IsochoricInvariant1 => eval::eval_dual_isochoric_invariant1(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3),
+                SolidOpCode::IsochoricInvariant2 => eval::eval_dual_isochoric_invariant2(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3),
+                SolidOpCode::Invariant2M3 => eval::eval_dual_invariant2_m3(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3),
+                SolidOpCode::CofactorM3 => eval::eval_dual_cofactor_m3(&mut ctx.sp_m3, &mut ctx.stack_m3),
+                SolidOpCode::TraceSqrM3 => eval::eval_dual_trace_sqr_m3(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3),
+                SolidOpCode::DeviatoricM3 => eval::eval_dual_deviatoric_m3(&mut ctx.sp_m3, &mut ctx.stack_m3),
             }
         }
     }
@@ -227,6 +187,21 @@ impl Domain for SolidDomain {
                     ];
                     return SimplifyAction::ReplaceWithConstant(Scalar::Mat3(res));
                 }
+                SolidOpCode::TraceSqrM3 => {
+                    let res = m[0] * m[0] + m[1] * m[3] + m[2] * m[6]
+                            + m[3] * m[1] + m[4] * m[4] + m[5] * m[7]
+                            + m[6] * m[2] + m[7] * m[5] + m[8] * m[8];
+                    return SimplifyAction::ReplaceWithConstant(Scalar::Float(res));
+                }
+                SolidOpCode::DeviatoricM3 => {
+                    let tr_third = (m[0] + m[4] + m[8]) / 3.0;
+                    let res = [
+                        m[0] - tr_third, m[1], m[2],
+                        m[3], m[4] - tr_third, m[5],
+                        m[6], m[7], m[8] - tr_third,
+                    ];
+                    return SimplifyAction::ReplaceWithConstant(Scalar::Mat3(res));
+                }
             }
         }
         SimplifyAction::None
@@ -240,7 +215,8 @@ impl Domain for SolidDomain {
         match op {
             SolidOpCode::Invariant2M3
             | SolidOpCode::IsochoricInvariant1
-            | SolidOpCode::IsochoricInvariant2 => ValueType::Float,
+            | SolidOpCode::IsochoricInvariant2
+            | SolidOpCode::TraceSqrM3 => ValueType::Float,
             _ => ValueType::Mat3,
         }
     }
@@ -251,15 +227,16 @@ impl Domain for SolidDomain {
 
     fn weight(op: Self::OpCode) -> usize {
         match op {
-            SolidOpCode::Invariant2M3 => 3,
+            SolidOpCode::DeviatoricM3 => 3,
+            SolidOpCode::Invariant2M3 | SolidOpCode::TraceSqrM3 => 4,
             SolidOpCode::RightCauchyGreenM3 | SolidOpCode::LeftCauchyGreenM3 => 4,
             SolidOpCode::GreenLagrangeStrainM3 | SolidOpCode::CofactorM3 => 5,
-            SolidOpCode::IsochoricInvariant1 | SolidOpCode::IsochoricInvariant2 => 6, // Még drágábbak
+            SolidOpCode::IsochoricInvariant1 | SolidOpCode::IsochoricInvariant2 => 6,
         }
     }
 
     fn is_differentiable(_op: Self::OpCode) -> bool {
-        true // MOST MÁR MEGY AZ AUTODIFF!
+        true
     }
 
     fn is_forbidden_child(parent: Self::OpCode, child: Self::OpCode) -> bool {
@@ -270,9 +247,6 @@ impl Domain for SolidDomain {
             | SolidOpCode::IsochoricInvariant1
             | SolidOpCode::IsochoricInvariant2
             | SolidOpCode::CofactorM3 => {
-                // Ezek a Deformációs Grádienst (F) várják.
-                // Szigorúan TILOS egy már kiszámított kinematikai metrikát újra beadni nekik!
-                // Megakadályozza a B(B(X)), C(Cof(X)), E(C(X)) és hasonló értelmetlen fákat.
                 matches!(
                     child,
                     SolidOpCode::RightCauchyGreenM3
@@ -282,11 +256,11 @@ impl Domain for SolidDomain {
                         | SolidOpCode::IsochoricInvariant2
                         | SolidOpCode::CofactorM3
                         | SolidOpCode::Invariant2M3
+                        | SolidOpCode::TraceSqrM3
+                        | SolidOpCode::DeviatoricM3
                 )
             }
             SolidOpCode::Invariant2M3 => {
-                // Az I_2 invariáns a B vagy C tenzorokat várja.
-                // Értelmetlen E-t, Kofaktort, vagy más invariánsokat (amik amúgy skalárok) beletenni.
                 matches!(
                     child,
                     SolidOpCode::GreenLagrangeStrainM3
@@ -294,8 +268,13 @@ impl Domain for SolidDomain {
                         | SolidOpCode::IsochoricInvariant1
                         | SolidOpCode::IsochoricInvariant2
                         | SolidOpCode::Invariant2M3
+                        | SolidOpCode::TraceSqrM3
                 )
             }
+            SolidOpCode::DeviatoricM3 => {
+                matches!(child, SolidOpCode::DeviatoricM3)
+            }
+            SolidOpCode::TraceSqrM3 => false
         }
     }
 
@@ -308,6 +287,8 @@ impl Domain for SolidDomain {
             SolidOpCode::IsochoricInvariant2 => format!("I2_bar({})", args[0]),
             SolidOpCode::Invariant2M3 => format!("I2({})", args[0]),
             SolidOpCode::CofactorM3 => format!("Cof({})", args[0]),
+            SolidOpCode::TraceSqrM3 => format!("tr({}^2)", args[0]), // ÚJ
+            SolidOpCode::DeviatoricM3 => format!("dev({})", args[0]), // ÚJ
         }
     }
 }

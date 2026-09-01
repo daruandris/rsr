@@ -154,6 +154,12 @@ impl Individual {
                                     }
                                     stack.push(child_flags | FLAG_SOLID_OTHER);
                                 }
+                                TraceSqrM3 => {
+                                    stack.push(child_flags | FLAG_SOLID_OTHER);
+                                }
+                                DeviatoricM3 => {
+                                    stack.push(child_flags | FLAG_SOLID_OTHER);
+                                }
                                 _ => {
                                     if (child_flags & (FLAG_SOLID_CB | FLAG_SOLID_OTHER)) != 0 {
                                         return true;

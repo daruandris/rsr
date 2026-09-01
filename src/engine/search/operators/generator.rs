@@ -26,7 +26,7 @@ pub fn generate_random_ast(
         rng,
         variables,
         allowed_ops,
-        None,
+        None
     );
 
     (nodes, constants)

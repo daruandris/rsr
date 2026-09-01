@@ -40,7 +40,6 @@ impl<S: Strategy> Island<S> {
         let size = strategy.island_size();
         let mut rng = Xoshiro256PlusPlus::seed_from_u64(seed);
         let mut individuals = Vec::with_capacity(size);
-
         for _ in 0..size {
             let (ast, constants) = generate_random_ast(
                 ValueType::Float,
@@ -102,7 +101,6 @@ impl<S: Strategy> Island<S> {
 
         let num_randoms = (pop_size as f32 * self.strategy.random_injection_rate())
             .max(self.strategy.min_random_injection() as f32) as usize;
-
         for _ in 0..num_randoms {
             if self.next_gen_buffer.len() >= pop_size {
                 break;
@@ -143,13 +141,9 @@ impl<S: Strategy> Island<S> {
                 child.invalidate();
                 self.next_gen_buffer.push(child);
             } else {
-                let mut candidate =
-                    tournament_selection_pareto(&self.individuals, tourn_size, &mut self.rng)
-                        .clone();
-                if candidate.fitness == f32::MAX {
-                    candidate.fitness = candidate.calculate_mse(mini_batch);
-                }
-                let mut current_fitness = candidate.fitness;
+                let mut candidate = tournament_selection_pareto(&self.individuals, tourn_size, &mut self.rng).clone();
+                let mut current_mse = candidate.calculate_mse(mini_batch);
+                candidate.fitness = f32::MAX;
 
                 for _ in 0..self.strategy.mutation_cycles() {
                     let mut mutated_candidate = candidate.clone();
@@ -173,10 +167,9 @@ impl<S: Strategy> Island<S> {
                     mutated_candidate.simplify();
                     if !mutated_candidate.has_forbidden_patterns() {
                         let new_mse = mutated_candidate.calculate_mse(mini_batch);
-                        if new_mse < current_fitness {
+                        if new_mse < current_mse {
                             candidate = mutated_candidate;
-                            current_fitness = new_mse;
-                            candidate.fitness = new_mse;
+                            current_mse = new_mse;
                         }
                     }
                 }
@@ -190,7 +183,6 @@ impl<S: Strategy> Island<S> {
         let pop_size = self.individuals.capacity();
         self.individuals.clear();
         self.individuals.push(self.best_individual.clone());
-
         for _ in 1..pop_size {
             let (ast, constants) = generate_random_ast(
                 ValueType::Float,
@@ -234,9 +226,17 @@ impl<S: Strategy> Island<S> {
 
             if is_promising {
                 final_mse = ind.calculate_mse(dataset);
+                
+                let complexity = ind.complexity();
+                let mse_floor = dataset.target_variance * 0.01;
+                let dynamic_penalty_rate = self.strategy.parsimony_penalty() * 
+                    final_mse.max(mse_floor).max(self.strategy.target_mse());
+                
+                let temp_fitness = final_mse + ((complexity as f32) * dynamic_penalty_rate);
+
                 let required_improvement = (self.best_individual.fitness * 0.005)
                     .max(self.strategy.min_improvement());
-                let is_potential_elite = final_mse < (self.best_individual.fitness - required_improvement);
+                let is_potential_elite = temp_fitness < (self.best_individual.fitness - required_improvement);
                 let random_opt = self.rng.random::<f32>() < self.strategy.opt_prob();
 
                 if (is_potential_elite || random_opt) && final_mse.is_finite() {

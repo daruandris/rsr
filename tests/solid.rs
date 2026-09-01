@@ -38,6 +38,7 @@ fn run_solid_test(
     subset_size: Option<usize>,
     generations: usize,
     extra_excluded_ops: Vec<Instruction>,
+    disabel_tensor_constants: bool
 ) {
     println!(">>> RUNNING {} <<<", name);
     let dataset = Dataset::new(&data_x, &data_y, feature_types, false);
@@ -101,6 +102,16 @@ fn solid_1_neo_hookean() {
         Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetZV3),
         Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetXV2),
         Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::GetYV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::AddV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::AddV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::SubV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::SubV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::ScaleV2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::ScaleV3),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::MulM2V2),
+        Instruction::Linalg(rsr::domains::linalg::LinalgOpCode::MulM3V3),
+
+
     ];
 
     run_solid_test(
@@ -111,7 +122,8 @@ fn solid_1_neo_hookean() {
         vec![ValueType::Mat3],
         Some(240),
         2000,
-        vector_exclusions
+        vector_exclusions,
+        true
     );
 }
 
@@ -178,7 +190,8 @@ fn solid_2_mooney_rivlin_noisy() {
         vec![ValueType::Mat3],
         Some(400),
         3000,
-        vector_exclusions
+        vector_exclusions,
+        true
     );
 }
 
@@ -228,7 +241,8 @@ fn solid_3_nanson_formula() {
         vec![ValueType::Mat3, ValueType::Vec3],
         Some(280),
         4000,
-        vec![]
+        vec![],
+        false
     );
 }
 
@@ -293,7 +307,8 @@ fn solid_4_st_venant_kirchhoff() {
         vec![ValueType::Mat3],
         Some(600),
         5000,
-        vector_exclusions
+        vector_exclusions,
+        true
     );
 }
 
@@ -342,6 +357,7 @@ fn solid_5_yeoh_3rd_order() {
         vec![ValueType::Mat3],
         Some(800),
         4000,
-        vector_exclusions
+        vector_exclusions,
+        true
     );
 }

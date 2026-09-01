@@ -174,6 +174,37 @@ pub unsafe fn eval_isochoric_invariant2(
     *sp_f += 1;
 }
 
+#[inline(always)]
+pub unsafe fn eval_trace_sqr_m3(
+    sp_f: &mut usize,
+    stack_f: &mut [f32x8; 32],
+    sp_m3: &mut usize,
+    stack_m3: &[[f32x8; 9]; 32],
+) {
+    *sp_m3 -= 1;
+    let a = *stack_m3.get_unchecked(*sp_m3);
+    // tr(A^2) = sum_{i,j} A_{ij} A_{ji}
+    let tr_sq = a[0]*a[0] + a[1]*a[3] + a[2]*a[6] +
+                a[3]*a[1] + a[4]*a[4] + a[5]*a[7] +
+                a[6]*a[2] + a[7]*a[5] + a[8]*a[8];
+    
+    *stack_f.get_unchecked_mut(*sp_f) = tr_sq;
+    *sp_f += 1;
+}
+
+#[inline(always)]
+pub unsafe fn eval_deviatoric_m3(sp_m3: &mut usize, stack_m3: &mut [[f32x8; 9]; 32]) {
+    let idx = *sp_m3 - 1;
+    let a = *stack_m3.get_unchecked(idx);
+    let tr_third = (a[0] + a[4] + a[8]) * f32x8::splat(1.0 / 3.0);
+    
+    *stack_m3.get_unchecked_mut(idx) = [
+        a[0] - tr_third, a[1], a[2],
+        a[3], a[4] - tr_third, a[5],
+        a[6], a[7], a[8] - tr_third,
+    ];
+}
+
 // =====================================================================
 // DUAL SIMD EVALUATION (Autodiff)
 // =====================================================================
@@ -357,4 +388,40 @@ pub unsafe fn eval_dual_isochoric_invariant2(
     *stack_f.get_unchecked_mut(*sp_f) =
         j_pow * DualSimd::constant(f32x8::splat(0.5)) * (i1 * i1 - tr_c2);
     *sp_f += 1;
+}
+
+#[inline(always)]
+pub unsafe fn eval_dual_trace_sqr_m3(
+    sp_f: &mut usize,
+    stack_f: &mut [DualSimd; 32],
+    sp_m3: &mut usize,
+    stack_m3: &[[DualSimd; 9]; 32],
+) {
+    *sp_m3 -= 1;
+    let a = *stack_m3.get_unchecked(*sp_m3);
+    
+    // Mivel a DualSimd-re implementálva van a Mul és Add operátor,
+    // a matematika pontosan ugyanaz, a gradiens kiszámítása automatikus!
+    let tr_sq = (a[0] * a[0] + a[1] * a[3] + a[2] * a[6])
+              + (a[3] * a[1] + a[4] * a[4] + a[5] * a[7])
+              + (a[6] * a[2] + a[7] * a[5] + a[8] * a[8]);
+              
+    *stack_f.get_unchecked_mut(*sp_f) = tr_sq;
+    *sp_f += 1;
+}
+
+#[inline(always)]
+pub unsafe fn eval_dual_deviatoric_m3(sp_m3: &mut usize, stack_m3: &mut [[DualSimd; 9]; 32]) {
+    let idx = *sp_m3 - 1;
+    let a = *stack_m3.get_unchecked(idx);
+    
+    let tr = a[0] + a[4] + a[8];
+    let third = DualSimd::constant(f32x8::splat(1.0 / 3.0));
+    let tr_third = tr * third;
+    
+    *stack_m3.get_unchecked_mut(idx) = [
+        a[0] - tr_third, a[1], a[2],
+        a[3], a[4] - tr_third, a[5],
+        a[6], a[7], a[8] - tr_third,
+    ];
 }
