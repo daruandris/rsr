@@ -55,7 +55,7 @@ pub fn crossover(
     append_nodes(&parent_b.nodes[start_b..=end_b], &parent_b.constants);
     append_nodes(&parent_a.nodes[end_a + 1..], &parent_a.constants);
 
-    Individual::new(child_nodes, child_constants)
+    Individual::new(child_nodes, child_constants, parent_a.disabled_constants.clone())
 }
 
 fn select_node_index(

@@ -61,3 +61,10 @@ pub unsafe fn eval_ln_f(sp_f: &mut usize, stack_f: &mut [f32x8; 32]) {
     let idx = *sp_f - 1;
     *stack_f.get_unchecked_mut(idx) = stack_f.get_unchecked(idx).ln();
 }
+
+#[inline(always)]
+pub unsafe fn eval_cube_f(sp_f: &mut usize, stack_f: &mut [f32x8; 32]) {
+    let idx = *sp_f - 1;
+    let a = *stack_f.get_unchecked(idx);
+    *stack_f.get_unchecked_mut(idx) = a * a * a;
+}

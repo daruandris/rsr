@@ -9,12 +9,14 @@ use crate::engine::expr::node::Node;
 use crate::engine::expr::program::Program;
 use crate::engine::expr::simplify::simplify_ast;
 use crate::engine::optimize::optimize_individual_constants;
+use crate::engine::eval::types::ValueType;
 use std::fmt;
 
 #[derive(Clone)]
 pub struct Individual {
     pub nodes: Vec<Node>,
     pub constants: Vec<Scalar>,
+    pub disabled_constants: Vec<ValueType>,
     pub fitness: f32,
     pub age: usize,
     pub program: Option<Program>,
@@ -23,10 +25,11 @@ pub struct Individual {
 }
 
 impl Individual {
-    pub fn new(nodes: Vec<Node>, constants: Vec<Scalar>) -> Self {
+    pub fn new(nodes: Vec<Node>, constants: Vec<Scalar>, disabled_constants: Vec<ValueType>) -> Self {
         Self {
             nodes,
             constants,
+            disabled_constants,
             fitness: f32::MAX,
             age: 0,
             program: None,
@@ -37,7 +40,7 @@ impl Individual {
 
     pub fn compile(&mut self) {
         if self.program.is_none() {
-            self.program = Some(Program::from_nodes(&self.nodes, &self.constants));
+            self.program = Some(Program::from_nodes(&self.nodes, &self.constants, &self.disabled_constants));
         }
     }
 
@@ -78,7 +81,7 @@ impl Individual {
         if self.nodes.is_empty() {
             return;
         }
-        let (new_nodes, new_consts) = simplify_ast(&self.nodes, &self.constants);
+        let (new_nodes, new_consts) = simplify_ast(&self.nodes, &self.constants, &self.disabled_constants);
         self.nodes = new_nodes;
         self.constants = new_consts;
         self.invalidate();

@@ -17,6 +17,7 @@ pub enum BasicOpCode {
     SqrF,
     SqrtF,
     LnF,
+    CubeF,
 }
 
 pub struct BasicDomain;
@@ -38,6 +39,7 @@ impl Domain for BasicDomain {
                 BasicOpCode::SqrF => eval::eval_sqr_f(&mut ctx.sp_f, &mut ctx.stack_f),
                 BasicOpCode::SqrtF => eval::eval_sqrt_f(&mut ctx.sp_f, &mut ctx.stack_f),
                 BasicOpCode::LnF => eval::eval_ln_f(&mut ctx.sp_f, &mut ctx.stack_f),
+                BasicOpCode::CubeF => eval::eval_cube_f(&mut ctx.sp_f, &mut ctx.stack_f),
             }
         }
     }
@@ -60,6 +62,7 @@ impl Domain for BasicDomain {
                     BasicOpCode::SqrF => a * a,
                     BasicOpCode::SqrtF => a.sqrt(),
                     BasicOpCode::LnF => a.ln(),
+                    BasicOpCode::CubeF => a * a * a,
                     _ => f32::NAN,
                 };
                 if res.is_finite() {
@@ -157,7 +160,7 @@ impl Domain for BasicDomain {
         match op {
             BasicOpCode::AddF | BasicOpCode::SubF | BasicOpCode::MulF => 1,
             BasicOpCode::DivF | BasicOpCode::SqrF | BasicOpCode::SqrtF => 2,
-            BasicOpCode::SinF | BasicOpCode::CosF => 3,
+            BasicOpCode::SinF | BasicOpCode::CosF | BasicOpCode::CubeF => 3,
             BasicOpCode::ExpF | BasicOpCode::LnF => 4,
         }
     }
@@ -184,12 +187,14 @@ impl Domain for BasicDomain {
                     | BasicOpCode::CosF
                     | BasicOpCode::LnF
                     | BasicOpCode::ExpF
+                    | BasicOpCode::CubeF
             ),
-            BasicOpCode::SqrF => matches!(child, BasicOpCode::SqrF | BasicOpCode::SqrtF),
+            BasicOpCode::SqrF => matches!(child, BasicOpCode::SqrF | BasicOpCode::SqrtF | BasicOpCode::CubeF),
             BasicOpCode::LnF => matches!(
                 child,
                 BasicOpCode::LnF | BasicOpCode::ExpF | BasicOpCode::SinF | BasicOpCode::CosF
             ),
+            BasicOpCode::CubeF => matches!(child, BasicOpCode::CubeF | BasicOpCode::SqrF | BasicOpCode::SqrtF),
             _ => false,
         }
     }
@@ -215,6 +220,7 @@ impl Domain for BasicDomain {
                 BasicOpCode::SqrF => autodiff::eval_sqr_dual_f(&mut ctx.sp_f, &mut ctx.stack_f),
                 BasicOpCode::SqrtF => autodiff::eval_sqrt_dual_f(&mut ctx.sp_f, &mut ctx.stack_f),
                 BasicOpCode::LnF => autodiff::eval_ln_dual_f(&mut ctx.sp_f, &mut ctx.stack_f),
+                BasicOpCode::CubeF => autodiff::eval_cube_dual_f(&mut ctx.sp_f, &mut ctx.stack_f),
             }
         }
     }
@@ -231,6 +237,7 @@ impl Domain for BasicDomain {
             BasicOpCode::SqrF => format!("({})^2", args[0]),
             BasicOpCode::SqrtF => format!("sqrt({})", args[0]),
             BasicOpCode::LnF => format!("ln({})", args[0]),
+            BasicOpCode::CubeF => format!("({})^3", args[0]),
         }
     }
 }

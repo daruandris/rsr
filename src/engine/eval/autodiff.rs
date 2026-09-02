@@ -77,6 +77,14 @@ impl DualSimd {
             grad: self.grad / self.val,
         }
     }
+
+    #[inline(always)]
+    pub fn cube(self) -> Self {
+        Self {
+            val: self.val * self.val * self.val,
+            grad: f32x8::splat(3.0) * self.val * self.val * self.grad,
+        }
+    }
 }
 
 impl Add for DualSimd {
@@ -870,4 +878,12 @@ pub unsafe fn eval_transpose_dual_m3(sp_m3: &mut usize, stack_m3: &mut [[DualSim
     let idx = *sp_m3 - 1;
     let m = *stack_m3.get_unchecked(idx);
     *stack_m3.get_unchecked_mut(idx) = [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]];
+}
+
+/// # Safety
+/// The caller must ensure that `*sp_f >= 1` to prevent underflow and out-of-bounds access.
+#[inline(always)]
+pub unsafe fn eval_cube_dual_f(sp_f: &mut usize, stack_f: &mut [DualSimd; 32]) {
+    let idx = *sp_f - 1;
+    *stack_f.get_unchecked_mut(idx) = stack_f.get_unchecked(idx).cube();
 }

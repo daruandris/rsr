@@ -49,7 +49,7 @@ impl<S: Strategy> Island<S> {
                 &allowed_ops,
                 strategy.disabled_constant_types(),
             );
-            let mut ind = Individual::new(ast, constants);
+            let mut ind = Individual::new(ast, constants, strategy.disabled_constant_types().to_vec());
             ind.simplify();
             individuals.push(ind);
         }
@@ -114,7 +114,7 @@ impl<S: Strategy> Island<S> {
                 &self.allowed_ops,
                 self.strategy.disabled_constant_types(),
             );
-            let mut ind = Individual::new(ast, constants);
+            let mut ind = Individual::new(ast, constants, self.strategy.disabled_constant_types().to_vec());
             ind.simplify();
             self.next_gen_buffer.push(ind);
         }
@@ -196,7 +196,7 @@ impl<S: Strategy> Island<S> {
                 &self.allowed_ops,
                 self.strategy.disabled_constant_types(),
             );
-            let mut new_ind = Individual::new(ast, constants);
+            let mut new_ind = Individual::new(ast, constants, self.strategy.disabled_constant_types().to_vec());
             new_ind.simplify();
 
             let mse = new_ind.calculate_mse(dataset);

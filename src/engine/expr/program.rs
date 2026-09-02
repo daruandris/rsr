@@ -20,6 +20,7 @@ pub struct Program {
     pub code: Vec<Instruction>,
     /// The numerical parameters (weights) extracted from the AST.
     pub constants: Vec<Scalar>,
+    pub disabled_constants: Vec<ValueType>,
 }
 
 impl Program {
@@ -31,7 +32,7 @@ impl Program {
     /// # Arguments
     ///
     /// * `nodes` - A slice of [`crate::engine::expr::node::Node`] representing the expression tree.
-    pub fn from_nodes(nodes: &[Node], ind_constants: &[Scalar]) -> Self {
+    pub fn from_nodes(nodes: &[Node], ind_constants: &[Scalar], disabled_constants: &[ValueType]) -> Self {
         let mut code = Vec::with_capacity(nodes.len());
         let mut constants = Vec::new();
 
@@ -51,7 +52,7 @@ impl Program {
             }
         }
 
-        Program { code, constants }
+        Program { code, constants, disabled_constants: disabled_constants.to_vec() }
     }
 
     #[inline(always)]
@@ -85,14 +86,25 @@ impl Parameterized for Program {
     fn param_count(&self) -> usize {
         let mut n = 0;
         for c in &self.constants {
-            n += match c {
-                Scalar::Float(_) => 1,
-                Scalar::Vec2(_) => 2,
-                Scalar::Vec3(_) => 3,
-                Scalar::Mat2(_) => 4,
-                Scalar::Mat3(_) => 9,
-                _ => 0,
+            let target_type = match c {
+                Scalar::Float(_) => ValueType::Float,
+                Scalar::Vec2(_) => ValueType::Vec2,
+                Scalar::Vec3(_) => ValueType::Vec3,
+                Scalar::Mat2(_) => ValueType::Mat2,
+                Scalar::Mat3(_) => ValueType::Mat3,
+                Scalar::Bool(_) => ValueType::Bool,
+                Scalar::Int(_) => ValueType::Int,
             };
+            if !self.disabled_constants.contains(&target_type) {
+                n += match c {
+                    Scalar::Float(_) => 1,
+                    Scalar::Vec2(_) => 2,
+                    Scalar::Vec3(_) => 3,
+                    Scalar::Mat2(_) => 4,
+                    Scalar::Mat3(_) => 9,
+                    _ => 0,
+                };
+            }
         }
         n
     }
@@ -100,6 +112,19 @@ impl Parameterized for Program {
     fn flatten_params(&self, buffer: &mut [f32]) {
         let mut ptr = 0;
         for c in &self.constants {
+             let target_type = match c {
+                Scalar::Float(_) => ValueType::Float,
+                Scalar::Vec2(_) => ValueType::Vec2,
+                Scalar::Vec3(_) => ValueType::Vec3,
+                Scalar::Mat2(_) => ValueType::Mat2,
+                Scalar::Mat3(_) => ValueType::Mat3,
+                Scalar::Bool(_) => ValueType::Bool,
+                Scalar::Int(_) => ValueType::Int,
+            };
+            if self.disabled_constants.contains(&target_type) {
+                continue;
+            }
+
             match c {
                 Scalar::Float(f) => {
                     if ptr < buffer.len() {
@@ -147,6 +172,19 @@ impl Parameterized for Program {
     fn unflatten_params(&mut self, buffer: &[f32]) {
         let mut ptr = 0;
         for c in self.constants.iter_mut() {
+            let target_type = match c {
+                Scalar::Float(_) => ValueType::Float,
+                Scalar::Vec2(_) => ValueType::Vec2,
+                Scalar::Vec3(_) => ValueType::Vec3,
+                Scalar::Mat2(_) => ValueType::Mat2,
+                Scalar::Mat3(_) => ValueType::Mat3,
+                Scalar::Bool(_) => ValueType::Bool,
+                Scalar::Int(_) => ValueType::Int,
+            };
+            if self.disabled_constants.contains(&target_type) {
+                continue;
+            }
+
             match c {
                 Scalar::Float(f) => {
                     if ptr < buffer.len() {

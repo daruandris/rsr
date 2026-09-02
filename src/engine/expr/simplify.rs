@@ -3,6 +3,7 @@ use crate::Instruction::Basic;
 use crate::domains::basic::BasicOpCode::{ExpF, LnF, SqrF, SqrtF};
 use crate::engine::domain::SimplifyAction;
 use crate::engine::eval::scalar::Scalar;
+use crate::engine::eval::types::ValueType;
 
 #[derive(Clone, Copy, Debug)]
 struct ExprInfo {
@@ -10,7 +11,11 @@ struct ExprInfo {
     const_val: Option<Scalar>,
 }
 
-pub fn simplify_ast(nodes: &[Node], constants: &[Scalar]) -> (Vec<Node>, Vec<Scalar>) {
+pub fn simplify_ast(
+    nodes: &[Node],
+    constants: &[Scalar],
+    disabled_constants: &[ValueType],
+) -> (Vec<Node>, Vec<Scalar>) {
     if nodes.is_empty() {
         return (vec![], vec![]);
     }
@@ -72,8 +77,23 @@ pub fn simplify_ast(nodes: &[Node], constants: &[Scalar]) -> (Vec<Node>, Vec<Sca
                 for i in 0..arity {
                     const_vals[i] = args[i].const_val;
                 }
-                let action =
+                let mut action =
                     crate::SymbolicEngine::try_simplify(op, &const_vals[..arity], args_equal);
+
+                if let SimplifyAction::ReplaceWithConstant(val) = action {
+                    let target_type = match val {
+                        Scalar::Float(_) => ValueType::Float,
+                        Scalar::Vec2(_) => ValueType::Vec2,
+                        Scalar::Vec3(_) => ValueType::Vec3,
+                        Scalar::Mat2(_) => ValueType::Mat2,
+                        Scalar::Mat3(_) => ValueType::Mat3,
+                        Scalar::Bool(_) => ValueType::Bool,
+                        Scalar::Int(_) => ValueType::Int,
+                    };
+                    if disabled_constants.contains(&target_type) {
+                        action = SimplifyAction::None;
+                    }
+                }
 
                 match action {
                     SimplifyAction::ReplaceWithConstant(val) => {

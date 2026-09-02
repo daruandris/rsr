@@ -32,6 +32,7 @@ pub struct Dataset {
 
     pub is_normalized: bool,
     pub feature_types: Vec<ValueType>,
+    pub extract_scalars: bool,
 }
 
 impl Dataset {
@@ -167,7 +168,13 @@ impl Dataset {
             target_variance,
             is_normalized: normalize,
             feature_types,
+            extract_scalars: true
         }
+    }
+
+    pub fn with_scalar_extraction(mut self, extract: bool) -> Self {
+        self.extract_scalars = extract;
+        self
     }
 
     #[inline(always)]
@@ -213,7 +220,7 @@ impl Dataset {
                 ValueType::Mat3 => 9,
                 _ => 1,
             };
-            if size > 1 {
+            if size > 1 && self.extract_scalars {
                 for offset in 0..size {
                     registry.push((ValueType::Float, current_idx + offset));
                 }
@@ -446,6 +453,7 @@ impl Dataset {
             target_variance: self.target_variance,
             is_normalized: self.is_normalized,
             feature_types: self.feature_types.clone(),
+            extract_scalars: self.extract_scalars
         }
     }
 }

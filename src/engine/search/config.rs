@@ -50,7 +50,7 @@ impl Config {
             crossover_rate: 0.10,
             tournament_size: 2,
             migration_interval: 25,
-            base_parsimony_penalty: 0.00005,
+            base_parsimony_penalty: 0.0005,
             opt_prob: 0.01,
             opt_iterations: 100,
             final_opt_iterations: 4000,
@@ -136,36 +136,87 @@ impl Config {
     }
 
     pub fn without_constants(mut self, types: Vec<ValueType>) -> Self {
-    for t in types {
-        if !self.disabled_constant_types.contains(&t) {
-            self.disabled_constant_types.push(t);
+        for t in types {
+            if !self.disabled_constant_types.contains(&t) {
+                self.disabled_constant_types.push(t);
+            }
         }
+        self
     }
-    self
-}
 
     // ==========================================
-    // ANYAGCSALÁDOK SZERINTI PROFILOK
+    // IPARI FELADAT-SPECIFIKUS PROFILOK (TASK-BASED CONFIGS)
     // ==========================================
 
-    /// Gumik, polimerek, elasztomerek, lágy szövetek (Nagy alakváltozás)
-    pub fn hyperelastic_isotropic(mut self) -> Self {
-        self.allowed_modules = vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid];
-        self.disabled_constant_types.extend(vec![
+    /// 1. Hiperelasztikus Energiasűrűség Felfedezése (Strain Energy Discovery)
+    /// 
+    /// Cél: W (skalár energia) előállítása F (Deformációs Gradiens) tenzorból.
+    /// Ipar: Gumiipar, biomechanika, polimerek (Abaqus UMAT/UHYPER).
+    /// Szabályok: Szigorúan objektív és izotróp. Csak invariánsokat használhat.
+    /// Tilos: Mátrix aritmetika, vektorok, osztás (szingularitás ellen), szögfüggvények.
+    pub fn hyperelastic_energy() -> Self {
+        let mut config = Self::default(vec![OpModule::Basic, OpModule::Solid]);
+        
+        // Magasabb büntetés a hosszú egyenletekre (a letisztult polinomokért)
+        config.base_parsimony_penalty = 0.001; 
+        config.num_islands = 32;
+        config.island_size = 100;
+        config.opt_iterations = 200;
+
+        // Szigorúan csak skalár konstansok
+        config.disabled_constant_types = vec![
             ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3
-        ]);
-        let mut exclusions = vec![
-            // Kis alakváltozási tenzor tiltása a modell objektivitása miatt
-            Instruction::Solid(SolidOpCode::GreenLagrangeStrainM3),
-            Instruction::Solid(SolidOpCode::TraceSqrM3),
-            Instruction::Solid(SolidOpCode::DeviatoricM3),
-            
-            // Szögfüggvények tiltása
-            Instruction::Basic(BasicOpCode::SinF),
-            Instruction::Basic(BasicOpCode::CosF),
         ];
 
-        // Összes térbeli vektor operátor tiltása (objektivitás garantálása)
+        config.excluded_ops = vec![
+            // Alap matek szűrése: csak polinomok (+, -, *, ^2, ^3) maradhatnak
+            Instruction::Basic(BasicOpCode::SinF),
+            Instruction::Basic(BasicOpCode::CosF),
+            Instruction::Basic(BasicOpCode::LnF),
+            Instruction::Basic(BasicOpCode::ExpF),
+            Instruction::Basic(BasicOpCode::SqrtF),
+            Instruction::Basic(BasicOpCode::DivF), // Oszás tiltása a stabil polinomokhoz
+
+            // Solid operátorok szűrése: feszültség/folyás operátorok tiltása
+            Instruction::Solid(SolidOpCode::GreenLagrangeStrainM3),
+            Instruction::Solid(SolidOpCode::DeviatoricM3),
+            Instruction::Solid(SolidOpCode::TraceSqrM3),
+            Instruction::Solid(SolidOpCode::CofactorM3),
+        ];
+
+        // Linalg modult nem is adjuk hozzá, így egyetlen vektor vagy mátrix 
+        // aritmetikai operátor (AddM3, InverseM3, stb.) sem lesz elérhető!
+        config
+    }
+
+    /// 2. Folyási Felület és Tönkremenetel Felfedezése (Yield Surface Discovery)
+    /// 
+    /// Cél: f (skalár folyási feltétel) előállítása Sigma (Feszültség) tenzorból.
+    /// Ipar: Fémfeldolgozás, talajmechanika, törésmechanika.
+    /// Szabályok: Feszültség-invariánsokon (J2, von Mises, hidrosztatikus nyomás) alapul.
+    /// Tilos: Kinematikai tenzorok (C, B), izochor invariánsok.
+    pub fn yield_surface() -> Self {
+        let mut config = Self::default(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
+        
+        config.base_parsimony_penalty = 0.005; 
+        config.disabled_constant_types = vec![
+            ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3
+        ];
+
+        let mut exclusions = vec![
+            Instruction::Basic(BasicOpCode::SinF),
+            Instruction::Basic(BasicOpCode::CosF),
+            
+            // Folyási felületeknél a bemenet feszültség, így a deformációs 
+            // operátorok (C, B, I1_bar) fizikailag értelmezhetetlenek itt.
+            Instruction::Solid(SolidOpCode::RightCauchyGreenM3),
+            Instruction::Solid(SolidOpCode::LeftCauchyGreenM3),
+            Instruction::Solid(SolidOpCode::IsochoricInvariant1),
+            Instruction::Solid(SolidOpCode::IsochoricInvariant2),
+            Instruction::Solid(SolidOpCode::GreenLagrangeStrainM3),
+        ];
+
+        // Vektoros operátorok tiltása
         let vector_ops = [
             LinalgOpCode::MakeVec2, LinalgOpCode::MakeVec3,
             LinalgOpCode::GetXV2, LinalgOpCode::GetYV2,
@@ -176,121 +227,52 @@ impl Config {
             LinalgOpCode::DotV3, LinalgOpCode::NormV3, LinalgOpCode::CrossV3,
             LinalgOpCode::MulM2V2, LinalgOpCode::MulM3V3,
         ];
-        
         for op in vector_ops {
             exclusions.push(Instruction::Linalg(op));
         }
 
-        self.excluded_ops.extend(exclusions);
-        self
+        config.excluded_ops = exclusions;
+        config
     }
 
-    /// Fémek, merev műanyagok, kerámiák (Kis alakváltozás)
-    pub fn linear_stiff_metals(mut self) -> Self {
-        self.allowed_modules = vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid];
-        self.disabled_constant_types.extend(vec![
-            ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3
-        ]);
-        self.excluded_ops.extend(vec![
-            // C és B tenzorok, illetve isochor invariánsok tiltása
-            Instruction::Solid(SolidOpCode::RightCauchyGreenM3),
-            Instruction::Solid(SolidOpCode::LeftCauchyGreenM3),
-            Instruction::Solid(SolidOpCode::IsochoricInvariant1),
-            Instruction::Solid(SolidOpCode::IsochoricInvariant2),
-            Instruction::Solid(SolidOpCode::CofactorM3),
-            
-            // Numerikus instabilitást okozó függvények tiltása fémeknél
-            Instruction::Basic(BasicOpCode::ExpF),
-            Instruction::Basic(BasicOpCode::LnF),
-            Instruction::Basic(BasicOpCode::SinF),
-            Instruction::Basic(BasicOpCode::CosF),
-        ]);
-        self
-    }
+    /// 3. Közvetlen Feszültségtenzor Modellezés (Constitutive Tensor Law)
+    /// 
+    /// Cél: Sigma (Mátrix) előállítása F vagy E (Mátrix) bemenetből.
+    /// Ipar: Anizotróp anyagok, viszkoelaszticitás komplex leírása.
+    /// Szabályok: Szabad mátrix-aritmetika (szorzás, inverz, transzponált).
+    pub fn constitutive_tensor_law() -> Self {
+        let mut config = Self::default(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
+        
+        config.base_parsimony_penalty = 0.0005;
+        config.opt_iterations = 300;
 
-    /// Szálerősített kompozitok, 3D nyomtatott alkatrészek, fa
-    pub fn anisotropic_composites(mut self) -> Self {
-        // Alapvetően a hiperelasztikus modellt vesszük alapul, de a vektoros
-        // operátorokat (MakeVec3, DotV3, CrossV3) ENGEDÉLYEZZÜK az irányvektorok miatt.
-        self.allowed_modules = vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid];
-        self.disabled_constant_types.extend(vec![
-            ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3
-        ]);
+        // Itt engedélyezhetjük a mátrix konstansokat az anizotrópiához (pl. szálirányok)
+        config.disabled_constant_types = vec![
+            ValueType::Vec2, ValueType::Vec3
+        ];
+
         let mut exclusions = vec![
-            Instruction::Solid(SolidOpCode::GreenLagrangeStrainM3),
             Instruction::Basic(BasicOpCode::SinF),
             Instruction::Basic(BasicOpCode::CosF),
+            Instruction::Basic(BasicOpCode::LnF),
         ];
 
-        // Csak a nem releváns 2D és transzformációs vektor operátorokat tiltjuk
+        // Vektoros operátorok tiltása
         let vector_ops = [
-            LinalgOpCode::MakeVec2, LinalgOpCode::GetXV2, LinalgOpCode::GetYV2,
+            LinalgOpCode::MakeVec2, LinalgOpCode::MakeVec3,
+            LinalgOpCode::GetXV2, LinalgOpCode::GetYV2,
+            LinalgOpCode::GetXV3, LinalgOpCode::GetYV3, LinalgOpCode::GetZV3,
             LinalgOpCode::AddV2, LinalgOpCode::SubV2, LinalgOpCode::ScaleV2, 
-            LinalgOpCode::DotV2, LinalgOpCode::NormV2, LinalgOpCode::MulM2V2,
+            LinalgOpCode::DotV2, LinalgOpCode::NormV2,
+            LinalgOpCode::AddV3, LinalgOpCode::SubV3, LinalgOpCode::ScaleV3, 
+            LinalgOpCode::DotV3, LinalgOpCode::NormV3, LinalgOpCode::CrossV3,
+            LinalgOpCode::MulM2V2, LinalgOpCode::MulM3V3,
         ];
-        
         for op in vector_ops {
             exclusions.push(Instruction::Linalg(op));
         }
 
-        self.excluded_ops.extend(exclusions);
-        self
-    }
-
-    // ==========================================
-    // FELADATTÍPUSOK SZERINTI PROFILOK
-    // ==========================================
-
-    /// Energiasűrűség-függvény keresése (Target: Scalar)
-    pub fn strain_energy_discovery(mut self) -> Self {
-        // Klasszikus 2-4 paraméteres modellek előnyben részesítése (magas parsimony penalty)
-        self.base_parsimony_penalty = 0.05; // Jelentősen magasabb büntetés a komplexitásra[cite: 1]
-        
-        // Magas L-BFGS iterációszám a konstansok precíz belövéséhez
-        self.opt_iterations = 300; 
-        self.final_opt_iterations = 10_000;
-        self.opt_prob = 0.05; // Gyakoribb lokális optimalizáció
-        
-        self
-    }
-
-    /// Feszültségtenzor közvetlen keresése (Target: Mat3)
-    pub fn constitutive_stress_law(mut self) -> Self {
-        // Ennél a feladatnál elengedhetetlenek a mátrix aritmetikai operátorok
-        // Ez a profil inkább biztosítja, hogy a konfiguráció támogatja a tenzoriális kimenetet.
-        self.base_parsimony_penalty = 0.005; // Standard büntetés[cite: 1]
-        self.opt_iterations = 100;
-        
-        // Mátrix inverz és szorzás kötelező meglétének biztosítása (ha nem lennének benne)
-        let required_ops = vec![
-            Instruction::Linalg(LinalgOpCode::AddM3),
-            Instruction::Linalg(LinalgOpCode::SubM3),
-            Instruction::Linalg(LinalgOpCode::ScaleM3),
-            Instruction::Linalg(LinalgOpCode::InverseM3),
-            Instruction::Linalg(LinalgOpCode::TransposeM3),
-        ];
-        
-        for op in required_ops {
-            self.excluded_ops.retain(|x| x != &op);
-        }
-        self
-    }
-
-    /// Folyási és tönkremeneteli felületek (Target: Scalar)
-    pub fn yield_surface_discovery(mut self) -> Self {
-        // Szorosan támaszkodik a TraceM3-ra és a deviatorikus tenzorokra
-        self.base_parsimony_penalty = 0.01;
-        
-        // A bemenet itt jellemzően a feszültségtenzor (sigma),
-        // ezért a kinematikai tenzorokat (C, B, E) felesleges és tiltott generálni.
-        self.excluded_ops.extend(vec![
-            Instruction::Solid(SolidOpCode::RightCauchyGreenM3),
-            Instruction::Solid(SolidOpCode::LeftCauchyGreenM3),
-            Instruction::Solid(SolidOpCode::GreenLagrangeStrainM3),
-            Instruction::Solid(SolidOpCode::IsochoricInvariant1),
-            Instruction::Solid(SolidOpCode::IsochoricInvariant2),
-        ]);
-        
-        self
+        config.excluded_ops = exclusions;
+        config
     }
 }

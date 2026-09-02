@@ -1,6 +1,6 @@
 const benchmarkHistory = [
   {
-    "timestamp": 1788290091,
+    "timestamp": 1788342058,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -32,7 +32,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788290156,
+    "timestamp": 1788342070,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -64,7 +64,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788294776,
+    "timestamp": 1788342457,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -96,7 +96,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788294811,
+    "timestamp": 1788342551,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -128,7 +128,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788294836,
+    "timestamp": 1788342588,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -160,7 +160,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788294870,
+    "timestamp": 1788342718,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -192,7 +192,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788294870,
+    "timestamp": 1788342752,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -224,7 +224,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788294917,
+    "timestamp": 1788342787,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -256,7 +256,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788295034,
+    "timestamp": 1788342835,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -288,7 +288,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788295042,
+    "timestamp": 1788344333,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -320,7 +320,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788295045,
+    "timestamp": 1788344365,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -352,7 +352,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788295191,
+    "timestamp": 1788344397,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -384,7 +384,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788295219,
+    "timestamp": 1788344445,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -416,7 +416,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788296720,
+    "timestamp": 1788344769,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -448,7 +448,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788296734,
+    "timestamp": 1788344921,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -480,7 +480,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788296735,
+    "timestamp": 1788345051,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -512,7 +512,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788296770,
+    "timestamp": 1788345146,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -544,103 +544,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788296796,
-    "commit_hash": "486633f",
-    "basic1_mse": 1.878977e-12,
-    "basic1_time_ms": 52,
-    "basic2_mse": 9.366233e-12,
-    "basic2_time_ms": 277,
-    "basic3_mse": 6.451313e-11,
-    "basic3_time_ms": 151,
-    "basic4_mse": 1.8065674e-10,
-    "basic4_time_ms": 356,
-    "basic5_mse": 3.998313e-13,
-    "basic5_time_ms": 2619,
-    "basic6_mse": 6.661338e-15,
-    "basic6_time_ms": 307,
-    "basic7_mse": 3.5677084e-7,
-    "basic7_time_ms": 71,
-    "basic8_mse": 1e-8,
-    "basic8_time_ms": 22,
-    "basic9_mse": 1.8530091e-10,
-    "basic9_time_ms": 1134,
-    "basic10_mse": 2.961634,
-    "basic10_time_ms": 20338,
-    "linalg1_mse": 0.000027175167,
-    "linalg1_time_ms": 97448,
-    "linalg2_mse": 7.6511206e-8,
-    "linalg2_time_ms": 1765,
-    "linalg3_mse": 2.9888558,
-    "linalg3_time_ms": 92123,
-    "linalg4_mse": 1e-8,
-    "linalg4_time_ms": 2906
-  },
-  {
-    "timestamp": 1788297400,
-    "commit_hash": "486633f",
-    "basic1_mse": 0.000010049016,
-    "basic1_time_ms": 38,
-    "basic2_mse": 1.0350995e-11,
-    "basic2_time_ms": 928,
-    "basic3_mse": 4.7827077e-12,
-    "basic3_time_ms": 89,
-    "basic4_mse": 7.625845e-10,
-    "basic4_time_ms": 2094,
-    "basic5_mse": 1.9557977e-12,
-    "basic5_time_ms": 2836,
-    "basic6_mse": 6.393885e-14,
-    "basic6_time_ms": 285,
-    "basic7_mse": 3.3779233e-7,
-    "basic7_time_ms": 37,
-    "basic8_mse": 1e-8,
-    "basic8_time_ms": 187,
-    "basic9_mse": 0.000043628617,
-    "basic9_time_ms": 48636,
-    "basic10_mse": 2.0912974,
-    "basic10_time_ms": 38289,
-    "linalg1_mse": 2.4935503e-7,
-    "linalg1_time_ms": 461,
-    "linalg2_mse": 4.2658464e-11,
-    "linalg2_time_ms": 496,
-    "linalg3_mse": 1.3031354e-13,
-    "linalg3_time_ms": 34940,
-    "linalg4_mse": 1e-8,
-    "linalg4_time_ms": 401
-  },
-  {
-    "timestamp": 1788297647,
-    "commit_hash": "486633f",
-    "basic1_mse": 0.000003704303,
-    "basic1_time_ms": 59,
-    "basic2_mse": 1.8381724e-10,
-    "basic2_time_ms": 278,
-    "basic3_mse": 2.941084e-8,
-    "basic3_time_ms": 163,
-    "basic4_mse": 1.9960955e-10,
-    "basic4_time_ms": 791,
-    "basic5_mse": 2.015564e-11,
-    "basic5_time_ms": 397,
-    "basic6_mse": 2.6498248e-14,
-    "basic6_time_ms": 880,
-    "basic7_mse": 3.3521727e-7,
-    "basic7_time_ms": 89,
-    "basic8_mse": 1e-8,
-    "basic8_time_ms": 49,
-    "basic9_mse": 1.2556704e-10,
-    "basic9_time_ms": 418,
-    "basic10_mse": 0.0263197,
-    "basic10_time_ms": 61809,
-    "linalg1_mse": 6.8099927e-12,
-    "linalg1_time_ms": 6086,
-    "linalg2_mse": 1e-8,
-    "linalg2_time_ms": 312,
-    "linalg3_mse": 0.0000021515675,
-    "linalg3_time_ms": 71214,
-    "linalg4_mse": 1e-8,
-    "linalg4_time_ms": 361
-  },
-  {
-    "timestamp": 1788297860,
+    "timestamp": 1788345238,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -672,7 +576,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788297901,
+    "timestamp": 1788345441,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -704,7 +608,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788297901,
+    "timestamp": 1788345533,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -736,7 +640,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788298051,
+    "timestamp": 1788345623,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -768,7 +672,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788298200,
+    "timestamp": 1788345750,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -800,7 +704,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788298200,
+    "timestamp": 1788346476,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -832,7 +736,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788298344,
+    "timestamp": 1788347199,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -864,7 +768,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788298705,
+    "timestamp": 1788347897,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -896,7 +800,7 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788298831,
+    "timestamp": 1788348494,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,
@@ -928,7 +832,103 @@ const benchmarkHistory = [
     "linalg4_time_ms": null
   },
   {
-    "timestamp": 1788298831,
+    "timestamp": 1788348720,
+    "commit_hash": "486633f",
+    "basic1_mse": null,
+    "basic1_time_ms": null,
+    "basic2_mse": null,
+    "basic2_time_ms": null,
+    "basic3_mse": null,
+    "basic3_time_ms": null,
+    "basic4_mse": null,
+    "basic4_time_ms": null,
+    "basic5_mse": null,
+    "basic5_time_ms": null,
+    "basic6_mse": null,
+    "basic6_time_ms": null,
+    "basic7_mse": null,
+    "basic7_time_ms": null,
+    "basic8_mse": null,
+    "basic8_time_ms": null,
+    "basic9_mse": null,
+    "basic9_time_ms": null,
+    "basic10_mse": null,
+    "basic10_time_ms": null,
+    "linalg1_mse": null,
+    "linalg1_time_ms": null,
+    "linalg2_mse": null,
+    "linalg2_time_ms": null,
+    "linalg3_mse": null,
+    "linalg3_time_ms": null,
+    "linalg4_mse": null,
+    "linalg4_time_ms": null
+  },
+  {
+    "timestamp": 1788348950,
+    "commit_hash": "486633f",
+    "basic1_mse": null,
+    "basic1_time_ms": null,
+    "basic2_mse": null,
+    "basic2_time_ms": null,
+    "basic3_mse": null,
+    "basic3_time_ms": null,
+    "basic4_mse": null,
+    "basic4_time_ms": null,
+    "basic5_mse": null,
+    "basic5_time_ms": null,
+    "basic6_mse": null,
+    "basic6_time_ms": null,
+    "basic7_mse": null,
+    "basic7_time_ms": null,
+    "basic8_mse": null,
+    "basic8_time_ms": null,
+    "basic9_mse": null,
+    "basic9_time_ms": null,
+    "basic10_mse": null,
+    "basic10_time_ms": null,
+    "linalg1_mse": null,
+    "linalg1_time_ms": null,
+    "linalg2_mse": null,
+    "linalg2_time_ms": null,
+    "linalg3_mse": null,
+    "linalg3_time_ms": null,
+    "linalg4_mse": null,
+    "linalg4_time_ms": null
+  },
+  {
+    "timestamp": 1788350971,
+    "commit_hash": "486633f",
+    "basic1_mse": null,
+    "basic1_time_ms": null,
+    "basic2_mse": null,
+    "basic2_time_ms": null,
+    "basic3_mse": null,
+    "basic3_time_ms": null,
+    "basic4_mse": null,
+    "basic4_time_ms": null,
+    "basic5_mse": null,
+    "basic5_time_ms": null,
+    "basic6_mse": null,
+    "basic6_time_ms": null,
+    "basic7_mse": null,
+    "basic7_time_ms": null,
+    "basic8_mse": null,
+    "basic8_time_ms": null,
+    "basic9_mse": null,
+    "basic9_time_ms": null,
+    "basic10_mse": null,
+    "basic10_time_ms": null,
+    "linalg1_mse": null,
+    "linalg1_time_ms": null,
+    "linalg2_mse": null,
+    "linalg2_time_ms": null,
+    "linalg3_mse": null,
+    "linalg3_time_ms": null,
+    "linalg4_mse": null,
+    "linalg4_time_ms": null
+  },
+  {
+    "timestamp": 1788351932,
     "commit_hash": "486633f",
     "basic1_mse": null,
     "basic1_time_ms": null,

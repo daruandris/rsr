@@ -150,6 +150,7 @@ impl Strategy for StaticStrategy {
                     Instruction::Basic(BasicOpCode::SqrF),
                     Instruction::Basic(BasicOpCode::LnF),
                     Instruction::Basic(BasicOpCode::SqrtF),
+                    Instruction::Basic(BasicOpCode::CubeF),
                 ]),
                 OpModule::Linalg => ops.extend_from_slice(&[
                     Instruction::Linalg(LinalgOpCode::MakeVec2),
