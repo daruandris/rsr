@@ -44,9 +44,9 @@ pub struct Config {
 impl Config {
     pub fn default(allowed_modules: Vec<OpModule>) -> Self {
         Config {
-            num_islands: 24,
-            island_size: 25,
-            max_generations: 3000,
+            num_islands: 32,
+            island_size: 500,
+            max_generations: 5000,
             crossover_rate: 0.10,
             tournament_size: 2,
             migration_interval: 25,
@@ -158,10 +158,9 @@ impl Config {
         let mut config = Self::default(vec![OpModule::Basic, OpModule::Solid]);
         
         // Magasabb büntetés a hosszú egyenletekre (a letisztult polinomokért)
-        config.base_parsimony_penalty = 0.001; 
         config.num_islands = 32;
-        config.island_size = 100;
-        config.opt_iterations = 200;
+        config.island_size = 500;
+        config.opt_iterations = 400;
 
         // Szigorúan csak skalár konstansok
         config.disabled_constant_types = vec![
@@ -172,9 +171,9 @@ impl Config {
             // Alap matek szűrése: csak polinomok (+, -, *, ^2, ^3) maradhatnak
             Instruction::Basic(BasicOpCode::SinF),
             Instruction::Basic(BasicOpCode::CosF),
-            Instruction::Basic(BasicOpCode::LnF),
-            Instruction::Basic(BasicOpCode::ExpF),
-            Instruction::Basic(BasicOpCode::SqrtF),
+            //Instruction::Basic(BasicOpCode::LnF),
+            //Instruction::Basic(BasicOpCode::ExpF), //biológiai szövetekhez kellhet
+            //Instruction::Basic(BasicOpCode::SqrtF),
             Instruction::Basic(BasicOpCode::DivF), // Oszás tiltása a stabil polinomokhoz
 
             // Solid operátorok szűrése: feszültség/folyás operátorok tiltása
@@ -182,6 +181,7 @@ impl Config {
             Instruction::Solid(SolidOpCode::DeviatoricM3),
             Instruction::Solid(SolidOpCode::TraceSqrM3),
             Instruction::Solid(SolidOpCode::CofactorM3),
+            Instruction::Solid(SolidOpCode::Invariant2M3),
         ];
 
         // Linalg modult nem is adjuk hozzá, így egyetlen vektor vagy mátrix 
@@ -198,7 +198,6 @@ impl Config {
     pub fn yield_surface() -> Self {
         let mut config = Self::default(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
         
-        config.base_parsimony_penalty = 0.005; 
         config.disabled_constant_types = vec![
             ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3
         ];
@@ -206,6 +205,9 @@ impl Config {
         let mut exclusions = vec![
             Instruction::Basic(BasicOpCode::SinF),
             Instruction::Basic(BasicOpCode::CosF),
+            Instruction::Basic(BasicOpCode::LnF),
+            Instruction::Basic(BasicOpCode::ExpF),
+            Instruction::Basic(BasicOpCode::DivF),
             
             // Folyási felületeknél a bemenet feszültség, így a deformációs 
             // operátorok (C, B, I1_bar) fizikailag értelmezhetetlenek itt.
@@ -242,9 +244,6 @@ impl Config {
     /// Szabályok: Szabad mátrix-aritmetika (szorzás, inverz, transzponált).
     pub fn constitutive_tensor_law() -> Self {
         let mut config = Self::default(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
-        
-        config.base_parsimony_penalty = 0.0005;
-        config.opt_iterations = 300;
 
         // Itt engedélyezhetjük a mátrix konstansokat az anizotrópiához (pl. szálirányok)
         config.disabled_constant_types = vec![

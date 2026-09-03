@@ -3,58 +3,6 @@ mod common;
 use std::path::Path;
 use std::time::Instant;
 use rsr::prelude::*;
-use rsr::Instruction;
-use rsr::domains::basic::BasicOpCode;
-use rsr::domains::linalg::LinalgOpCode;
-use rsr::domains::solid::SolidOpCode;
-
-fn get_vector_exclusions() -> Vec<Instruction> {
-    vec![
-        Instruction::Linalg(LinalgOpCode::MakeVec2),
-        Instruction::Linalg(LinalgOpCode::MakeVec3),
-        Instruction::Linalg(LinalgOpCode::DotV2),
-        Instruction::Linalg(LinalgOpCode::DotV3),
-        Instruction::Linalg(LinalgOpCode::CrossV3),
-        Instruction::Linalg(LinalgOpCode::GetXV3),
-        Instruction::Linalg(LinalgOpCode::GetYV3),
-        Instruction::Linalg(LinalgOpCode::GetZV3),
-        Instruction::Linalg(LinalgOpCode::GetXV2),
-        Instruction::Linalg(LinalgOpCode::GetYV2),
-        Instruction::Linalg(LinalgOpCode::AddV3),
-        Instruction::Linalg(LinalgOpCode::AddV2),
-        Instruction::Linalg(LinalgOpCode::SubV3),
-        Instruction::Linalg(LinalgOpCode::SubV2),
-        Instruction::Linalg(LinalgOpCode::ScaleV2),
-        Instruction::Linalg(LinalgOpCode::ScaleV3),
-        Instruction::Linalg(LinalgOpCode::MulM2V2),
-        Instruction::Linalg(LinalgOpCode::MulM3V3),
-        Instruction::Basic(BasicOpCode::SinF),
-        Instruction::Basic(BasicOpCode::CosF),
-        Instruction::Basic(BasicOpCode::LnF),
-        Instruction::Basic(BasicOpCode::ExpF),
-        Instruction::Basic(BasicOpCode::SqrtF),
-        Instruction::Basic(BasicOpCode::DivF),
-
-        // ÚJ: Tenzor aritmetika szigorú tiltása! 
-        // Ne tudjon mátrixokat összeadni, invertálni, csak invariánst képezni belőlük.
-        Instruction::Linalg(LinalgOpCode::AddM3),
-        Instruction::Linalg(LinalgOpCode::SubM3),
-        Instruction::Linalg(LinalgOpCode::ScaleM3),
-        Instruction::Linalg(LinalgOpCode::MulM3),
-        Instruction::Linalg(LinalgOpCode::InverseM3),
-        Instruction::Linalg(LinalgOpCode::TransposeM3),
-        Instruction::Linalg(LinalgOpCode::DetM3),
-        Instruction::Linalg(LinalgOpCode::TraceM3),
-        
-        // ÚJ: Felesleges kontinuummechanikai operátorok tiltása
-        Instruction::Solid(SolidOpCode::CofactorM3),
-        Instruction::Solid(SolidOpCode::DeviatoricM3),
-        Instruction::Solid(SolidOpCode::RightCauchyGreenM3),
-        Instruction::Solid(SolidOpCode::LeftCauchyGreenM3),
-        Instruction::Solid(SolidOpCode::GreenLagrangeStrainM3),
-        Instruction::Solid(SolidOpCode::TraceSqrM3),
-    ]
-}
 
 fn run_treloar_test(
     name: &str,
@@ -65,18 +13,12 @@ fn run_treloar_test(
     println!(">>> RUNNING {} <<<", name);
     let dataset = Dataset::new(&data_x, &data_y, vec![ValueType::Mat3], false).with_scalar_extraction(false);
 
-    let mut config = common::get_test_config(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
-    config.excluded_ops = get_vector_exclusions();
-    // A valós adatokhoz elegendő kisebb iterációszám és subset
-    config.disabled_constant_types = vec![
-        ValueType::Mat3,
-        ValueType::Mat2,
-        ValueType::Vec3,
-        ValueType::Vec2,
-    ];
+    let mut config = Config::hyperelastic_energy();
+    // Fontos: Itt biztosítsd, hogy a config tartalmazza az 'exp', 'sqrt' és 'log' függvényeket!
     config.max_generations = 5000;
     config.island_size = 500;
     config.num_islands = 32;
+    // A subset_size-t megnöveltük, mivel most 3 adatsor pontjait (köztük duplikáltakat) tartalmazza
     config.subset_size = Some(data_x.len().min(400));
 
     let regressor = SymbolicRegressor::new(config);
@@ -152,25 +94,41 @@ fn load_treloar_csv(path: &str, mode: &str) -> (Vec<Vec<f32>>, Vec<f32>) {
 }
 
 #[test]
-fn treloar_1_uniaxial() {
-    let path = "test_data/Treloar/Treloar_uniaxial.csv";
-    if !Path::new(path).exists() { return; }
-    let (dx, dy) = load_treloar_csv(path, "uniaxial");
-    run_treloar_test("Treloar: Uniaxial", "TreloarUni", dx, dy);
-}
+fn treloar_combined_test() {
+    let path_uni = "test_data/Treloar/Treloar_uniaxial.csv";
+    let path_bi = "test_data/Treloar/Treloar_equibiaxial.csv";
+    let path_shear = "test_data/Treloar/Treloar_pureshear.csv";
 
-#[test]
-fn treloar_2_biaxial() {
-    let path = "test_data/Treloar/Treloar_equibiaxial.csv";
-    if !Path::new(path).exists() { return; }
-    let (dx, dy) = load_treloar_csv(path, "biaxial");
-    run_treloar_test("Treloar: Biaxial", "TreloarBi", dx, dy);
-}
+    if !Path::new(path_uni).exists() || !Path::new(path_bi).exists() || !Path::new(path_shear).exists() { 
+        return; 
+    }
 
-#[test]
-fn treloar_3_shear() {
-    let path = "test_data/Treloar/Treloar_pureshear.csv";
-    if !Path::new(path).exists() { return; }
-    let (dx, dy) = load_treloar_csv(path, "shear");
-    run_treloar_test("Treloar: Pure Shear", "TreloarShear", dx, dy);
+    let (mut dx_uni, mut dy_uni) = load_treloar_csv(path_uni, "uniaxial");
+    let (mut dx_bi, mut dy_bi) = load_treloar_csv(path_bi, "biaxial");
+    let (mut dx_shear, mut dy_shear) = load_treloar_csv(path_shear, "shear");
+
+    // Összefűzzük a bemeneteket egyetlen nagy adatsorrá
+    let mut dx_combined = Vec::new();
+    let mut dy_combined = Vec::new();
+
+    // 1. Uniaxial adatok
+    dx_combined.append(&mut dx_uni);
+    dy_combined.append(&mut dy_uni);
+
+    // 2. Pure Shear adatok
+    dx_combined.append(&mut dx_shear);
+    dy_combined.append(&mut dy_shear);
+
+    // 3. Equibiaxial adatok (Duplikálva a súlyozás kiegyenlítése végett a cikk alapján)
+    dx_combined.extend(dx_bi.clone());
+    dy_combined.extend(dy_bi.clone());
+    dx_combined.append(&mut dx_bi);
+    dy_combined.append(&mut dy_bi);
+
+    run_treloar_test(
+        "Treloar: Combined Simultaneous Fit (Uni, Shear, Bi weighted)", 
+        "TreloarCombined", 
+        dx_combined, 
+        dy_combined
+    );
 }
