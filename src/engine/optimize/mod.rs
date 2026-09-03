@@ -2,6 +2,7 @@ use crate::engine::data::dataset::Dataset;
 use crate::engine::eval::scalar::Scalar;
 use crate::engine::expr::node::Node;
 use crate::engine::search::individual::Individual;
+use crate::engine::search::config::LossFunctionType;
 
 mod cmaes;
 mod lbfgs;
@@ -11,6 +12,7 @@ pub fn optimize_individual_constants(
     ind: &mut Individual,
     dataset: &Dataset,
     max_iterations: usize,
+    loss_type: LossFunctionType,
 ) {
     if ind.program.is_none() {
         ind.compile();
@@ -23,6 +25,10 @@ pub fn optimize_individual_constants(
 
     let mut is_differentiable = true;
     let mut requires_cmaes = false;
+
+    if loss_type == LossFunctionType::YieldSurface {
+        is_differentiable = false;
+    }
 
     // Dinamikus lekérdezés a fában lévő műveletektől
     for node in &ind.nodes {
@@ -49,12 +55,12 @@ pub fn optimize_individual_constants(
 
     if is_differentiable {
         let lbfgs_iters = 15;
-        lbfgs::run_lbfgs(ind, dataset, lbfgs_iters);
+        lbfgs::run_lbfgs(ind, dataset, lbfgs_iters, loss_type);
     } else if requires_cmaes {
         let cmaes_iters = (max_iterations / 16).max(2);
-        cmaes::run_cma_es(ind, dataset, cmaes_iters);
+        cmaes::run_cma_es(ind, dataset, cmaes_iters, loss_type);
     } else {
-        nelder_mead::run_nelder_mead(ind, dataset, max_iterations);
+        nelder_mead::run_nelder_mead(ind, dataset, max_iterations, loss_type);
     }
 }
 

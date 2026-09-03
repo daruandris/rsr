@@ -2,6 +2,7 @@ use crate::engine::data::dataset::Dataset;
 use crate::engine::eval::evaluator;
 use crate::engine::eval::scalar::Scalar;
 use crate::engine::optimize::Parameterized;
+use crate::engine::search::config::LossFunctionType;
 use crate::engine::search::individual::Individual;
 use rand::RngExt;
 
@@ -16,7 +17,7 @@ fn rand_normal(rng: &mut impl RngExt) -> f32 {
     (-2.0 * u1.ln()).sqrt() * (2.0 * std::f32::consts::PI * u2).cos()
 }
 
-pub fn run_cma_es(ind: &mut Individual, dataset: &Dataset, max_iterations: usize) {
+pub fn run_cma_es(ind: &mut Individual, dataset: &Dataset, max_iterations: usize, loss_type: LossFunctionType) {
     let program = match ind.program.as_mut() {
         Some(p) => p,
         None => return,
@@ -101,7 +102,7 @@ pub fn run_cma_es(ind: &mut Individual, dataset: &Dataset, max_iterations: usize
     let c_cov = (1.0 / mu_eff) * (2.0 / ((n as f32) + 1.414).powi(2))
         + (1.0 - 1.0 / mu_eff) * ((2.0 * mu_eff - 1.0) / (((n as f32) + 2.0).powi(2) + mu_eff));
 
-    let initial_mse = evaluator::compute_mse(program, dataset);
+    let initial_mse = evaluator::compute_loss(program, dataset, loss_type);
 
     let mut initial_l1 = 0.0f32;
     for m in mean.iter().take(n) {
@@ -129,7 +130,7 @@ pub fn run_cma_es(ind: &mut Individual, dataset: &Dataset, max_iterations: usize
             }
 
             program.unflatten_params(&population[i]);
-            let mse = evaluator::compute_mse(program, dataset);
+            let mse = evaluator::compute_loss(program, dataset, loss_type);
             let fitness = mse + L1_REG_LAMBDA * l1_norm;
             pop_fitness[i] = (fitness, mse, i);
         }

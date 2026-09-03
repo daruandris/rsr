@@ -4,6 +4,14 @@ use crate::domains::linalg::LinalgOpCode;
 use crate::domains::solid::SolidOpCode;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+pub enum LossFunctionType {
+    /// Default Mean Squared Error
+    DirectMse,
+    /// MSE + Convexity
+    YieldSurface,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum OpModule {
     Basic,
     Linalg,
@@ -39,6 +47,7 @@ pub struct Config {
     pub subset_size: Option<usize>,
     pub mini_batch_size: usize,
     pub disabled_constant_types: Vec<ValueType>,
+    pub loss_type: LossFunctionType,
 }
 
 impl Config {
@@ -69,6 +78,7 @@ impl Config {
             subset_size: Some(400),
             mini_batch_size: 64,
             disabled_constant_types: vec![],
+            loss_type: LossFunctionType::DirectMse,
         }
     }
 
@@ -158,8 +168,9 @@ impl Config {
         let mut config = Self::default(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
         
         config.disabled_constant_types = vec![
-            ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3
-        ];
+            ValueType::Vec2, ValueType::Vec3, ValueType::Mat2];
+        config.loss_type = LossFunctionType::YieldSurface;
+        config.base_parsimony_penalty = 0.00005;
 
         let mut exclusions = vec![
             Instruction::Basic(BasicOpCode::SinF),

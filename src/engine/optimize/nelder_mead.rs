@@ -2,11 +2,12 @@ use crate::engine::data::dataset::Dataset;
 use crate::engine::eval::evaluator;
 use crate::engine::eval::scalar::Scalar;
 use crate::engine::expr::program::Program;
+use crate::engine::search::config::LossFunctionType;
 use crate::engine::search::individual::Individual;
 
 const L1_REG_LAMBDA: f32 = 0.01;
 
-pub fn run_nelder_mead(ind: &mut Individual, dataset: &Dataset, max_iterations: usize) {
+pub fn run_nelder_mead(ind: &mut Individual, dataset: &Dataset, max_iterations: usize, loss_type: LossFunctionType) {
     if ind.program.is_none() {
         ind.compile();
     }
@@ -43,7 +44,7 @@ pub fn run_nelder_mead(ind: &mut Individual, dataset: &Dataset, max_iterations: 
         for j in 0..n {
             prog.constants[opt_indices[j]] = Scalar::Float(vals[j]);
         }
-        let mse = evaluator::compute_mse(prog, dataset);
+        let mse = evaluator::compute_loss(prog, dataset, loss_type);
 
         let l1: f32 = vals[..n].iter().map(|v| v.abs()).sum();
 

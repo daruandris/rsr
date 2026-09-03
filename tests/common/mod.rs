@@ -220,6 +220,7 @@ pub fn get_test_config(modules: Vec<OpModule>) -> Config {
         excluded_ops: vec![],
         subset_size: Some(400),
         mini_batch_size: 64,
-        disabled_constant_types: vec![]
+        disabled_constant_types: vec![],
+        loss_type: rsr::engine::search::config::LossFunctionType::DirectMse
     }
 }

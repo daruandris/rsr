@@ -1,12 +1,13 @@
 use crate::engine::data::dataset::Dataset;
 use crate::engine::eval::evaluator;
 use crate::engine::optimize::Parameterized;
+use crate::engine::search::config::LossFunctionType;
 use crate::engine::search::individual::Individual;
 
 const MAX_PARAMS: usize = 32;
 const M: usize = 6;
 
-pub fn run_lbfgs(ind: &mut Individual, dataset: &Dataset, max_iterations: usize) {
+pub fn run_lbfgs(ind: &mut Individual, dataset: &Dataset, max_iterations: usize, loss_type: LossFunctionType) {
     if ind.program.is_none() {
         ind.compile();
     }
@@ -30,8 +31,7 @@ pub fn run_lbfgs(ind: &mut Individual, dataset: &Dataset, max_iterations: usize)
     let mut q = [0.0f32; MAX_PARAMS];
 
     let (mut current_mse, mut current_grad) =
-        evaluator::compute_mse_with_gradient(program, dataset);
-
+        evaluator::compute_loss_with_gradient(program, dataset, loss_type);
     let mut history_size = 0;
     let mut head = 0;
 
@@ -115,7 +115,7 @@ pub fn run_lbfgs(ind: &mut Individual, dataset: &Dataset, max_iterations: usize)
                 next_x[j] = x[j] + step_size * p[j];
             }
             program.unflatten_params(&next_x);
-            let mse = evaluator::compute_mse(program, dataset);
+            let mse = evaluator::compute_loss(program, dataset, loss_type);
 
             if mse <= current_mse + c1 * step_size * dir_dot_grad || ls_iters > 10 {
                 break mse;
@@ -124,7 +124,7 @@ pub fn run_lbfgs(ind: &mut Individual, dataset: &Dataset, max_iterations: usize)
             ls_iters += 1;
         };
 
-        let (_, next_grad) = evaluator::compute_mse_with_gradient(program, dataset);
+        let (_, next_grad) = evaluator::compute_loss_with_gradient(program, dataset, loss_type);
 
         let mut s_new = [0.0f32; MAX_PARAMS];
         let mut y_new = [0.0f32; MAX_PARAMS];

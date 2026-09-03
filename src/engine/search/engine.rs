@@ -65,7 +65,7 @@ impl<S: Strategy> Engine<S> {
                 }
             }
 
-            let pure_mse = self.get_global_best().clone().calculate_mse(dataset);
+            let pure_mse = self.get_global_best().clone().calculate_loss(dataset, self.global_strategy.loss_type());
             if pure_mse <= target_mse {
                 if verbose {
                     println!(
@@ -92,9 +92,9 @@ impl<S: Strategy> Engine<S> {
 
         let final_opt_iters = self.global_strategy.final_opt_iterations();
         let mut final_best = self.get_global_best().clone();
-        final_best.optimize_constants(dataset, final_opt_iters);
+        final_best.optimize_constants(dataset, final_opt_iters, self.global_strategy.loss_type());
         
-        let final_mse = final_best.calculate_mse(dataset);
+        let final_mse = final_best.calculate_loss(dataset, self.global_strategy.loss_type());
 
         let mse_floor = dataset.target_variance * 0.01;
         let dynamic_penalty_rate = self.global_strategy.parsimony_penalty() * 

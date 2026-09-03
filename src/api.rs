@@ -158,7 +158,7 @@ impl SymbolicRegressor {
         engine.run(&train_data);
 
         let mut best = engine.get_global_best().clone();
-        let final_mse = best.calculate_mse(full_dataset);
+        let final_mse = best.calculate_loss(full_dataset, self.config.loss_type);
         let clean_eq = crate::engine::ffi::symengine::simplify_symengine(&best.to_string());
 
         FitResult {

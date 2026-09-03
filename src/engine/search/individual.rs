@@ -10,6 +10,7 @@ use crate::engine::expr::program::Program;
 use crate::engine::expr::simplify::simplify_ast;
 use crate::engine::optimize::optimize_individual_constants;
 use crate::engine::eval::types::ValueType;
+use crate::engine::search::config::LossFunctionType;
 use std::fmt;
 
 #[derive(Clone)]
@@ -44,13 +45,13 @@ impl Individual {
         }
     }
 
-    pub fn calculate_mse(&mut self, dataset: &Dataset) -> f32 {
+    pub fn calculate_loss(&mut self, dataset: &Dataset, loss_type: LossFunctionType) -> f32 {
         if self.program.is_none() {
             self.compile();
         }
 
         if let Some(prog) = &self.program {
-            evaluator::compute_mse(prog, dataset)
+            evaluator::compute_loss(prog, dataset, loss_type)
         } else {
             f32::MAX
         }
@@ -65,8 +66,8 @@ impl Individual {
         self.invalidate();
     }
 
-    pub fn optimize_constants(&mut self, dataset: &Dataset, iterations: usize) {
-        optimize_individual_constants(self, dataset, iterations);
+    pub fn optimize_constants(&mut self, dataset: &Dataset, iterations: usize, loss_type: LossFunctionType) {
+        optimize_individual_constants(self, dataset, iterations, loss_type);
         let threshold = 1e-5;
         let mut constants = self.get_constants();
         for c in constants.iter_mut() {

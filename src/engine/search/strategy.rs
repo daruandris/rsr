@@ -1,4 +1,5 @@
 use super::config::{Config, OpModule};
+use crate::engine::search::config::LossFunctionType;
 use crate::{Instruction, ValueType};
 use crate::domains::basic::BasicOpCode;
 use crate::domains::linalg::LinalgOpCode;
@@ -30,6 +31,7 @@ pub trait Strategy: Clone + Send + Sync {
     fn get_allowed_operators(&self) -> Vec<Instruction>;
     fn on_generation_end(&mut self, _best_mse: f32, _stagnation_counter: usize) {}
     fn on_nuke(&mut self) {}
+    fn loss_type(&self) -> LossFunctionType;
 }
 
 #[derive(Clone)]
@@ -220,5 +222,10 @@ impl Strategy for StaticStrategy {
     #[inline(always)]
     fn disabled_constant_types(&self) -> &[ValueType] {
         &self.config.disabled_constant_types
+    }
+
+    #[inline(always)]
+    fn loss_type(&self) -> LossFunctionType {
+        self.config.loss_type
     }
 }

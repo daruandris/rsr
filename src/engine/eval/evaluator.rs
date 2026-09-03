@@ -10,6 +10,8 @@ use crate::engine::eval::scalar::Scalar;
 use crate::engine::eval::state::{DualVmState, VmState};
 use crate::engine::expr::program::Program;
 use crate::engine::optimize::Parameterized;
+use crate::engine::search::config::LossFunctionType;
+use wide::CmpLt;
 use wide::f32x8;
 
 /// Evaluates a compiled program on a single batch of SIMD features.
@@ -149,8 +151,16 @@ pub fn eval_simd(program: &Program, features: &[f32x8]) -> f32x8 {
     unsafe { *ctx.stack_f.get_unchecked(0) }
 }
 
+#[inline(always)]
+pub fn compute_loss(program: &Program, dataset: &Dataset, loss_type: LossFunctionType) -> f32 {
+    match loss_type {
+        LossFunctionType::DirectMse => compute_direct_mse(program, dataset),
+        LossFunctionType::YieldSurface => compute_yield_surface_loss(program, dataset),
+    }
+}
+
 /// Computes the Mean Squared Error (MSE) of a program over the entire dataset.
-pub fn compute_mse(program: &Program, dataset: &Dataset) -> f32 {
+pub fn compute_direct_mse(program: &Program, dataset: &Dataset) -> f32 {
     let mut sum_squared_error = f32x8::splat(0.0);
     let num_features = dataset.num_features as usize;
     let flat_features = &dataset.feature_flat;
@@ -182,8 +192,18 @@ pub fn compute_mse(program: &Program, dataset: &Dataset) -> f32 {
     if !mse.is_finite() { f32::MAX } else { mse }
 }
 
+#[inline(always)]
+pub fn compute_loss_with_gradient(program: &Program, dataset: &Dataset, loss_type: LossFunctionType) -> (f32, [f32; 32]) {
+    match loss_type {
+        LossFunctionType::DirectMse => compute_direct_mse_with_gradient(program, dataset),
+        LossFunctionType::YieldSurface => {
+            compute_direct_mse_with_gradient(program, dataset)
+        }
+    }
+}
+
 /// Computes both the MSE and the gradient of the MSE with respect to the program's constants.
-pub fn compute_mse_with_gradient(program: &Program, dataset: &Dataset) -> (f32, [f32; 32]) {
+pub fn compute_direct_mse_with_gradient(program: &Program, dataset: &Dataset) -> (f32, [f32; 32]) {
     let mut sum_squared_error = f32x8::splat(0.0);
     let mut grad_sum = [f32x8::splat(0.0); 32];
 
@@ -194,7 +214,7 @@ pub fn compute_mse_with_gradient(program: &Program, dataset: &Dataset) -> (f32, 
     let active_params_count = program.param_count().min(32);
 
     if active_params_count == 0 {
-        return (compute_mse(program, dataset), [0.0; 32]);
+        return (compute_direct_mse(program, dataset), [0.0; 32]);
     }
 
     let remainder = dataset.num_samples % 8;
@@ -240,6 +260,64 @@ pub fn compute_mse_with_gradient(program: &Program, dataset: &Dataset) -> (f32, 
     }
 
     (total_mse, final_gradient)
+}
+
+fn compute_yield_surface_loss(program: &Program, dataset: &Dataset) -> f32 {
+    let mut sum_squared_error = f32x8::splat(0.0);
+    let mut convexity_penalty = f32x8::splat(0.0);
+    let num_features = dataset.num_features as usize;
+    let remainder = dataset.num_samples % 8;
+
+    // MEGNÖVELT EPSILON ÉS KISEBB BÜNTETÉS/TOLERANCIA
+    let eps = f32x8::splat(1e-2); // 10^-2 tökéletesen stabil az f32-höz!
+    let penalty_weight = f32x8::splat(1000.0); // Elég nagy, de nem teszi tönkre az algoritmust
+
+    for i in 0..dataset.num_batches {
+        let start = i * num_features;
+        let input_batch = unsafe { dataset.feature_flat.get_unchecked(start..start + num_features) };
+        let target = unsafe { *dataset.target_batches.get_unchecked(i) };
+
+        let prediction = eval_simd(program, input_batch);
+        let mut diff = prediction - target;
+
+        if i % 4 == 0 {
+            let mut batch_plus = [f32x8::splat(0.0); 32];
+            let mut batch_minus = [f32x8::splat(0.0); 32];
+            for j in 0..num_features {
+                batch_plus[j] = input_batch[j];
+                batch_minus[j] = input_batch[j];
+            }
+            batch_plus[0] = input_batch[0] + eps;
+            batch_minus[0] = input_batch[0] - eps;
+
+            // ZSENIÁLIS TRÜKK: Véges differencia az *EGZAKT* első deriváltakból!
+            let dual_plus = eval_simd_dual_feature(program, &batch_plus[..num_features], 0);
+            let dual_minus = eval_simd_dual_feature(program, &batch_minus[..num_features], 0);
+
+            // H_11 = (dPsi_plus - dPsi_minus) / (2 * eps)
+            let h_ii = (dual_plus.grad - dual_minus.grad) / (f32x8::splat(2.0) * eps);
+
+            // Tolerancia a numerikus f32 zajra: csak a durván negatív (konkáv) eseteket büntetjük
+            let is_concave = h_ii.simd_lt(f32x8::splat(-0.01));
+            convexity_penalty += is_concave.blend(penalty_weight, f32x8::splat(0.0));
+        }
+
+        if i == dataset.num_batches - 1 && remainder != 0 {
+            let mut mask = [1.0f32; 8];
+            for j in remainder..8 { mask[j] = 0.0; }
+            let mask_simd = wide::f32x8::new(mask);
+            diff *= mask_simd;
+            convexity_penalty *= mask_simd;
+        }
+
+        sum_squared_error += diff * diff;
+    }
+
+    let mse = sum_squared_error.reduce_add() / (dataset.num_samples as f32);
+    let penalty = convexity_penalty.reduce_add() / (dataset.num_samples as f32);
+
+    let total_loss = mse + penalty;
+    if !total_loss.is_finite() { f32::MAX } else { total_loss }
 }
 
 /// Evaluates a compiled program using forward-mode automatic differentiation.
@@ -403,5 +481,128 @@ pub fn eval_simd_dual(program: &Program, features: &[f32x8], active_const_idx: u
     }
 
     // SAFETY: AST ensures exactly one DualSimd float value represents the root answer.
+    unsafe { *ctx.stack_f.get_unchecked(0) }
+}
+
+/// Evaluálja a programot Forward-Mode Autodiff (DualSimd) használatával, 
+/// egy adott bemeneti változó (feature) szerinti derivált kiszámításához.
+#[inline(always)]
+pub fn eval_simd_dual_feature(program: &Program, features: &[f32x8], active_feature_idx: usize) -> DualSimd {
+    let mut ctx = DualVmState::new();
+    let constants = &program.constants;
+
+    let get_grad = |flat_idx: usize| -> f32x8 {
+        if flat_idx == active_feature_idx {
+            f32x8::splat(1.0)
+        } else {
+            f32x8::splat(0.0)
+        }
+    };
+
+    for op in &program.code {
+        match op {
+            Instruction::LoadVarF(idx) => unsafe {
+                let i = *idx as usize;
+                *ctx.stack_f.get_unchecked_mut(ctx.sp_f) = DualSimd::new(*features.get_unchecked(i), get_grad(i));
+                ctx.sp_f += 1;
+            },
+            Instruction::LoadConstF(idx) => unsafe {
+                if let Scalar::Float(val) = constants.get_unchecked(*idx as usize) {
+                    *ctx.stack_f.get_unchecked_mut(ctx.sp_f) = DualSimd::constant(f32x8::splat(*val));
+                }
+                ctx.sp_f += 1;
+            },
+            Instruction::LoadVarV2(idx) => unsafe {
+                let i = *idx as usize;
+                *ctx.stack_v2.get_unchecked_mut(ctx.sp_v2) = [
+                    DualSimd::new(*features.get_unchecked(i), get_grad(i)),
+                    DualSimd::new(*features.get_unchecked(i + 1), get_grad(i + 1)),
+                ];
+                ctx.sp_v2 += 1;
+            },
+            Instruction::LoadConstV2(idx) => unsafe {
+                if let Scalar::Vec2(val) = constants.get_unchecked(*idx as usize) {
+                    *ctx.stack_v2.get_unchecked_mut(ctx.sp_v2) = [
+                        DualSimd::constant(f32x8::splat(val[0])),
+                        DualSimd::constant(f32x8::splat(val[1])),
+                    ];
+                }
+                ctx.sp_v2 += 1;
+            },
+            Instruction::LoadVarV3(idx) => unsafe {
+                let i = *idx as usize;
+                *ctx.stack_v3.get_unchecked_mut(ctx.sp_v3) = [
+                    DualSimd::new(*features.get_unchecked(i), get_grad(i)),
+                    DualSimd::new(*features.get_unchecked(i + 1), get_grad(i + 1)),
+                    DualSimd::new(*features.get_unchecked(i + 2), get_grad(i + 2)),
+                ];
+                ctx.sp_v3 += 1;
+            },
+            Instruction::LoadConstV3(idx) => unsafe {
+                if let Scalar::Vec3(val) = constants.get_unchecked(*idx as usize) {
+                    *ctx.stack_v3.get_unchecked_mut(ctx.sp_v3) = [
+                        DualSimd::constant(f32x8::splat(val[0])),
+                        DualSimd::constant(f32x8::splat(val[1])),
+                        DualSimd::constant(f32x8::splat(val[2])),
+                    ];
+                }
+                ctx.sp_v3 += 1;
+            },
+            Instruction::LoadVarM2(idx) => unsafe {
+                let i = *idx as usize;
+                *ctx.stack_m2.get_unchecked_mut(ctx.sp_m2) = [
+                    DualSimd::new(*features.get_unchecked(i), get_grad(i)),
+                    DualSimd::new(*features.get_unchecked(i + 1), get_grad(i + 1)),
+                    DualSimd::new(*features.get_unchecked(i + 2), get_grad(i + 2)),
+                    DualSimd::new(*features.get_unchecked(i + 3), get_grad(i + 3)),
+                ];
+                ctx.sp_m2 += 1;
+            },
+            Instruction::LoadConstM2(idx) => unsafe {
+                if let Scalar::Mat2(val) = constants.get_unchecked(*idx as usize) {
+                    *ctx.stack_m2.get_unchecked_mut(ctx.sp_m2) = [
+                        DualSimd::constant(f32x8::splat(val[0])),
+                        DualSimd::constant(f32x8::splat(val[1])),
+                        DualSimd::constant(f32x8::splat(val[2])),
+                        DualSimd::constant(f32x8::splat(val[3])),
+                    ];
+                }
+                ctx.sp_m2 += 1;
+            },
+            Instruction::LoadVarM3(idx) => unsafe {
+                let i = *idx as usize;
+                *ctx.stack_m3.get_unchecked_mut(ctx.sp_m3) = [
+                    DualSimd::new(*features.get_unchecked(i), get_grad(i)),
+                    DualSimd::new(*features.get_unchecked(i + 1), get_grad(i + 1)),
+                    DualSimd::new(*features.get_unchecked(i + 2), get_grad(i + 2)),
+                    DualSimd::new(*features.get_unchecked(i + 3), get_grad(i + 3)),
+                    DualSimd::new(*features.get_unchecked(i + 4), get_grad(i + 4)),
+                    DualSimd::new(*features.get_unchecked(i + 5), get_grad(i + 5)),
+                    DualSimd::new(*features.get_unchecked(i + 6), get_grad(i + 6)),
+                    DualSimd::new(*features.get_unchecked(i + 7), get_grad(i + 7)),
+                    DualSimd::new(*features.get_unchecked(i + 8), get_grad(i + 8)),
+                ];
+                ctx.sp_m3 += 1;
+            },
+            Instruction::LoadConstM3(idx) => unsafe {
+                if let Scalar::Mat3(val) = constants.get_unchecked(*idx as usize) {
+                    *ctx.stack_m3.get_unchecked_mut(ctx.sp_m3) = [
+                        DualSimd::constant(f32x8::splat(val[0])),
+                        DualSimd::constant(f32x8::splat(val[1])),
+                        DualSimd::constant(f32x8::splat(val[2])),
+                        DualSimd::constant(f32x8::splat(val[3])),
+                        DualSimd::constant(f32x8::splat(val[4])),
+                        DualSimd::constant(f32x8::splat(val[5])),
+                        DualSimd::constant(f32x8::splat(val[6])),
+                        DualSimd::constant(f32x8::splat(val[7])),
+                        DualSimd::constant(f32x8::splat(val[8])),
+                    ];
+                }
+                ctx.sp_m3 += 1;
+            },
+            _ => crate::SymbolicEngine::eval_dual_single(*op, &mut ctx),
+        }
+    }
+    // SAFETY: Az AST garantálja, hogy pontosan 1 lebegőpontos float (ami most egy DualSimd) marad a veremben.
     unsafe { *ctx.stack_f.get_unchecked(0) }
 }

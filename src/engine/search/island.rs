@@ -144,7 +144,7 @@ impl<S: Strategy> Island<S> {
                 self.next_gen_buffer.push(child);
             } else {
                 let mut candidate = tournament_selection_pareto(&self.individuals, tourn_size, &mut self.rng).clone();
-                let mut current_mse = candidate.calculate_mse(mini_batch);
+                let mut current_mse = candidate.calculate_loss(mini_batch, self.strategy.loss_type());
                 candidate.fitness = f32::MAX;
 
                 for _ in 0..self.strategy.mutation_cycles() {
@@ -170,7 +170,7 @@ impl<S: Strategy> Island<S> {
                     }
                     mutated_candidate.simplify();
                     if !mutated_candidate.has_forbidden_patterns() {
-                        let new_mse = mutated_candidate.calculate_mse(mini_batch);
+                        let new_mse = mutated_candidate.calculate_loss(mini_batch, self.strategy.loss_type());
                         if new_mse < current_mse {
                             candidate = mutated_candidate;
                             current_mse = new_mse;
@@ -199,7 +199,7 @@ impl<S: Strategy> Island<S> {
             let mut new_ind = Individual::new(ast, constants, self.strategy.disabled_constant_types().to_vec());
             new_ind.simplify();
 
-            let mse = new_ind.calculate_mse(dataset);
+            let mse = new_ind.calculate_loss(dataset, self.strategy.loss_type());
 
             if mse.is_finite() {
                 let mse_floor = dataset.target_variance * 0.01;
@@ -218,10 +218,10 @@ impl<S: Strategy> Island<S> {
 
     fn evaluate_buffer(&mut self, dataset: &Dataset, mini_batch: &Dataset) {
         let mut best_clone = self.best_individual.clone();
-        let baseline_mini_mse = best_clone.calculate_mse(mini_batch);
+        let baseline_mini_mse = best_clone.calculate_loss(mini_batch, self.strategy.loss_type());
 
         for ind in self.next_gen_buffer.iter_mut() {
-            let mini_mse = ind.calculate_mse(mini_batch);
+            let mini_mse = ind.calculate_loss(mini_batch, self.strategy.loss_type());
             let mut is_promising = mini_mse < (baseline_mini_mse * 2.0);
             if !is_promising && self.rng.random::<f32>() < 0.05 {
                 is_promising = true;
@@ -230,7 +230,7 @@ impl<S: Strategy> Island<S> {
             let mut final_mse = mini_mse;
 
             if is_promising {
-                final_mse = ind.calculate_mse(dataset);
+                final_mse = ind.calculate_loss(dataset, self.strategy.loss_type());
                 
                 let complexity = ind.complexity();
                 let mse_floor = dataset.target_variance * 0.01;
@@ -245,11 +245,11 @@ impl<S: Strategy> Island<S> {
                 let random_opt = self.rng.random::<f32>() < self.strategy.opt_prob();
 
                 if (is_potential_elite || random_opt) && final_mse.is_finite() {
-                    ind.optimize_constants(dataset, self.strategy.opt_iterations());
+                    ind.optimize_constants(dataset, self.strategy.opt_iterations(), self.strategy.loss_type());
                     if ind.program.is_none() {
                         ind.compile();
                     }
-                    final_mse = ind.calculate_mse(dataset);
+                    final_mse = ind.calculate_loss(dataset, self.strategy.loss_type());
                 }
             }
             if final_mse.is_finite() {
