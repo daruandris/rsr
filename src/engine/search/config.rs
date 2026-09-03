@@ -148,47 +148,6 @@ impl Config {
     // IPARI FELADAT-SPECIFIKUS PROFILOK (TASK-BASED CONFIGS)
     // ==========================================
 
-    /// 1. Hiperelasztikus Energiasűrűség Felfedezése (Strain Energy Discovery)
-    /// 
-    /// Cél: W (skalár energia) előállítása F (Deformációs Gradiens) tenzorból.
-    /// Ipar: Gumiipar, biomechanika, polimerek (Abaqus UMAT/UHYPER).
-    /// Szabályok: Szigorúan objektív és izotróp. Csak invariánsokat használhat.
-    /// Tilos: Mátrix aritmetika, vektorok, osztás (szingularitás ellen), szögfüggvények.
-    pub fn hyperelastic_energy() -> Self {
-        let mut config = Self::default(vec![OpModule::Basic, OpModule::Solid]);
-        
-        // Magasabb büntetés a hosszú egyenletekre (a letisztult polinomokért)
-        config.num_islands = 32;
-        config.island_size = 500;
-        config.opt_iterations = 400;
-
-        // Szigorúan csak skalár konstansok
-        config.disabled_constant_types = vec![
-            ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3
-        ];
-
-        config.excluded_ops = vec![
-            // Alap matek szűrése: csak polinomok (+, -, *, ^2, ^3) maradhatnak
-            Instruction::Basic(BasicOpCode::SinF),
-            Instruction::Basic(BasicOpCode::CosF),
-            //Instruction::Basic(BasicOpCode::LnF),
-            //Instruction::Basic(BasicOpCode::ExpF), //biológiai szövetekhez kellhet
-            //Instruction::Basic(BasicOpCode::SqrtF),
-            Instruction::Basic(BasicOpCode::DivF), // Oszás tiltása a stabil polinomokhoz
-
-            // Solid operátorok szűrése: feszültség/folyás operátorok tiltása
-            Instruction::Solid(SolidOpCode::GreenLagrangeStrainM3),
-            Instruction::Solid(SolidOpCode::DeviatoricM3),
-            Instruction::Solid(SolidOpCode::TraceSqrM3),
-            Instruction::Solid(SolidOpCode::CofactorM3),
-            Instruction::Solid(SolidOpCode::Invariant2M3),
-        ];
-
-        // Linalg modult nem is adjuk hozzá, így egyetlen vektor vagy mátrix 
-        // aritmetikai operátor (AddM3, InverseM3, stb.) sem lesz elérhető!
-        config
-    }
-
     /// 2. Folyási Felület és Tönkremenetel Felfedezése (Yield Surface Discovery)
     /// 
     /// Cél: f (skalár folyási feltétel) előállítása Sigma (Feszültség) tenzorból.
