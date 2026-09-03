@@ -205,6 +205,52 @@ pub unsafe fn eval_deviatoric_m3(sp_m3: &mut usize, stack_m3: &mut [[f32x8; 9]; 
     ];
 }
 
+#[inline(always)]
+pub unsafe fn eval_invariant_j2_m3(
+    sp_f: &mut usize,
+    stack_f: &mut [f32x8; 32],
+    sp_m3: &mut usize,
+    stack_m3: &[[f32x8; 9]; 32],
+) {
+    *sp_m3 -= 1;
+    let a = *stack_m3.get_unchecked(*sp_m3);
+    let tr_third = (a[0] + a[4] + a[8]) * f32x8::splat(1.0 / 3.0);
+    
+    let s0 = a[0] - tr_third; let s1 = a[1]; let s2 = a[2];
+    let s3 = a[3]; let s4 = a[4] - tr_third; let s5 = a[5];
+    let s6 = a[6]; let s7 = a[7]; let s8 = a[8] - tr_third;
+
+    let tr_s2 = s0*s0 + s1*s3 + s2*s6 +
+                s3*s1 + s4*s4 + s5*s7 +
+                s6*s2 + s7*s5 + s8*s8;
+                
+    *stack_f.get_unchecked_mut(*sp_f) = tr_s2 * f32x8::splat(0.5);
+    *sp_f += 1;
+}
+
+#[inline(always)]
+pub unsafe fn eval_invariant_j3_m3(
+    sp_f: &mut usize,
+    stack_f: &mut [f32x8; 32],
+    sp_m3: &mut usize,
+    stack_m3: &[[f32x8; 9]; 32],
+) {
+    *sp_m3 -= 1;
+    let a = *stack_m3.get_unchecked(*sp_m3);
+    let tr_third = (a[0] + a[4] + a[8]) * f32x8::splat(1.0 / 3.0);
+    
+    let s0 = a[0] - tr_third; let s1 = a[1]; let s2 = a[2];
+    let s3 = a[3]; let s4 = a[4] - tr_third; let s5 = a[5];
+    let s6 = a[6]; let s7 = a[7]; let s8 = a[8] - tr_third;
+
+    let det_s = s0 * (s4 * s8 - s5 * s7)
+              - s3 * (s1 * s8 - s2 * s7)
+              + s6 * (s1 * s5 - s2 * s4);
+              
+    *stack_f.get_unchecked_mut(*sp_f) = det_s;
+    *sp_f += 1;
+}
+
 // =====================================================================
 // DUAL SIMD EVALUATION (Autodiff)
 // =====================================================================
@@ -424,4 +470,54 @@ pub unsafe fn eval_dual_deviatoric_m3(sp_m3: &mut usize, stack_m3: &mut [[DualSi
         a[3], a[4] - tr_third, a[5],
         a[6], a[7], a[8] - tr_third,
     ];
+}
+
+
+#[inline(always)]
+pub unsafe fn eval_dual_invariant_j2_m3(
+    sp_f: &mut usize,
+    stack_f: &mut [DualSimd; 32],
+    sp_m3: &mut usize,
+    stack_m3: &[[DualSimd; 9]; 32],
+) {
+    *sp_m3 -= 1;
+    let a = *stack_m3.get_unchecked(*sp_m3);
+    let third = DualSimd::constant(f32x8::splat(1.0 / 3.0));
+    let tr_third = (a[0] + a[4] + a[8]) * third;
+    
+    let s0 = a[0] - tr_third; let s1 = a[1]; let s2 = a[2];
+    let s3 = a[3]; let s4 = a[4] - tr_third; let s5 = a[5];
+    let s6 = a[6]; let s7 = a[7]; let s8 = a[8] - tr_third;
+
+    let tr_s2 = s0*s0 + s1*s3 + s2*s6 +
+                s3*s1 + s4*s4 + s5*s7 +
+                s6*s2 + s7*s5 + s8*s8;
+                
+    let half = DualSimd::constant(f32x8::splat(0.5));
+    *stack_f.get_unchecked_mut(*sp_f) = tr_s2 * half;
+    *sp_f += 1;
+}
+
+#[inline(always)]
+pub unsafe fn eval_dual_invariant_j3_m3(
+    sp_f: &mut usize,
+    stack_f: &mut [DualSimd; 32],
+    sp_m3: &mut usize,
+    stack_m3: &[[DualSimd; 9]; 32],
+) {
+    *sp_m3 -= 1;
+    let a = *stack_m3.get_unchecked(*sp_m3);
+    let third = DualSimd::constant(f32x8::splat(1.0 / 3.0));
+    let tr_third = (a[0] + a[4] + a[8]) * third;
+    
+    let s0 = a[0] - tr_third; let s1 = a[1]; let s2 = a[2];
+    let s3 = a[3]; let s4 = a[4] - tr_third; let s5 = a[5];
+    let s6 = a[6]; let s7 = a[7]; let s8 = a[8] - tr_third;
+
+    let det_s = s0 * (s4 * s8 - s5 * s7)
+              - s3 * (s1 * s8 - s2 * s7)
+              + s6 * (s1 * s5 - s2 * s4);
+              
+    *stack_f.get_unchecked_mut(*sp_f) = det_s;
+    *sp_f += 1;
 }

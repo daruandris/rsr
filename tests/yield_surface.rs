@@ -17,7 +17,7 @@ fn generate_sym_stress(rng: &mut impl RngExt) -> [f32; 9] {
 
 fn run_yield_test(name: &str, data_x: Vec<Vec<f32>>, data_y: Vec<f32>) {
     println!(">>> RUNNING {} <<<", name);
-    let dataset = Dataset::new(&data_x, &data_y, vec![ValueType::Mat3], false);
+    let dataset = Dataset::new(&data_x, &data_y, vec![ValueType::Mat3], false).with_scalar_extraction(false);
     
     // Folyási felület profil (csak feszültség-invariánsok)
     let config = Config::yield_surface(); 

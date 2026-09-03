@@ -205,6 +205,8 @@ impl Strategy for StaticStrategy {
                     Instruction::Solid(SolidOpCode::IsochoricInvariant2),
                     Instruction::Solid(SolidOpCode::TraceSqrM3),
                     Instruction::Solid(SolidOpCode::DeviatoricM3),
+                    Instruction::Solid(SolidOpCode::InvariantJ2M3),
+                    Instruction::Solid(SolidOpCode::InvariantJ3M3),
                 ]),
             }
         }

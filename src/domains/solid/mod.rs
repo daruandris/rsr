@@ -16,6 +16,8 @@ pub enum SolidOpCode {
     IsochoricInvariant2,
     TraceSqrM3,
     DeviatoricM3,
+    InvariantJ2M3,
+    InvariantJ3M3,
 }
 
 pub struct SolidDomain;
@@ -36,6 +38,8 @@ impl Domain for SolidDomain {
                 SolidOpCode::CofactorM3 => eval::eval_cofactor_m3(&mut ctx.sp_m3, &mut ctx.stack_m3),
                 SolidOpCode::TraceSqrM3 => eval::eval_trace_sqr_m3(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3),
                 SolidOpCode::DeviatoricM3 => eval::eval_deviatoric_m3(&mut ctx.sp_m3, &mut ctx.stack_m3),
+                SolidOpCode::InvariantJ2M3 => eval::eval_invariant_j2_m3(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3),
+                SolidOpCode::InvariantJ3M3 => eval::eval_invariant_j3_m3(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3),
             }
         }
     }
@@ -53,6 +57,8 @@ impl Domain for SolidDomain {
                 SolidOpCode::CofactorM3 => eval::eval_dual_cofactor_m3(&mut ctx.sp_m3, &mut ctx.stack_m3),
                 SolidOpCode::TraceSqrM3 => eval::eval_dual_trace_sqr_m3(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3),
                 SolidOpCode::DeviatoricM3 => eval::eval_dual_deviatoric_m3(&mut ctx.sp_m3, &mut ctx.stack_m3),
+                SolidOpCode::InvariantJ2M3 => eval::eval_dual_invariant_j2_m3(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3),
+                SolidOpCode::InvariantJ3M3 => eval::eval_dual_invariant_j3_m3(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3),
             }
         }
     }
@@ -202,6 +208,22 @@ impl Domain for SolidDomain {
                     ];
                     return SimplifyAction::ReplaceWithConstant(Scalar::Mat3(res));
                 }
+                SolidOpCode::InvariantJ2M3 => {
+                    let tr_third = (m[0] + m[4] + m[8]) / 3.0;
+                    let s0 = m[0] - tr_third; let s1 = m[1]; let s2 = m[2];
+                    let s3 = m[3]; let s4 = m[4] - tr_third; let s5 = m[5];
+                    let s6 = m[6]; let s7 = m[7]; let s8 = m[8] - tr_third;
+                    let j2 = 0.5 * (s0*s0 + s1*s3 + s2*s6 + s3*s1 + s4*s4 + s5*s7 + s6*s2 + s7*s5 + s8*s8);
+                    return SimplifyAction::ReplaceWithConstant(Scalar::Float(j2));
+                }
+                SolidOpCode::InvariantJ3M3 => {
+                    let tr_third = (m[0] + m[4] + m[8]) / 3.0;
+                    let s0 = m[0] - tr_third; let s1 = m[1]; let s2 = m[2];
+                    let s3 = m[3]; let s4 = m[4] - tr_third; let s5 = m[5];
+                    let s6 = m[6]; let s7 = m[7]; let s8 = m[8] - tr_third;
+                    let j3 = s0 * (s4 * s8 - s5 * s7) - s3 * (s1 * s8 - s2 * s7) + s6 * (s1 * s5 - s2 * s4);
+                    return SimplifyAction::ReplaceWithConstant(Scalar::Float(j3));
+                }
             }
         }
         SimplifyAction::None
@@ -216,7 +238,9 @@ impl Domain for SolidDomain {
             SolidOpCode::Invariant2M3
             | SolidOpCode::IsochoricInvariant1
             | SolidOpCode::IsochoricInvariant2
-            | SolidOpCode::TraceSqrM3 => ValueType::Float,
+            | SolidOpCode::TraceSqrM3
+            | SolidOpCode::InvariantJ2M3
+            | SolidOpCode::InvariantJ3M3 => ValueType::Float,
             _ => ValueType::Mat3,
         }
     }
@@ -231,6 +255,7 @@ impl Domain for SolidDomain {
             SolidOpCode::Invariant2M3 | SolidOpCode::TraceSqrM3 => 4,
             SolidOpCode::RightCauchyGreenM3 | SolidOpCode::LeftCauchyGreenM3 => 4,
             SolidOpCode::GreenLagrangeStrainM3 | SolidOpCode::CofactorM3 => 5,
+            SolidOpCode::InvariantJ2M3 | SolidOpCode::InvariantJ3M3 => 5,
             SolidOpCode::IsochoricInvariant1 | SolidOpCode::IsochoricInvariant2 => 6,
         }
     }
@@ -274,6 +299,9 @@ impl Domain for SolidDomain {
             SolidOpCode::DeviatoricM3 => {
                 matches!(child, SolidOpCode::DeviatoricM3)
             }
+            SolidOpCode::InvariantJ2M3 | SolidOpCode::InvariantJ3M3 => {
+                matches!(child, SolidOpCode::DeviatoricM3 | SolidOpCode::RightCauchyGreenM3 | SolidOpCode::LeftCauchyGreenM3)
+            }
             SolidOpCode::TraceSqrM3 => false
         }
     }
@@ -287,8 +315,10 @@ impl Domain for SolidDomain {
             SolidOpCode::IsochoricInvariant2 => format!("I2_bar({})", args[0]),
             SolidOpCode::Invariant2M3 => format!("I2({})", args[0]),
             SolidOpCode::CofactorM3 => format!("Cof({})", args[0]),
-            SolidOpCode::TraceSqrM3 => format!("tr({}^2)", args[0]), // ÚJ
-            SolidOpCode::DeviatoricM3 => format!("dev({})", args[0]), // ÚJ
+            SolidOpCode::TraceSqrM3 => format!("tr({}^2)", args[0]),
+            SolidOpCode::DeviatoricM3 => format!("dev({})", args[0]),
+            SolidOpCode::InvariantJ2M3 => format!("J2({})", args[0]),
+            SolidOpCode::InvariantJ3M3 => format!("J3({})", args[0]),
         }
     }
 }
