@@ -32,6 +32,7 @@ pub trait Strategy: Clone + Send + Sync {
     fn on_generation_end(&mut self, _best_mse: f32, _stagnation_counter: usize) {}
     fn on_nuke(&mut self) {}
     fn loss_type(&self) -> LossFunctionType;
+    fn target_type(&self) -> ValueType;
 }
 
 #[derive(Clone)]
@@ -229,5 +230,10 @@ impl Strategy for StaticStrategy {
     #[inline(always)]
     fn loss_type(&self) -> LossFunctionType {
         self.config.loss_type
+    }
+
+    #[inline(always)]
+    fn target_type(&self) -> ValueType {
+        self.config.target_type // ÚJ IMPL
     }
 }

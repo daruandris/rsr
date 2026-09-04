@@ -20,6 +20,8 @@ pub struct Dataset {
     pub feature_flat: Vec<f32x8>,
     /// SIMD-aligned target values (Y).
     pub target_batches: Vec<f32x8>,
+    pub target_mat2_batches: Option<Vec<[f32x8; 4]>>,
+    pub target_mat3_batches: Option<Vec<[f32x8; 9]>>,
     pub num_features: u8,
     pub num_batches: usize,
     pub num_samples: usize,
@@ -158,6 +160,8 @@ impl Dataset {
         Self {
             feature_flat,
             target_batches,
+            target_mat2_batches: None,
+            target_mat3_batches: None,
             num_features,
             num_batches,
             num_samples,
@@ -169,6 +173,116 @@ impl Dataset {
             is_normalized: normalize,
             feature_types,
             extract_scalars: true
+        }
+    }
+
+    pub fn new_mat2(data_x: &[Vec<f32>], data_y: &[[f32; 4]], feature_types: Vec<ValueType>) -> Self {
+        let num_samples = data_x.len();
+        let mut num_features_usize = 0;
+        for t in &feature_types {
+            num_features_usize += match t {
+                ValueType::Float => 1, ValueType::Vec2 => 2, ValueType::Vec3 => 3,
+                ValueType::Mat2 => 4, ValueType::Mat3 => 9, _ => 1,
+            };
+        }
+        let simd_width = 8;
+        let padding = if num_samples % simd_width == 0 { 0 } else { simd_width - (num_samples % simd_width) };
+        let num_batches = (num_samples + padding) / simd_width;
+
+        let mut feature_flat = Vec::with_capacity(num_batches * num_features_usize);
+        let mut target_mat2_batches = Vec::with_capacity(num_batches);
+
+        for i in 0..num_batches {
+            let start = i * simd_width;
+            for f_idx in 0..num_features_usize {
+                feature_flat.push(f32x8::new([
+                    if start < num_samples { data_x[start][f_idx] } else { 0.0 },
+                    if start+1 < num_samples { data_x[start+1][f_idx] } else { 0.0 },
+                    if start+2 < num_samples { data_x[start+2][f_idx] } else { 0.0 },
+                    if start+3 < num_samples { data_x[start+3][f_idx] } else { 0.0 },
+                    if start+4 < num_samples { data_x[start+4][f_idx] } else { 0.0 },
+                    if start+5 < num_samples { data_x[start+5][f_idx] } else { 0.0 },
+                    if start+6 < num_samples { data_x[start+6][f_idx] } else { 0.0 },
+                    if start+7 < num_samples { data_x[start+7][f_idx] } else { 0.0 },
+                ]));
+            }
+            let mut batch_target = [f32x8::splat(0.0); 4];
+            for dim in 0..4 {
+                batch_target[dim] = f32x8::new([
+                    if start < num_samples { data_y[start][dim] } else { 0.0 },
+                    if start+1 < num_samples { data_y[start+1][dim] } else { 0.0 },
+                    if start+2 < num_samples { data_y[start+2][dim] } else { 0.0 },
+                    if start+3 < num_samples { data_y[start+3][dim] } else { 0.0 },
+                    if start+4 < num_samples { data_y[start+4][dim] } else { 0.0 },
+                    if start+5 < num_samples { data_y[start+5][dim] } else { 0.0 },
+                    if start+6 < num_samples { data_y[start+6][dim] } else { 0.0 },
+                    if start+7 < num_samples { data_y[start+7][dim] } else { 0.0 },
+                ]);
+            }
+            target_mat2_batches.push(batch_target);
+        }
+
+        Self {
+            feature_flat, target_batches: vec![], target_mat2_batches: Some(target_mat2_batches),
+            target_mat3_batches: None, num_features: num_features_usize as u8,
+            num_batches, num_samples, feature_means: vec![0.0; num_features_usize],
+            feature_std_devs: vec![1.0; num_features_usize], target_mean: 0.0, target_std_dev: 1.0,
+            target_variance: 1.0, is_normalized: false, feature_types, extract_scalars: false,
+        }
+    }
+
+    pub fn new_mat3(data_x: &[Vec<f32>], data_y: &[[f32; 9]], feature_types: Vec<ValueType>) -> Self {
+        let num_samples = data_x.len();
+        let mut num_features_usize = 0;
+        for t in &feature_types {
+            num_features_usize += match t {
+                ValueType::Float => 1, ValueType::Vec2 => 2, ValueType::Vec3 => 3,
+                ValueType::Mat2 => 4, ValueType::Mat3 => 9, _ => 1,
+            };
+        }
+        let simd_width = 8;
+        let padding = if num_samples % simd_width == 0 { 0 } else { simd_width - (num_samples % simd_width) };
+        let num_batches = (num_samples + padding) / simd_width;
+
+        let mut feature_flat = Vec::with_capacity(num_batches * num_features_usize);
+        let mut target_mat3_batches = Vec::with_capacity(num_batches);
+
+        for i in 0..num_batches {
+            let start = i * simd_width;
+            for f_idx in 0..num_features_usize {
+                feature_flat.push(f32x8::new([
+                    if start < num_samples { data_x[start][f_idx] } else { 0.0 },
+                    if start+1 < num_samples { data_x[start+1][f_idx] } else { 0.0 },
+                    if start+2 < num_samples { data_x[start+2][f_idx] } else { 0.0 },
+                    if start+3 < num_samples { data_x[start+3][f_idx] } else { 0.0 },
+                    if start+4 < num_samples { data_x[start+4][f_idx] } else { 0.0 },
+                    if start+5 < num_samples { data_x[start+5][f_idx] } else { 0.0 },
+                    if start+6 < num_samples { data_x[start+6][f_idx] } else { 0.0 },
+                    if start+7 < num_samples { data_x[start+7][f_idx] } else { 0.0 },
+                ]));
+            }
+            let mut batch_target = [f32x8::splat(0.0); 9];
+            for dim in 0..9 {
+                batch_target[dim] = f32x8::new([
+                    if start < num_samples { data_y[start][dim] } else { 0.0 },
+                    if start+1 < num_samples { data_y[start+1][dim] } else { 0.0 },
+                    if start+2 < num_samples { data_y[start+2][dim] } else { 0.0 },
+                    if start+3 < num_samples { data_y[start+3][dim] } else { 0.0 },
+                    if start+4 < num_samples { data_y[start+4][dim] } else { 0.0 },
+                    if start+5 < num_samples { data_y[start+5][dim] } else { 0.0 },
+                    if start+6 < num_samples { data_y[start+6][dim] } else { 0.0 },
+                    if start+7 < num_samples { data_y[start+7][dim] } else { 0.0 },
+                ]);
+            }
+            target_mat3_batches.push(batch_target);
+        }
+
+        Self {
+            feature_flat, target_batches: vec![], target_mat2_batches: None,
+            target_mat3_batches: Some(target_mat3_batches), num_features: num_features_usize as u8,
+            num_batches, num_samples, feature_means: vec![0.0; num_features_usize],
+            feature_std_devs: vec![1.0; num_features_usize], target_mean: 0.0, target_std_dev: 1.0,
+            target_variance: 1.0, is_normalized: false, feature_types, extract_scalars: false,
         }
     }
 
@@ -368,92 +482,97 @@ impl Dataset {
     /// Get the subset of the data for better performance
     pub fn subset(&self, target_samples: usize) -> Self {
         let samples = target_samples.min(self.num_samples);
-        if samples == self.num_samples {
-            return self.clone();
-        }
+        if samples == self.num_samples { return self.clone(); }
 
         let simd_width = 8;
-        let padding = if samples.is_multiple_of(simd_width) {
-            0
-        } else {
-            simd_width - (samples % simd_width)
-        };
+        let padding = if samples % simd_width == 0 { 0 } else { simd_width - (samples % simd_width) };
         let num_batches = (samples + padding) / simd_width;
 
         let num_features_usize = self.num_features as usize;
         let mut feature_flat = Vec::with_capacity(num_batches * num_features_usize);
-        let mut target_batches = Vec::with_capacity(num_batches);
+        
+        let mut target_batches = if !self.target_batches.is_empty() { Vec::with_capacity(num_batches) } else { vec![] };
+        let mut target_mat2_batches = if self.target_mat2_batches.is_some() { Some(Vec::with_capacity(num_batches)) } else { None };
+        let mut target_mat3_batches = if self.target_mat3_batches.is_some() { Some(Vec::with_capacity(num_batches)) } else { None };
 
         let step = (self.num_samples as f64 - 1.0) / (samples as f64 - 1.0).max(1.0);
-
-        let get_feature_val = |orig_idx: usize, f_idx: usize| -> f32 {
-            if orig_idx >= self.num_samples {
-                return 0.0;
-            }
-            let batch_idx = orig_idx / 8;
-            let lane_idx = orig_idx % 8;
-
-            let vec_val = self.feature_flat[batch_idx * num_features_usize + f_idx];
-            let arr: &[f32; 8] = unsafe { &*(&vec_val as *const _ as *const [f32; 8]) };
-            arr[lane_idx]
-        };
-
-        let get_target_val = |orig_idx: usize| -> f32 {
-            if orig_idx >= self.num_samples {
-                return 0.0;
-            }
-            let batch_idx = orig_idx / 8;
-            let lane_idx = orig_idx % 8;
-
-            let vec_val = self.target_batches[batch_idx];
-            let arr: &[f32; 8] = unsafe { &*(&vec_val as *const _ as *const [f32; 8]) };
-            arr[lane_idx]
-        };
 
         for i in 0..num_batches {
             let start_idx = i * simd_width;
 
+            // ... IDE JÖN A FEATURE KISZEDÉS ...
             for f_idx in 0..num_features_usize {
-                let batch = wide::f32x8::new([
-                    get_feature_val(((start_idx as f64) * step).round() as usize, f_idx),
-                    get_feature_val((((start_idx + 1) as f64) * step).round() as usize, f_idx),
-                    get_feature_val((((start_idx + 2) as f64) * step).round() as usize, f_idx),
-                    get_feature_val((((start_idx + 3) as f64) * step).round() as usize, f_idx),
-                    get_feature_val((((start_idx + 4) as f64) * step).round() as usize, f_idx),
-                    get_feature_val((((start_idx + 5) as f64) * step).round() as usize, f_idx),
-                    get_feature_val((((start_idx + 6) as f64) * step).round() as usize, f_idx),
-                    get_feature_val((((start_idx + 7) as f64) * step).round() as usize, f_idx),
-                ]);
-                feature_flat.push(batch);
+                let mut batch_arr = [0.0; 8];
+                for lane in 0..8 {
+                    let orig_idx = (((start_idx + lane) as f64) * step).round() as usize;
+                    if orig_idx < self.num_samples {
+                        let b_idx = orig_idx / 8;
+                        let l_idx = orig_idx % 8;
+                        let vec_val = self.feature_flat[b_idx * num_features_usize + f_idx];
+                        batch_arr[lane] = unsafe { (*(&vec_val as *const _ as *const [f32; 8]))[l_idx] };
+                    }
+                }
+                feature_flat.push(wide::f32x8::new(batch_arr));
             }
 
-            let target_batch = wide::f32x8::new([
-                get_target_val(((start_idx as f64) * step).round() as usize),
-                get_target_val((((start_idx + 1) as f64) * step).round() as usize),
-                get_target_val((((start_idx + 2) as f64) * step).round() as usize),
-                get_target_val((((start_idx + 3) as f64) * step).round() as usize),
-                get_target_val((((start_idx + 4) as f64) * step).round() as usize),
-                get_target_val((((start_idx + 5) as f64) * step).round() as usize),
-                get_target_val((((start_idx + 6) as f64) * step).round() as usize),
-                get_target_val((((start_idx + 7) as f64) * step).round() as usize),
-            ]);
-            target_batches.push(target_batch);
+            if !self.target_batches.is_empty() {
+                let mut batch_arr = [0.0; 8];
+                for lane in 0..8 {
+                    let orig_idx = (((start_idx + lane) as f64) * step).round() as usize;
+                    if orig_idx < self.num_samples {
+                        let b_idx = orig_idx / 8;
+                        let l_idx = orig_idx % 8;
+                        let vec_val = self.target_batches[b_idx];
+                        batch_arr[lane] = unsafe { (*(&vec_val as *const _ as *const [f32; 8]))[l_idx] };
+                    }
+                }
+                target_batches.push(wide::f32x8::new(batch_arr));
+            }
+
+            if let Some(tb) = &self.target_mat2_batches {
+                let mut mat2_batch = [wide::f32x8::splat(0.0); 4];
+                for dim in 0..4 {
+                    let mut batch_arr = [0.0; 8];
+                    for lane in 0..8 {
+                        let orig_idx = (((start_idx + lane) as f64) * step).round() as usize;
+                        if orig_idx < self.num_samples {
+                            let b_idx = orig_idx / 8;
+                            let l_idx = orig_idx % 8;
+                            let vec_val = tb[b_idx][dim];
+                            batch_arr[lane] = unsafe { (*(&vec_val as *const _ as *const [f32; 8]))[l_idx] };
+                        }
+                    }
+                    mat2_batch[dim] = wide::f32x8::new(batch_arr);
+                }
+                target_mat2_batches.as_mut().unwrap().push(mat2_batch);
+            }
+
+            if let Some(tb) = &self.target_mat3_batches {
+                let mut mat3_batch = [wide::f32x8::splat(0.0); 9];
+                for dim in 0..9 {
+                    let mut batch_arr = [0.0; 8];
+                    for lane in 0..8 {
+                        let orig_idx = (((start_idx + lane) as f64) * step).round() as usize;
+                        if orig_idx < self.num_samples {
+                            let b_idx = orig_idx / 8;
+                            let l_idx = orig_idx % 8;
+                            let vec_val = tb[b_idx][dim];
+                            batch_arr[lane] = unsafe { (*(&vec_val as *const _ as *const [f32; 8]))[l_idx] };
+                        }
+                    }
+                    mat3_batch[dim] = wide::f32x8::new(batch_arr);
+                }
+                target_mat3_batches.as_mut().unwrap().push(mat3_batch);
+            }
         }
 
         Self {
-            feature_flat,
-            target_batches,
-            num_features: self.num_features,
-            num_batches,
-            num_samples: samples,
-            feature_means: self.feature_means.clone(),
-            feature_std_devs: self.feature_std_devs.clone(),
-            target_mean: self.target_mean,
-            target_std_dev: self.target_std_dev,
-            target_variance: self.target_variance,
-            is_normalized: self.is_normalized,
-            feature_types: self.feature_types.clone(),
-            extract_scalars: self.extract_scalars
+            feature_flat, target_batches, target_mat2_batches, target_mat3_batches,
+            num_features: self.num_features, num_batches, num_samples: samples,
+            feature_means: self.feature_means.clone(), feature_std_devs: self.feature_std_devs.clone(),
+            target_mean: self.target_mean, target_std_dev: self.target_std_dev,
+            target_variance: self.target_variance, is_normalized: self.is_normalized,
+            feature_types: self.feature_types.clone(), extract_scalars: self.extract_scalars,
         }
     }
 }

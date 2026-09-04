@@ -11,7 +11,6 @@ use crate::engine::eval::state::{DualVmState, VmState};
 use crate::engine::expr::program::Program;
 use crate::engine::optimize::Parameterized;
 use crate::engine::search::config::LossFunctionType;
-use wide::CmpLt;
 use wide::f32x8;
 
 /// Evaluates a compiled program on a single batch of SIMD features.
@@ -155,7 +154,8 @@ pub fn eval_simd(program: &Program, features: &[f32x8]) -> f32x8 {
 pub fn compute_loss(program: &Program, dataset: &Dataset, loss_type: LossFunctionType) -> f32 {
     match loss_type {
         LossFunctionType::DirectMse => compute_direct_mse(program, dataset),
-        LossFunctionType::YieldSurface => compute_yield_surface_loss(program, dataset),
+        LossFunctionType::TensorMseMat2 => compute_tensor_mat2_mse(program, dataset),
+        LossFunctionType::TensorMseMat3 => compute_tensor_mat3_mse(program, dataset),
     }
 }
 
@@ -195,10 +195,11 @@ pub fn compute_direct_mse(program: &Program, dataset: &Dataset) -> f32 {
 #[inline(always)]
 pub fn compute_loss_with_gradient(program: &Program, dataset: &Dataset, loss_type: LossFunctionType) -> (f32, [f32; 32]) {
     match loss_type {
-        LossFunctionType::DirectMse => compute_direct_mse_with_gradient(program, dataset),
-        LossFunctionType::YieldSurface => {
+        LossFunctionType::DirectMse => {
             compute_direct_mse_with_gradient(program, dataset)
         }
+        LossFunctionType::TensorMseMat2 => (compute_tensor_mat2_mse(program, dataset), [0.0; 32]),
+        LossFunctionType::TensorMseMat3 => (compute_tensor_mat3_mse(program, dataset), [0.0; 32]),
     }
 }
 
@@ -260,64 +261,6 @@ pub fn compute_direct_mse_with_gradient(program: &Program, dataset: &Dataset) ->
     }
 
     (total_mse, final_gradient)
-}
-
-fn compute_yield_surface_loss(program: &Program, dataset: &Dataset) -> f32 {
-    let mut sum_squared_error = f32x8::splat(0.0);
-    let mut convexity_penalty = f32x8::splat(0.0);
-    let num_features = dataset.num_features as usize;
-    let remainder = dataset.num_samples % 8;
-
-    // MEGNÖVELT EPSILON ÉS KISEBB BÜNTETÉS/TOLERANCIA
-    let eps = f32x8::splat(1e-2); // 10^-2 tökéletesen stabil az f32-höz!
-    let penalty_weight = f32x8::splat(1000.0); // Elég nagy, de nem teszi tönkre az algoritmust
-
-    for i in 0..dataset.num_batches {
-        let start = i * num_features;
-        let input_batch = unsafe { dataset.feature_flat.get_unchecked(start..start + num_features) };
-        let target = unsafe { *dataset.target_batches.get_unchecked(i) };
-
-        let prediction = eval_simd(program, input_batch);
-        let mut diff = prediction - target;
-
-        if i % 4 == 0 {
-            let mut batch_plus = [f32x8::splat(0.0); 32];
-            let mut batch_minus = [f32x8::splat(0.0); 32];
-            for j in 0..num_features {
-                batch_plus[j] = input_batch[j];
-                batch_minus[j] = input_batch[j];
-            }
-            batch_plus[0] = input_batch[0] + eps;
-            batch_minus[0] = input_batch[0] - eps;
-
-            // ZSENIÁLIS TRÜKK: Véges differencia az *EGZAKT* első deriváltakból!
-            let dual_plus = eval_simd_dual_feature(program, &batch_plus[..num_features], 0);
-            let dual_minus = eval_simd_dual_feature(program, &batch_minus[..num_features], 0);
-
-            // H_11 = (dPsi_plus - dPsi_minus) / (2 * eps)
-            let h_ii = (dual_plus.grad - dual_minus.grad) / (f32x8::splat(2.0) * eps);
-
-            // Tolerancia a numerikus f32 zajra: csak a durván negatív (konkáv) eseteket büntetjük
-            let is_concave = h_ii.simd_lt(f32x8::splat(-0.01));
-            convexity_penalty += is_concave.blend(penalty_weight, f32x8::splat(0.0));
-        }
-
-        if i == dataset.num_batches - 1 && remainder != 0 {
-            let mut mask = [1.0f32; 8];
-            for j in remainder..8 { mask[j] = 0.0; }
-            let mask_simd = wide::f32x8::new(mask);
-            diff *= mask_simd;
-            convexity_penalty *= mask_simd;
-        }
-
-        sum_squared_error += diff * diff;
-    }
-
-    let mse = sum_squared_error.reduce_add() / (dataset.num_samples as f32);
-    let penalty = convexity_penalty.reduce_add() / (dataset.num_samples as f32);
-
-    let total_loss = mse + penalty;
-    if !total_loss.is_finite() { f32::MAX } else { total_loss }
 }
 
 /// Evaluates a compiled program using forward-mode automatic differentiation.
@@ -605,4 +548,182 @@ pub fn eval_simd_dual_feature(program: &Program, features: &[f32x8], active_feat
     }
     // SAFETY: Az AST garantálja, hogy pontosan 1 lebegőpontos float (ami most egy DualSimd) marad a veremben.
     unsafe { *ctx.stack_f.get_unchecked(0) }
+}
+
+#[inline(always)]
+pub fn eval_simd_mat2(program: &Program, features: &[f32x8]) -> [f32x8; 4] {
+    let mut ctx = VmState::new();
+    let constants = &program.constants;
+
+    for op in &program.code {
+        match op {
+            // Pontosan ugyanaz a betöltés mint a floatnál
+            Instruction::LoadVarF(idx) => unsafe {
+                *ctx.stack_f.get_unchecked_mut(ctx.sp_f) = *features.get_unchecked(*idx as usize);
+                ctx.sp_f += 1;
+            },
+            Instruction::LoadConstF(idx) => unsafe {
+                if let Scalar::Float(val) = constants.get_unchecked(*idx as usize) {
+                    *ctx.stack_f.get_unchecked_mut(ctx.sp_f) = f32x8::splat(*val);
+                }
+                ctx.sp_f += 1;
+            },
+            Instruction::LoadVarM2(idx) => unsafe {
+                let i = *idx as usize;
+                *ctx.stack_m2.get_unchecked_mut(ctx.sp_m2) = [
+                    *features.get_unchecked(i), *features.get_unchecked(i + 1),
+                    *features.get_unchecked(i + 2), *features.get_unchecked(i + 3),
+                ];
+                ctx.sp_m2 += 1;
+            },
+            Instruction::LoadConstM2(idx) => unsafe {
+                if let Scalar::Mat2(val) = constants.get_unchecked(*idx as usize) {
+                    *ctx.stack_m2.get_unchecked_mut(ctx.sp_m2) = [
+                        f32x8::splat(val[0]), f32x8::splat(val[1]),
+                        f32x8::splat(val[2]), f32x8::splat(val[3]),
+                    ];
+                }
+                ctx.sp_m2 += 1;
+            },
+            Instruction::LoadVarM3(idx) => unsafe {
+                let i = *idx as usize;
+                *ctx.stack_m3.get_unchecked_mut(ctx.sp_m3) = [
+                    *features.get_unchecked(i), *features.get_unchecked(i + 1), *features.get_unchecked(i + 2),
+                    *features.get_unchecked(i + 3), *features.get_unchecked(i + 4), *features.get_unchecked(i + 5),
+                    *features.get_unchecked(i + 6), *features.get_unchecked(i + 7), *features.get_unchecked(i + 8),
+                ];
+                ctx.sp_m3 += 1;
+            },
+            Instruction::LoadConstM3(idx) => unsafe {
+                if let Scalar::Mat3(val) = constants.get_unchecked(*idx as usize) {
+                    *ctx.stack_m3.get_unchecked_mut(ctx.sp_m3) = [
+                        f32x8::splat(val[0]), f32x8::splat(val[1]), f32x8::splat(val[2]),
+                        f32x8::splat(val[3]), f32x8::splat(val[4]), f32x8::splat(val[5]),
+                        f32x8::splat(val[6]), f32x8::splat(val[7]), f32x8::splat(val[8]),
+                    ];
+                }
+                ctx.sp_m3 += 1;
+            },
+            _ => crate::SymbolicEngine::eval_single(*op, &mut ctx),
+        }
+    }
+    unsafe { *ctx.stack_m2.get_unchecked(0) }
+}
+
+#[inline(always)]
+pub fn eval_simd_mat3(program: &Program, features: &[f32x8]) -> [f32x8; 9] {
+    let mut ctx = VmState::new();
+    let constants = &program.constants;
+
+    for op in &program.code {
+        match op {
+            // Ugyanaz a másolás...
+            Instruction::LoadVarF(idx) => unsafe {
+                *ctx.stack_f.get_unchecked_mut(ctx.sp_f) = *features.get_unchecked(*idx as usize);
+                ctx.sp_f += 1;
+            },
+            Instruction::LoadConstF(idx) => unsafe {
+                if let Scalar::Float(val) = constants.get_unchecked(*idx as usize) {
+                    *ctx.stack_f.get_unchecked_mut(ctx.sp_f) = f32x8::splat(*val);
+                }
+                ctx.sp_f += 1;
+            },
+            Instruction::LoadVarM2(idx) => unsafe {
+                let i = *idx as usize;
+                *ctx.stack_m2.get_unchecked_mut(ctx.sp_m2) = [
+                    *features.get_unchecked(i), *features.get_unchecked(i + 1),
+                    *features.get_unchecked(i + 2), *features.get_unchecked(i + 3),
+                ];
+                ctx.sp_m2 += 1;
+            },
+            Instruction::LoadConstM2(idx) => unsafe {
+                if let Scalar::Mat2(val) = constants.get_unchecked(*idx as usize) {
+                    *ctx.stack_m2.get_unchecked_mut(ctx.sp_m2) = [
+                        f32x8::splat(val[0]), f32x8::splat(val[1]),
+                        f32x8::splat(val[2]), f32x8::splat(val[3]),
+                    ];
+                }
+                ctx.sp_m2 += 1;
+            },
+            Instruction::LoadVarM3(idx) => unsafe {
+                let i = *idx as usize;
+                *ctx.stack_m3.get_unchecked_mut(ctx.sp_m3) = [
+                    *features.get_unchecked(i), *features.get_unchecked(i + 1), *features.get_unchecked(i + 2),
+                    *features.get_unchecked(i + 3), *features.get_unchecked(i + 4), *features.get_unchecked(i + 5),
+                    *features.get_unchecked(i + 6), *features.get_unchecked(i + 7), *features.get_unchecked(i + 8),
+                ];
+                ctx.sp_m3 += 1;
+            },
+            Instruction::LoadConstM3(idx) => unsafe {
+                if let Scalar::Mat3(val) = constants.get_unchecked(*idx as usize) {
+                    *ctx.stack_m3.get_unchecked_mut(ctx.sp_m3) = [
+                        f32x8::splat(val[0]), f32x8::splat(val[1]), f32x8::splat(val[2]),
+                        f32x8::splat(val[3]), f32x8::splat(val[4]), f32x8::splat(val[5]),
+                        f32x8::splat(val[6]), f32x8::splat(val[7]), f32x8::splat(val[8]),
+                    ];
+                }
+                ctx.sp_m3 += 1;
+            },
+            _ => crate::SymbolicEngine::eval_single(*op, &mut ctx),
+        }
+    }
+    unsafe { *ctx.stack_m3.get_unchecked(0) }
+}
+
+pub fn compute_tensor_mat2_mse(program: &Program, dataset: &Dataset) -> f32 {
+    let mut sum_squared_error = f32x8::splat(0.0);
+    let num_features = dataset.num_features as usize;
+    let targets = dataset.target_mat2_batches.as_ref().unwrap();
+    let remainder = dataset.num_samples % 8;
+
+    for i in 0..dataset.num_batches {
+        let start = i * num_features;
+        let input_batch = unsafe { dataset.feature_flat.get_unchecked(start..start + num_features) };
+        let prediction = eval_simd_mat2(program, input_batch);
+        let target = targets[i];
+
+        let mut batch_sse = f32x8::splat(0.0);
+        for dim in 0..4 {
+            let mut diff = prediction[dim] - target[dim];
+            if i == dataset.num_batches - 1 && remainder != 0 {
+                let mut mask = [1.0f32; 8];
+                for j in remainder..8 { mask[j] = 0.0; }
+                diff *= wide::f32x8::new(mask);
+            }
+            batch_sse += diff * diff;
+        }
+        sum_squared_error += batch_sse;
+    }
+
+    let mse = sum_squared_error.reduce_add() / ((dataset.num_samples * 4) as f32);
+    if !mse.is_finite() { f32::MAX } else { mse }
+}
+
+pub fn compute_tensor_mat3_mse(program: &Program, dataset: &Dataset) -> f32 {
+    let mut sum_squared_error = f32x8::splat(0.0);
+    let num_features = dataset.num_features as usize;
+    let targets = dataset.target_mat3_batches.as_ref().unwrap();
+    let remainder = dataset.num_samples % 8;
+
+    for i in 0..dataset.num_batches {
+        let start = i * num_features;
+        let input_batch = unsafe { dataset.feature_flat.get_unchecked(start..start + num_features) };
+        let prediction = eval_simd_mat3(program, input_batch);
+        let target = targets[i];
+
+        let mut batch_sse = f32x8::splat(0.0);
+        for dim in 0..9 {
+            let mut diff = prediction[dim] - target[dim];
+            if i == dataset.num_batches - 1 && remainder != 0 {
+                let mut mask = [1.0f32; 8];
+                for j in remainder..8 { mask[j] = 0.0; }
+                diff *= wide::f32x8::new(mask);
+            }
+            batch_sse += diff * diff;
+        }
+        sum_squared_error += batch_sse;
+    }
+
+    let mse = sum_squared_error.reduce_add() / ((dataset.num_samples * 9) as f32);
+    if !mse.is_finite() { f32::MAX } else { mse }
 }

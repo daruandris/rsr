@@ -715,7 +715,7 @@ impl Domain for LinalgDomain {
             | LinalgOpCode::MulM3
             | LinalgOpCode::MulM2V2
             | LinalgOpCode::MulM3V3 => format!("({} * {})", args[0], args[1]),
-            LinalgOpCode::InverseM2 | LinalgOpCode::InverseM3 => format!("{}^-1", args[0]),
+            LinalgOpCode::InverseM2 | LinalgOpCode::InverseM3 => format!("Inv({})", args[0]),
             LinalgOpCode::TransposeM2 | LinalgOpCode::TransposeM3 => format!("{}^T", args[0]),
             LinalgOpCode::DetM2 | LinalgOpCode::DetM3 => format!("det({})", args[0]),
             LinalgOpCode::TraceM2 | LinalgOpCode::TraceM3 => format!("tr({})", args[0]),

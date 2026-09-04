@@ -26,8 +26,9 @@ pub fn optimize_individual_constants(
     let mut is_differentiable = true;
     let mut requires_cmaes = false;
 
-    if loss_type == LossFunctionType::YieldSurface {
+    if loss_type == LossFunctionType::TensorMseMat2 ||  loss_type == LossFunctionType::TensorMseMat3 {
         is_differentiable = false;
+        requires_cmaes = true;
     }
 
     // Dinamikus lekérdezés a fában lévő műveletektől

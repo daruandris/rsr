@@ -42,7 +42,7 @@ impl<S: Strategy> Island<S> {
         let mut individuals = Vec::with_capacity(size);
         for _ in 0..size {
             let (ast, constants) = generate_random_ast(
-                ValueType::Float,
+                strategy.target_type(),
                 5,
                 &mut rng,
                 &variable_registry,
@@ -107,7 +107,7 @@ impl<S: Strategy> Island<S> {
                 break;
             }
             let (ast, constants) = generate_random_ast(
-                ValueType::Float,
+                self.strategy.target_type(),
                 5,
                 &mut self.rng,
                 &self.variable_registry,
@@ -189,7 +189,7 @@ impl<S: Strategy> Island<S> {
         self.individuals.push(self.best_individual.clone());
         for _ in 1..pop_size {
             let (ast, constants) = generate_random_ast(
-                ValueType::Float,
+                self.strategy.target_type(),
                 5,
                 &mut self.rng,
                 &self.variable_registry,

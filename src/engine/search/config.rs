@@ -7,8 +7,8 @@ use crate::domains::solid::SolidOpCode;
 pub enum LossFunctionType {
     /// Default Mean Squared Error
     DirectMse,
-    /// MSE + Convexity
-    YieldSurface,
+    TensorMseMat2,
+    TensorMseMat3,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -48,6 +48,7 @@ pub struct Config {
     pub mini_batch_size: usize,
     pub disabled_constant_types: Vec<ValueType>,
     pub loss_type: LossFunctionType,
+    pub target_type: ValueType,
 }
 
 impl Config {
@@ -79,6 +80,7 @@ impl Config {
             mini_batch_size: 64,
             disabled_constant_types: vec![],
             loss_type: LossFunctionType::DirectMse,
+            target_type: ValueType::Float,
         }
     }
 
@@ -154,38 +156,22 @@ impl Config {
         self
     }
 
-    // ==========================================
-    // IPARI FELADAT-SPECIFIKUS PROFILOK (TASK-BASED CONFIGS)
-    // ==========================================
-
-    /// 2. Folyási Felület és Tönkremenetel Felfedezése (Yield Surface Discovery)
+    /// 3. Feszültség-alakváltozás kapcsolat keresése
     /// 
-    /// Cél: f (skalár folyási feltétel) előállítása Sigma (Feszültség) tenzorból.
-    /// Ipar: Fémfeldolgozás, talajmechanika, törésmechanika.
-    /// Szabályok: Feszültség-invariánsokon (J2, von Mises, hidrosztatikus nyomás) alapul.
-    /// Tilos: Kinematikai tenzorok (C, B), izochor invariánsok.
-    pub fn yield_surface() -> Self {
+    /// data_x: F vagy E (Mat3), data_y: sigma vagy P (Mat3)
+    /// target: pl. f(F)=sigma
+    pub fn constitutive_tensor_law_mat2() -> Self {
         let mut config = Self::default(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
-        
+        config.loss_type = LossFunctionType::TensorMseMat2;
+        config.target_type = ValueType::Mat2;
         config.disabled_constant_types = vec![
-            ValueType::Vec2, ValueType::Vec3, ValueType::Mat2];
-        config.loss_type = LossFunctionType::YieldSurface;
-        config.base_parsimony_penalty = 0.00005;
+            ValueType::Vec2, ValueType::Vec3
+        ];
 
         let mut exclusions = vec![
             Instruction::Basic(BasicOpCode::SinF),
             Instruction::Basic(BasicOpCode::CosF),
             Instruction::Basic(BasicOpCode::LnF),
-            Instruction::Basic(BasicOpCode::ExpF),
-            Instruction::Basic(BasicOpCode::DivF),
-            
-            // Folyási felületeknél a bemenet feszültség, így a deformációs 
-            // operátorok (C, B, I1_bar) fizikailag értelmezhetetlenek itt.
-            Instruction::Solid(SolidOpCode::RightCauchyGreenM3),
-            Instruction::Solid(SolidOpCode::LeftCauchyGreenM3),
-            Instruction::Solid(SolidOpCode::IsochoricInvariant1),
-            Instruction::Solid(SolidOpCode::IsochoricInvariant2),
-            Instruction::Solid(SolidOpCode::GreenLagrangeStrainM3),
         ];
 
         // Vektoros operátorok tiltása
@@ -207,15 +193,10 @@ impl Config {
         config
     }
 
-    /// 3. Közvetlen Feszültségtenzor Modellezés (Constitutive Tensor Law)
-    /// 
-    /// Cél: Sigma (Mátrix) előállítása F vagy E (Mátrix) bemenetből.
-    /// Ipar: Anizotróp anyagok, viszkoelaszticitás komplex leírása.
-    /// Szabályok: Szabad mátrix-aritmetika (szorzás, inverz, transzponált).
-    pub fn constitutive_tensor_law() -> Self {
+     pub fn constitutive_tensor_law_mat3() -> Self {
         let mut config = Self::default(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
-
-        // Itt engedélyezhetjük a mátrix konstansokat az anizotrópiához (pl. szálirányok)
+        config.loss_type = LossFunctionType::TensorMseMat3;
+        config.target_type = ValueType::Mat3;
         config.disabled_constant_types = vec![
             ValueType::Vec2, ValueType::Vec3
         ];
