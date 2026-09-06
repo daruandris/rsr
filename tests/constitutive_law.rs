@@ -49,7 +49,6 @@ fn test_law_1_st_venant_kirchhoff() {
         s[4] += lambda * tr_e;
         s[8] += lambda * tr_e;
 
-        // JAVÍTVA: Közvetlenül az [f32; 9] tömböt pusholjuk
         dy.push(s);
     }
 

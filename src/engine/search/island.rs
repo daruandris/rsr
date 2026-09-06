@@ -41,17 +41,26 @@ impl<S: Strategy> Island<S> {
         let mut rng = Xoshiro256PlusPlus::seed_from_u64(seed);
         let mut individuals = Vec::with_capacity(size);
         for _ in 0..size {
-            let (ast, constants) = generate_random_ast(
-                strategy.target_type(),
-                5,
-                &mut rng,
-                &variable_registry,
-                &allowed_ops,
-                strategy.disabled_constant_types(),
-            );
-            let mut ind = Individual::new(ast, constants, strategy.disabled_constant_types().to_vec());
-            ind.simplify();
-            individuals.push(ind);
+            let valid_ind;
+            loop {
+                let (ast, constants) = generate_random_ast(
+                    strategy.target_type(),
+                    5,
+                    &mut rng,
+                    &variable_registry,
+                    &allowed_ops,
+                    strategy.disabled_constant_types(),
+                );
+                let mut ind = Individual::new(ast, constants, strategy.disabled_constant_types().to_vec());
+                ind.simplify();
+                
+                // CSAK AKKOR engedjük be, ha fizikailag valid!
+                if !ind.has_forbidden_patterns() {
+                    valid_ind = ind;
+                    break;
+                }
+            }
+            individuals.push(valid_ind);
         }
 
         let best_individual = individuals[0].clone();
@@ -106,17 +115,26 @@ impl<S: Strategy> Island<S> {
             if self.next_gen_buffer.len() >= pop_size {
                 break;
             }
-            let (ast, constants) = generate_random_ast(
-                self.strategy.target_type(),
-                5,
-                &mut self.rng,
-                &self.variable_registry,
-                &self.allowed_ops,
-                self.strategy.disabled_constant_types(),
-            );
-            let mut ind = Individual::new(ast, constants, self.strategy.disabled_constant_types().to_vec());
-            ind.simplify();
-            self.next_gen_buffer.push(ind);
+            let valid_ind;
+            loop {
+                let (ast, constants) = generate_random_ast(
+                    self.strategy.target_type(),
+                    5,
+                    &mut self.rng,
+                    &self.variable_registry,
+                    &self.allowed_ops,
+                    self.strategy.disabled_constant_types(),
+                );
+                let mut ind = Individual::new(ast, constants, self.strategy.disabled_constant_types().to_vec());
+                ind.simplify();
+                
+                // CSAK AKKOR engedjük be, ha fizikailag valid!
+                if !ind.has_forbidden_patterns() {
+                    valid_ind = ind;
+                    break;
+                }
+            }
+            self.next_gen_buffer.push(valid_ind);
         }
 
         while self.next_gen_buffer.len() < pop_size {
@@ -188,30 +206,39 @@ impl<S: Strategy> Island<S> {
         self.individuals.clear();
         self.individuals.push(self.best_individual.clone());
         for _ in 1..pop_size {
-            let (ast, constants) = generate_random_ast(
-                self.strategy.target_type(),
-                5,
-                &mut self.rng,
-                &self.variable_registry,
-                &self.allowed_ops,
-                self.strategy.disabled_constant_types(),
-            );
-            let mut new_ind = Individual::new(ast, constants, self.strategy.disabled_constant_types().to_vec());
-            new_ind.simplify();
+            let mut valid_ind;
+            loop {
+                let (ast, constants) = generate_random_ast(
+                    self.strategy.target_type(),
+                    5,
+                    &mut self.rng,
+                    &self.variable_registry,
+                    &self.allowed_ops,
+                    self.strategy.disabled_constant_types(),
+                );
+                let mut ind = Individual::new(ast, constants, self.strategy.disabled_constant_types().to_vec());
+                ind.simplify();
+                
+                // CSAK AKKOR engedjük be, ha fizikailag valid!
+                if !ind.has_forbidden_patterns() {
+                    valid_ind = ind;
+                    break;
+                }
+            }
 
-            let mse = new_ind.calculate_loss(dataset, self.strategy.loss_type());
+            let mse = valid_ind.calculate_loss(dataset, self.strategy.loss_type());
 
             if mse.is_finite() {
                 let mse_floor = dataset.target_variance * 0.01;
                 let dynamic_penalty_rate = self.strategy.parsimony_penalty() * 
                     mse.max(mse_floor).max(self.strategy.target_mse());
                 
-                let penalty = (new_ind.complexity() as f32) * dynamic_penalty_rate;
-                new_ind.fitness = mse + penalty;
+                let penalty = (valid_ind.complexity() as f32) * dynamic_penalty_rate;
+                valid_ind.fitness = mse + penalty;
             } else {
-                new_ind.fitness = f32::MAX;
+                valid_ind.fitness = f32::MAX;
             }
-            self.individuals.push(new_ind);
+            self.individuals.push(valid_ind);
         }
         self.stagnation_counter = 0;
     }

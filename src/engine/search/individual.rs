@@ -113,7 +113,225 @@ impl Individual {
         self.nodes.iter().map(|node| node.weight()).sum()
     }
 
+    pub fn has_solid_physics_error(&self) -> bool {
+        #[derive(Clone, Copy, PartialEq)]
+        enum Space { Material, Spatial, Mixed }
+
+        #[derive(Clone, Copy, PartialEq)]
+        enum TensorType {
+            Scalar,
+            Mat3(Space, Space), // (Left Space, Right Space)
+            Other,
+        }
+
+        struct PhysNode {
+            ttype: TensorType,
+            history: u32,
+        }
+
+        // Történeti (history) flagek az egymásba ágyazás megakadályozásához
+        const HIST_KINEMATIC: u32 = 1 << 0; // C, B, E
+        const HIST_DEVIATORIC: u32 = 1 << 1; // dev
+        const HIST_COFACTOR: u32 = 1 << 2; // Cof
+        const HIST_INVERSE: u32 = 1 << 3; // Inv
+        const HIST_TRANSPOSE: u32 = 1 << 4; // Transpose
+        const HIST_INVARIANT: u32 = 1 << 5; // I1, I2, Tr, J2, J3, Det
+
+        let mut stack: Vec<PhysNode> = Vec::with_capacity(32);
+
+        // Két tér akkor illeszthető össze, ha azonosak, vagy valamelyik vegyes (pl. konstans)
+        let spaces_match = |a: Space, b: Space| -> bool {
+            a == b || a == Space::Mixed || b == Space::Mixed
+        };
+
+        for node in &self.nodes {
+            match node {
+                Node::Variable(_, type_id) => {
+                    let ttype = match type_id {
+                        ValueType::Float => TensorType::Scalar,
+                        // Bemeneti F tenzor (Deformation Gradient) tere: (Spatial, Material)
+                        ValueType::Mat3 => TensorType::Mat3(Space::Spatial, Space::Material),
+                        _ => TensorType::Other,
+                    };
+                    stack.push(PhysNode { ttype, history: 0 });
+                }
+                Node::Constant(_, type_id) => {
+                    let ttype = match type_id {
+                        ValueType::Float => TensorType::Scalar,
+                        // Generált konstans tenzor bármely térbe beilleszkedhet
+                        ValueType::Mat3 => TensorType::Mat3(Space::Mixed, Space::Mixed),
+                        _ => TensorType::Other,
+                    };
+                    stack.push(PhysNode { ttype, history: 0 });
+                }
+                Node::Operator(op) => {
+                    let arity = op.arity();
+                    if stack.len() < arity { return true; } // Helytelen AST
+                    
+                    let mut children = Vec::with_capacity(arity);
+                    for _ in 0..arity {
+                        children.push(stack.pop().unwrap());
+                    }
+                    children.reverse();
+
+                    let mut combined_history = 0;
+                    for child in &children {
+                        combined_history |= child.history;
+                    }
+
+                    let mut new_history = combined_history;
+                    let mut res_type = TensorType::Other;
+
+                    match op {
+                        Instruction::Solid(solid_op) => {
+                            use crate::domains::solid::SolidOpCode::*;
+                            match solid_op {
+                                RightCauchyGreenM3 | LeftCauchyGreenM3 | GreenLagrangeStrainM3 => {
+                                    // Tilos másik kinematikai tenzorba, invariánsba, vagy inverzbe tenni
+                                    if (combined_history & (HIST_KINEMATIC | HIST_INVARIANT | HIST_INVERSE)) != 0 {
+                                        return true;
+                                    }
+                                    
+                                    if let TensorType::Mat3(l, r) = children[0].ttype {
+                                        // SZIGORÍTÁS: Ezek az operátorok kizárólag [Spatial, Material] (F-jellegű) tenzoron értelmezettek!
+                                        if !spaces_match(l, Space::Spatial) || !spaces_match(r, Space::Material) {
+                                            return true;
+                                        }
+
+                                        if *solid_op == RightCauchyGreenM3 || *solid_op == GreenLagrangeStrainM3 {
+                                            res_type = TensorType::Mat3(Space::Material, Space::Material); // C és E anyagi tenzorok
+                                        } else {
+                                            res_type = TensorType::Mat3(Space::Spatial, Space::Spatial); // B térbeli tenzor
+                                        }
+                                    } else { 
+                                        return true; 
+                                    }
+                                    new_history |= HIST_KINEMATIC;
+                                }
+                                CofactorM3 => {
+                                    if (combined_history & (HIST_KINEMATIC | HIST_INVARIANT | HIST_INVERSE | HIST_COFACTOR)) != 0 {
+                                        return true;
+                                    }
+                                    if let TensorType::Mat3(l, r) = children[0].ttype {
+                                        res_type = TensorType::Mat3(r, l); // Cofactor felcseréli az indexeket (mint inverz)
+                                    } else { return true; }
+                                    new_history |= HIST_COFACTOR;
+                                }
+                                DeviatoricM3 => {
+                                    // Nem deviátorosítjuk kétszer a tenzort
+                                    if (combined_history & HIST_DEVIATORIC) != 0 { return true; }
+                                    if let TensorType::Mat3(l, r) = children[0].ttype {
+                                        res_type = TensorType::Mat3(l, r); // A dev() a teret békén hagyja
+                                    } else { return true; }
+                                    new_history |= HIST_DEVIATORIC;
+                                }
+                                Invariant2M3 | InvariantJ2M3 | InvariantJ3M3 | TraceSqrM3 => {
+                                    if (combined_history & HIST_INVARIANT) != 0 { return true; }
+                                    if let TensorType::Mat3(l, r) = children[0].ttype {
+                                        // Invariáns képzés csak transzponált szimmetrikus jellegű tenzorokon értelmes (pl M,M)
+                                        if !spaces_match(l, r) { return true; } // F (S,M) invariánsa helytelen
+                                    } else { return true; }
+                                    res_type = TensorType::Scalar;
+                                    new_history |= HIST_INVARIANT;
+                                }
+                                IsochoricInvariant1 | IsochoricInvariant2 => {
+                                    if (combined_history & HIST_INVARIANT) != 0 { return true; }
+                                    if let TensorType::Mat3(l, r) = children[0].ttype {
+                                        // Ezek a függvények F-re (S,M) vannak optimalizálva
+                                        if !spaces_match(l, Space::Spatial) || !spaces_match(r, Space::Material) {
+                                            return true;
+                                        }
+                                    } else { return true; }
+                                    res_type = TensorType::Scalar;
+                                    new_history |= HIST_INVARIANT;
+                                }
+                            }
+                        }
+                        Instruction::Linalg(linalg_op) => {
+                            use crate::domains::linalg::LinalgOpCode::*;
+                            match linalg_op {
+                                AddM3 | SubM3 => {
+                                    if let (TensorType::Mat3(l1, r1), TensorType::Mat3(l2, r2)) = (children[0].ttype, children[1].ttype) {
+                                        // Pl: F + F^T elvérzik itt, mert (S,M) != (M,S)
+                                        if !spaces_match(l1, l2) || !spaces_match(r1, r2) {
+                                            return true; 
+                                        }
+                                        let res_l = if l1 != Space::Mixed { l1 } else { l2 };
+                                        let res_r = if r1 != Space::Mixed { r1 } else { r2 };
+                                        res_type = TensorType::Mat3(res_l, res_r);
+                                    } else { res_type = TensorType::Mat3(Space::Mixed, Space::Mixed); }
+                                }
+                                MulM3 => {
+                                    if let (TensorType::Mat3(l1, r1), TensorType::Mat3(l2, r2)) = (children[0].ttype, children[1].ttype) {
+                                        // Tenzorszorzásnál a belső indexeknek (r1 és l2) stimmelniük kell
+                                        // Pl: F * F elvérzik, mert (S,M) * (S,M) -> M!=S
+                                        if !spaces_match(r1, l2) {
+                                            return true; 
+                                        }
+                                        let res_l = if l1 != Space::Mixed { l1 } else { Space::Mixed }; 
+                                        let res_r = if r2 != Space::Mixed { r2 } else { Space::Mixed }; 
+                                        res_type = TensorType::Mat3(res_l, res_r);
+                                    } else { res_type = TensorType::Mat3(Space::Mixed, Space::Mixed); }
+                                }
+                                ScaleM3 => { res_type = children[1].ttype; }
+                                TransposeM3 => {
+                                    if (combined_history & HIST_TRANSPOSE) != 0 { return true; }
+                                    if let TensorType::Mat3(l, r) = children[0].ttype {
+                                        res_type = TensorType::Mat3(r, l);
+                                    } else { res_type = TensorType::Mat3(Space::Mixed, Space::Mixed); }
+                                    new_history |= HIST_TRANSPOSE;
+                                }
+                                InverseM3 => {
+                                    if (combined_history & (HIST_INVERSE | HIST_KINEMATIC)) != 0 { return true; }
+                                    if let TensorType::Mat3(l, r) = children[0].ttype {
+                                        res_type = TensorType::Mat3(r, l);
+                                    } else { res_type = TensorType::Mat3(Space::Mixed, Space::Mixed); }
+                                    new_history |= HIST_INVERSE;
+                                }
+                                TraceM3 => {
+                                    if (combined_history & HIST_INVARIANT) != 0 { return true; }
+                                    if let TensorType::Mat3(l, r) = children[0].ttype {
+                                        if !spaces_match(l, r) { return true; } // Pl: tr(F) letiltva
+                                    }
+                                    res_type = TensorType::Scalar;
+                                    new_history |= HIST_INVARIANT;
+                                }
+                                DetM3 => {
+                                    if (combined_history & HIST_INVARIANT) != 0 { return true; }
+                                    res_type = TensorType::Scalar;
+                                    new_history |= HIST_INVARIANT;
+                                }
+                                _ => {
+                                    res_type = match op.return_type() {
+                                        ValueType::Float => TensorType::Scalar,
+                                        ValueType::Mat3 => TensorType::Mat3(Space::Mixed, Space::Mixed),
+                                        _ => TensorType::Other,
+                                    };
+                                }
+                            }
+                        }
+                        _ => {
+                            res_type = match op.return_type() {
+                                ValueType::Float => TensorType::Scalar,
+                                ValueType::Mat3 => TensorType::Mat3(Space::Mixed, Space::Mixed),
+                                _ => TensorType::Other,
+                            };
+                        }
+                    }
+                    stack.push(PhysNode { ttype: res_type, history: new_history });
+                }
+            }
+        }
+        false
+    }
+
     pub fn has_forbidden_patterns(&self) -> bool {
+        // Hívjuk meg a fizikai engine-t. Ha nem Solid domaint futtatsz (pl Navier-Stokes),
+        // ezt az if ágat elég kikommentezni/konfigurációhoz kötni.
+        if self.has_solid_physics_error() {
+            return true;
+        }
+
         const FLAG_TRIG: u16 = 1 << 0;
         const FLAG_EXP: u16 = 1 << 1;
         const FLAG_LN: u16 = 1 << 2;
@@ -121,17 +339,13 @@ impl Individual {
         const FLAG_TRANSPOSE: u16 = 1 << 4;
         const FLAG_INVERSE: u16 = 1 << 5;
         const FLAG_DET: u16 = 1 << 6;
-        
-        // ÚJ: Szétválasztott Solid flagek a fizikai hierarchia alapján
-        const FLAG_SOLID_KINEMATIC: u16 = 1 << 7; // C, B, (és ide értendő a Cofactor is, ha van neki külön Solid op-ja)
-        const FLAG_SOLID_INVARIANT: u16 = 1 << 8; // I1, I2, Tr, J
 
         let mut stack: Vec<u16> = Vec::with_capacity(32);
 
         for node in &self.nodes {
             match node {
                 Node::Variable(_, _) | Node::Constant(_, _) => {
-                    stack.push(0); // Alapváltozó, tiszta
+                    stack.push(0);
                 }
                 Node::Operator(op) => {
                     let arity = op.arity();
@@ -141,57 +355,10 @@ impl Individual {
 
                     let mut child_flags = 0;
                     for _ in 0..arity {
-                        // Az összeadás/szorzás operátorok itt szépen egyesítik (OR) a gyerekeik flagjeit!
                         child_flags |= stack.pop().unwrap();
                     }
 
                     match op {
-                        Instruction::Solid(solid_op) => {
-                            use crate::domains::solid::SolidOpCode::*;
-                            match solid_op {
-                                // 1. KINEMATIKAI TENZOROK (C, B)
-                                // Ezeket csak nyers F-ből (vagy max transzponáltjából) szabad képezni.
-                                RightCauchyGreenM3 | LeftCauchyGreenM3 => {
-                                    // TILTÁS: Ne csináljunk C-t/B-t másik C-ből/B-ből, Invariánsból, vagy INVERZBŐL!
-                                    if (child_flags & (FLAG_SOLID_KINEMATIC | FLAG_SOLID_INVARIANT | FLAG_INVERSE)) != 0 {
-                                        return true;
-                                    }
-                                    stack.push(child_flags | FLAG_SOLID_KINEMATIC);
-                                }
-                                
-                                // 2. INVARIÁNSOK (I1, I2, Trace)
-                                // Ezek skalárok. Tilos őket egymásba ágyazni!
-                                Invariant2M3 | TraceSqrM3 => {
-                                    // TILTÁS: Invariáns belsejében ne legyen másik Invariáns vagy Determináns
-                                    if (child_flags & (FLAG_SOLID_INVARIANT | FLAG_DET)) != 0 {
-                                        return true;
-                                    }
-                                    stack.push(child_flags | FLAG_SOLID_INVARIANT);
-                                }
-                                
-                                // 3. DEVIATORIKUS RÉSZ
-                                DeviatoricM3 => {
-                                    // Tilos kétszer deviátorosítani, vagy invariánst deviátorosítani (mivel az skalár)
-                                    if (child_flags & FLAG_SOLID_INVARIANT) != 0 {
-                                        return true;
-                                    }
-                                    stack.push(child_flags | FLAG_SOLID_KINEMATIC); // Ez továbbra is tenzor marad
-                                }
-                                
-                                // Ha van nálad külön Cofactor operátor a Solid-ban:
-                                CofactorM3 => {
-                                //     // TILTÁS: Kofaktort inverzből, invariánsból, másik kinematikai tenzorból nem csinálunk!
-                                     if (child_flags & (FLAG_SOLID_KINEMATIC | FLAG_SOLID_INVARIANT | FLAG_INVERSE)) != 0 {
-                                         return true;
-                                     }
-                                     stack.push(child_flags | FLAG_SOLID_KINEMATIC);
-                                }
-
-                                _ => {
-                                    stack.push(child_flags);
-                                }
-                            }
-                        }
                         Instruction::Basic(basic_op) => match basic_op {
                             BasicOpCode::SinF | BasicOpCode::CosF => {
                                 if (child_flags & (FLAG_TRIG | FLAG_EXP | FLAG_LN)) != 0 { return true; }
@@ -209,7 +376,6 @@ impl Individual {
                                 if (child_flags & (FLAG_POWER | FLAG_TRIG | FLAG_LN | FLAG_EXP)) != 0 { return true; }
                                 stack.push(child_flags | FLAG_POWER);
                             }
-                            // HA VAN ADD / MUL / SUB, azok ide jönnek (gondolom, csak passzolják a child_flags-et)
                             _ => stack.push(child_flags),
                         },
                         Instruction::Linalg(linalg_op) => match linalg_op {
@@ -218,14 +384,12 @@ impl Individual {
                                 stack.push(child_flags | FLAG_TRANSPOSE);
                             }
                             LinalgOpCode::InverseM2 | LinalgOpCode::InverseM3 => {
-                                // Ne invertáljunk már meglevő kinematikai tenzort (C, B), vagy másik inverzt!
-                                if (child_flags & (FLAG_INVERSE | FLAG_SOLID_KINEMATIC)) != 0 { return true; }
+                                if (child_flags & FLAG_INVERSE) != 0 { return true; }
                                 stack.push(child_flags | FLAG_INVERSE);
                             }
                             LinalgOpCode::DetM2 | LinalgOpCode::DetM3 => {
-                                // Det(Det) tilos, Det(Trace) tilos.
-                                if (child_flags & (FLAG_DET | FLAG_SOLID_INVARIANT)) != 0 { return true; }
-                                stack.push(child_flags | FLAG_DET); // Ez skalárként viselkedik, úgyhogy Invariant kategória felé hajlik
+                                if (child_flags & FLAG_DET) != 0 { return true; }
+                                stack.push(child_flags | FLAG_DET);
                             }
                             _ => stack.push(child_flags),
                         },
