@@ -4,6 +4,7 @@
 //! the underlying genetic engine and configuration into an easy-to-use API.
 
 use crate::engine::data::dataset::Dataset;
+use crate::engine::expr::program::Program;
 use crate::engine::search::config::{Config, OpModule};
 use crate::engine::search::engine::Engine;
 use crate::engine::search::strategy::{StaticStrategy, Strategy};
@@ -36,10 +37,16 @@ pub struct SymbolicRegressor {
 pub struct FitResult {
     /// The final simplified mathematical equation as a string (e.g., `"2.5 * x + sin(y)"`).
     pub equation: String,
-    /// The Mean Squared Error of the best equation found.
+    /// The Mean Squared Error of the best equation found (scaled to the normalized data).
     pub mse: f32,
+    /// The unnormalized, raw Mean Squared Error of the best equation found.
+    pub clear_mse: f32,
     /// The complexity score of the equation (sum of the weights of its nodes).
     pub complexity: usize,
+    /// The Pareto front containing the best equations found at each complexity level.
+    pub pareto_front: Vec<ParetoEntry>,
+    /// The compiled program of the best equation, used for post-evaluations (e.g., plotting).
+    pub program: Option<Program>,
 }
 
 impl SymbolicRegressor {
@@ -145,6 +152,7 @@ impl SymbolicRegressor {
                 self.config.mini_batch_size
             );
         }
+        
         let strategy = StaticStrategy::new(self.config.clone(), full_dataset.target_variance);
         let allowed_ops = strategy.get_allowed_operators();
 
@@ -159,12 +167,36 @@ impl SymbolicRegressor {
 
         let mut best = engine.get_global_best().clone();
         let final_mse = best.calculate_loss(full_dataset, self.config.loss_type);
+        let clear_mse = final_mse * full_dataset.target_variance;
         let clean_eq = crate::engine::ffi::symengine::simplify_symengine(&best.to_string());
+
+        let mut pareto_front = Vec::new();
+        for (comp, mse, ind) in engine.get_pareto_front() {
+            let eq_str = crate::engine::ffi::symengine::simplify_symengine(&ind.to_string());
+            pareto_front.push(ParetoEntry {
+                equation: eq_str,
+                mse,
+                clear_mse: mse * full_dataset.target_variance,
+                complexity: comp,
+            });
+        }
 
         FitResult {
             equation: clean_eq,
             mse: final_mse,
+            clear_mse,
             complexity: best.complexity(),
+            pareto_front,
+            program: best.program.clone(),
         }
     }
+}
+
+/// A Pareto-front egyetlen eleme
+#[derive(Clone, Debug)]
+pub struct ParetoEntry {
+    pub equation: String,
+    pub mse: f32,
+    pub clear_mse: f32,
+    pub complexity: usize,
 }
