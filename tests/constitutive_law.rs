@@ -53,7 +53,7 @@ fn test_law_1_st_venant_kirchhoff() {
         dy.push(s);
     }
 
-    let dataset = Dataset::new_mat3(&dx, &dy, vec![ValueType::Mat3, ValueType::Mat3]);
+    let dataset = Dataset::new_mat3(&dx, &dy, vec![ValueType::Mat3]);
     
     let mut config = Config::constitutive_tensor_law_mat3();
     config.max_generations = 5000;

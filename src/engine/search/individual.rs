@@ -121,15 +121,17 @@ impl Individual {
         const FLAG_TRANSPOSE: u16 = 1 << 4;
         const FLAG_INVERSE: u16 = 1 << 5;
         const FLAG_DET: u16 = 1 << 6;
-        const FLAG_SOLID_CB: u16 = 1 << 7;
-        const FLAG_SOLID_OTHER: u16 = 1 << 8;
+        
+        // ÚJ: Szétválasztott Solid flagek a fizikai hierarchia alapján
+        const FLAG_SOLID_KINEMATIC: u16 = 1 << 7; // C, B, (és ide értendő a Cofactor is, ha van neki külön Solid op-ja)
+        const FLAG_SOLID_INVARIANT: u16 = 1 << 8; // I1, I2, Tr, J
 
         let mut stack: Vec<u16> = Vec::with_capacity(32);
 
         for node in &self.nodes {
             match node {
                 Node::Variable(_, _) | Node::Constant(_, _) => {
-                    stack.push(0);
+                    stack.push(0); // Alapváltozó, tiszta
                 }
                 Node::Operator(op) => {
                     let arity = op.arity();
@@ -139,6 +141,7 @@ impl Individual {
 
                     let mut child_flags = 0;
                     for _ in 0..arity {
+                        // Az összeadás/szorzás operátorok itt szépen egyesítik (OR) a gyerekeik flagjeit!
                         child_flags |= stack.pop().unwrap();
                     }
 
@@ -146,81 +149,83 @@ impl Individual {
                         Instruction::Solid(solid_op) => {
                             use crate::domains::solid::SolidOpCode::*;
                             match solid_op {
+                                // 1. KINEMATIKAI TENZOROK (C, B)
+                                // Ezeket csak nyers F-ből (vagy max transzponáltjából) szabad képezni.
                                 RightCauchyGreenM3 | LeftCauchyGreenM3 => {
-                                    if (child_flags & (FLAG_SOLID_CB | FLAG_SOLID_OTHER)) != 0 {
+                                    // TILTÁS: Ne csináljunk C-t/B-t másik C-ből/B-ből, Invariánsból, vagy INVERZBŐL!
+                                    if (child_flags & (FLAG_SOLID_KINEMATIC | FLAG_SOLID_INVARIANT | FLAG_INVERSE)) != 0 {
                                         return true;
                                     }
-                                    stack.push(child_flags | FLAG_SOLID_CB);
+                                    stack.push(child_flags | FLAG_SOLID_KINEMATIC);
                                 }
-                                Invariant2M3 => {
-                                    if (child_flags & FLAG_SOLID_OTHER) != 0 {
+                                
+                                // 2. INVARIÁNSOK (I1, I2, Trace)
+                                // Ezek skalárok. Tilos őket egymásba ágyazni!
+                                Invariant2M3 | TraceSqrM3 => {
+                                    // TILTÁS: Invariáns belsejében ne legyen másik Invariáns vagy Determináns
+                                    if (child_flags & (FLAG_SOLID_INVARIANT | FLAG_DET)) != 0 {
                                         return true;
                                     }
-                                    stack.push(child_flags | FLAG_SOLID_OTHER);
+                                    stack.push(child_flags | FLAG_SOLID_INVARIANT);
                                 }
-                                TraceSqrM3 => {
-                                    stack.push(child_flags | FLAG_SOLID_OTHER);
-                                }
+                                
+                                // 3. DEVIATORIKUS RÉSZ
                                 DeviatoricM3 => {
-                                    stack.push(child_flags | FLAG_SOLID_OTHER);
-                                }
-                                _ => {
-                                    if (child_flags & (FLAG_SOLID_CB | FLAG_SOLID_OTHER)) != 0 {
+                                    // Tilos kétszer deviátorosítani, vagy invariánst deviátorosítani (mivel az skalár)
+                                    if (child_flags & FLAG_SOLID_INVARIANT) != 0 {
                                         return true;
                                     }
-                                    stack.push(child_flags | FLAG_SOLID_OTHER);
+                                    stack.push(child_flags | FLAG_SOLID_KINEMATIC); // Ez továbbra is tenzor marad
+                                }
+                                
+                                // Ha van nálad külön Cofactor operátor a Solid-ban:
+                                CofactorM3 => {
+                                //     // TILTÁS: Kofaktort inverzből, invariánsból, másik kinematikai tenzorból nem csinálunk!
+                                     if (child_flags & (FLAG_SOLID_KINEMATIC | FLAG_SOLID_INVARIANT | FLAG_INVERSE)) != 0 {
+                                         return true;
+                                     }
+                                     stack.push(child_flags | FLAG_SOLID_KINEMATIC);
+                                }
+
+                                _ => {
+                                    stack.push(child_flags);
                                 }
                             }
                         }
                         Instruction::Basic(basic_op) => match basic_op {
                             BasicOpCode::SinF | BasicOpCode::CosF => {
-                                if (child_flags & (FLAG_TRIG | FLAG_EXP | FLAG_LN)) != 0 {
-                                    return true;
-                                }
+                                if (child_flags & (FLAG_TRIG | FLAG_EXP | FLAG_LN)) != 0 { return true; }
                                 stack.push(child_flags | FLAG_TRIG);
                             }
                             BasicOpCode::ExpF => {
-                                if (child_flags & (FLAG_TRIG | FLAG_EXP | FLAG_LN | FLAG_POWER))
-                                    != 0
-                                {
-                                    return true;
-                                }
+                                if (child_flags & (FLAG_TRIG | FLAG_EXP | FLAG_LN | FLAG_POWER)) != 0 { return true; }
                                 stack.push(child_flags | FLAG_EXP);
                             }
                             BasicOpCode::LnF => {
-                                if (child_flags & (FLAG_TRIG | FLAG_EXP | FLAG_LN)) != 0 {
-                                    return true;
-                                }
+                                if (child_flags & (FLAG_TRIG | FLAG_EXP | FLAG_LN)) != 0 { return true; }
                                 stack.push(child_flags | FLAG_LN);
                             }
                             BasicOpCode::SqrtF | BasicOpCode::SqrF => {
-                                if (child_flags & (FLAG_POWER | FLAG_TRIG | FLAG_LN | FLAG_EXP))
-                                    != 0
-                                {
-                                    return true;
-                                }
+                                if (child_flags & (FLAG_POWER | FLAG_TRIG | FLAG_LN | FLAG_EXP)) != 0 { return true; }
                                 stack.push(child_flags | FLAG_POWER);
                             }
+                            // HA VAN ADD / MUL / SUB, azok ide jönnek (gondolom, csak passzolják a child_flags-et)
                             _ => stack.push(child_flags),
                         },
                         Instruction::Linalg(linalg_op) => match linalg_op {
                             LinalgOpCode::TransposeM2 | LinalgOpCode::TransposeM3 => {
-                                if (child_flags & FLAG_TRANSPOSE) != 0 {
-                                    return true;
-                                }
+                                if (child_flags & FLAG_TRANSPOSE) != 0 { return true; }
                                 stack.push(child_flags | FLAG_TRANSPOSE);
                             }
                             LinalgOpCode::InverseM2 | LinalgOpCode::InverseM3 => {
-                                if (child_flags & FLAG_INVERSE) != 0 {
-                                    return true;
-                                }
+                                // Ne invertáljunk már meglevő kinematikai tenzort (C, B), vagy másik inverzt!
+                                if (child_flags & (FLAG_INVERSE | FLAG_SOLID_KINEMATIC)) != 0 { return true; }
                                 stack.push(child_flags | FLAG_INVERSE);
                             }
                             LinalgOpCode::DetM2 | LinalgOpCode::DetM3 => {
-                                if (child_flags & FLAG_DET) != 0 {
-                                    return true;
-                                }
-                                stack.push(child_flags | FLAG_DET);
+                                // Det(Det) tilos, Det(Trace) tilos.
+                                if (child_flags & (FLAG_DET | FLAG_SOLID_INVARIANT)) != 0 { return true; }
+                                stack.push(child_flags | FLAG_DET); // Ez skalárként viselkedik, úgyhogy Invariant kategória felé hajlik
                             }
                             _ => stack.push(child_flags),
                         },

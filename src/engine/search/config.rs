@@ -1,7 +1,6 @@
 use crate::{Instruction, ValueType};
 use crate::domains::basic::BasicOpCode;
 use crate::domains::linalg::LinalgOpCode;
-use crate::domains::solid::SolidOpCode;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum LossFunctionType {
@@ -171,7 +170,6 @@ impl Config {
         let mut exclusions = vec![
             Instruction::Basic(BasicOpCode::SinF),
             Instruction::Basic(BasicOpCode::CosF),
-            Instruction::Basic(BasicOpCode::LnF),
         ];
 
         // Vektoros operátorok tiltása
@@ -198,13 +196,13 @@ impl Config {
         config.loss_type = LossFunctionType::TensorMseMat3;
         config.target_type = ValueType::Mat3;
         config.disabled_constant_types = vec![
-            ValueType::Vec2, ValueType::Vec3
+            ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3, 
         ];
+        config.base_parsimony_penalty = 0.00005;
 
         let mut exclusions = vec![
             Instruction::Basic(BasicOpCode::SinF),
             Instruction::Basic(BasicOpCode::CosF),
-            Instruction::Basic(BasicOpCode::LnF),
         ];
 
         // Vektoros operátorok tiltása
