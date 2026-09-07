@@ -65,6 +65,12 @@ fn test_law_1_st_venant_kirchhoff() {
     let start_time = Instant::now();
     let result = regressor.fit(&dataset);
     let time_ms = start_time.elapsed().as_millis() as u64;
+
+    result.plot_solid(&dataset, PlotConfig {
+        output_path: "biaxial_eredmeny.png".to_string(),
+        mode: SolidPlotMode::UniaxialTension,
+        max_points: 300,
+    }).expect("Nem sikerült a diagramot kimenteni!");
     
     common::update_history("Tensor_StVenant", result.mse, time_ms);
     println!("MSE = {:.8}, Time = {}ms\nEquation: {}\n", result.mse, time_ms, result.equation);

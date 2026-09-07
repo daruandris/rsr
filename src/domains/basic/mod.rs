@@ -176,7 +176,6 @@ impl Domain for BasicDomain {
                 BasicOpCode::ExpF
                     | BasicOpCode::SinF
                     | BasicOpCode::CosF
-                    | BasicOpCode::SqrF
                     | BasicOpCode::LnF
             ),
             BasicOpCode::SqrtF => matches!(

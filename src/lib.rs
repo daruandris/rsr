@@ -39,6 +39,7 @@ pub mod domains;
 pub mod engine;
 
 pub mod api;
+pub mod plot;
 pub mod prelude;
 
 crate::compose_engine!(

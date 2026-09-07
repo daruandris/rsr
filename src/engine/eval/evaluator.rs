@@ -156,6 +156,7 @@ pub fn compute_loss(program: &Program, dataset: &Dataset, loss_type: LossFunctio
         LossFunctionType::DirectMse => compute_direct_mse(program, dataset),
         LossFunctionType::TensorMseMat2 => compute_tensor_mat2_mse(program, dataset),
         LossFunctionType::TensorMseMat3 => compute_tensor_mat3_mse(program, dataset),
+        LossFunctionType::PlanarBiaxialMse => compute_planar_biaxial_mse(program, dataset), // ÚJ
     }
 }
 
@@ -199,7 +200,8 @@ pub fn compute_loss_with_gradient(program: &Program, dataset: &Dataset, loss_typ
             compute_direct_mse_with_gradient(program, dataset)
         }
         LossFunctionType::TensorMseMat2 => (compute_tensor_mat2_mse(program, dataset), [0.0; 32]),
-        LossFunctionType::TensorMseMat3 => (compute_tensor_mat3_mse(program, dataset), [0.0; 32]),
+        LossFunctionType::TensorMseMat3 => compute_tensor_mat3_mse_with_gradient(program, dataset),
+        LossFunctionType::PlanarBiaxialMse => compute_planar_biaxial_mse_with_gradient(program, dataset), // ÚJ
     }
 }
 
@@ -726,4 +728,324 @@ pub fn compute_tensor_mat3_mse(program: &Program, dataset: &Dataset) -> f32 {
 
     let mse = sum_squared_error.reduce_add() / ((dataset.num_samples * 9) as f32);
     if !mse.is_finite() { f32::MAX } else { mse }
+}
+
+/// Kiszámítja az MSE-t (itt MAE-re állítva) és a gradienst a Mat3 kimenetekhez
+pub fn compute_tensor_mat3_mse_with_gradient(program: &Program, dataset: &Dataset) -> (f32, [f32; 32]) {
+    let mut sum_squared_error = f32x8::splat(0.0);
+    let mut grad_sum = [f32x8::splat(0.0); 32];
+
+    let num_features = dataset.num_features as usize;
+    let flat_features = &dataset.feature_flat;
+    let targets = dataset.target_mat3_batches.as_ref().unwrap();
+    
+    let active_params_count = program.param_count().min(32);
+
+    if active_params_count == 0 {
+        return (compute_tensor_mat3_mse(program, dataset), [0.0; 32]);
+    }
+
+    let remainder = dataset.num_samples % 8;
+
+    for i in 0..dataset.num_batches {
+        let start = i * num_features;
+        let input_batch = unsafe { flat_features.get_unchecked(start..start + num_features) };
+        let target = targets[i];
+
+        for k in 0..active_params_count {
+            let prediction_dual = eval_simd_dual_mat3(program, input_batch, k);
+
+            let mut batch_sse = f32x8::splat(0.0);
+            let mut batch_grad = f32x8::splat(0.0);
+
+            for dim in 0..9 {
+                let mut diff_val = prediction_dual[dim].val - target[dim];
+                let mut mask = f32x8::splat(1.0);
+
+                if i == dataset.num_batches - 1 && remainder != 0 {
+                    let mut m_arr = [1.0f32; 8];
+                    for j in remainder..8 {
+                        m_arr[j] = 0.0;
+                    }
+                    mask = wide::f32x8::new(m_arr);
+                    diff_val *= mask;
+                }
+
+                if k == 0 {
+                    // MAE hiba gyűjtése
+                    batch_sse += diff_val * diff_val;
+                }
+
+                batch_grad += f32x8::splat(2.0) * diff_val * prediction_dual[dim].grad * mask;
+            }
+
+            if k == 0 {
+                sum_squared_error += batch_sse;
+            }
+            grad_sum[k] += batch_grad;
+        }
+    }
+
+    let num_samples_f32 = dataset.num_samples as f32;
+    let total_mse = sum_squared_error.reduce_add() / (num_samples_f32 * 9.0);
+
+    if !total_mse.is_finite() {
+        return (f32::MAX, [0.0; 32]);
+    }
+
+    let mut final_gradient = [0.0f32; 32];
+    for k in 0..active_params_count {
+        final_gradient[k] = grad_sum[k].reduce_add() / (num_samples_f32 * 9.0);
+    }
+
+    (total_mse, final_gradient)
+}
+
+/// Dual-SIMD kiértékelő a Mat3 kimenetekhez. 
+/// Teljesen megegyezik az `eval_simd_dual` kóddal, csak a végén a stack_m3-at adja vissza.
+#[inline(always)]
+pub fn eval_simd_dual_mat3(program: &Program, features: &[f32x8], active_const_idx: usize) -> [DualSimd; 9] {
+    let mut ctx = DualVmState::new();
+    let constants = &program.constants;
+
+    let get_flat_start_idx = |target_c_idx: usize| -> usize {
+        let mut flat_idx = 0;
+        for c in constants.iter().take(target_c_idx) {
+            flat_idx += match c {
+                Scalar::Float(_) => 1, Scalar::Vec2(_) => 2, Scalar::Vec3(_) => 3,
+                Scalar::Mat2(_) => 4, Scalar::Mat3(_) => 9, _ => 0,
+            };
+        }
+        flat_idx
+    };
+
+    let get_grad = |flat_idx: usize| -> f32x8 {
+        if flat_idx == active_const_idx { f32x8::splat(1.0) } else { f32x8::splat(0.0) }
+    };
+
+    for op in &program.code {
+        match op {
+            Instruction::LoadVarF(idx) =>
+            // SAFETY: AST guarantees `idx` is within dataset bounds.
+            unsafe {
+                *ctx.stack_f.get_unchecked_mut(ctx.sp_f) =
+                    DualSimd::constant(*features.get_unchecked(*idx as usize));
+                ctx.sp_f += 1;
+            },
+            Instruction::LoadConstF(idx) =>
+            // SAFETY: Constant loading respects bounds checked at compile time.
+            unsafe {
+                if let Scalar::Float(val) = constants.get_unchecked(*idx as usize) {
+                    let flat_idx = get_flat_start_idx(*idx as usize);
+                    *ctx.stack_f.get_unchecked_mut(ctx.sp_f) =
+                        DualSimd::new(f32x8::splat(*val), get_grad(flat_idx));
+                }
+                ctx.sp_f += 1;
+            },
+            Instruction::LoadVarV2(idx) =>
+            // SAFETY: Layout is ensured by feature vector limits.
+            unsafe {
+                let i = *idx as usize;
+                *ctx.stack_v2.get_unchecked_mut(ctx.sp_v2) = [
+                    DualSimd::constant(*features.get_unchecked(i)),
+                    DualSimd::constant(*features.get_unchecked(i + 1)),
+                ];
+                ctx.sp_v2 += 1;
+            },
+            Instruction::LoadConstV2(idx) =>
+            // SAFETY: Layout is ensured by constant array mapping.
+            unsafe {
+                if let Scalar::Vec2(val) = constants.get_unchecked(*idx as usize) {
+                    let flat_idx = get_flat_start_idx(*idx as usize);
+                    *ctx.stack_v2.get_unchecked_mut(ctx.sp_v2) = [
+                        DualSimd::new(f32x8::splat(val[0]), get_grad(flat_idx)),
+                        DualSimd::new(f32x8::splat(val[1]), get_grad(flat_idx + 1)),
+                    ];
+                }
+                ctx.sp_v2 += 1;
+            },
+            Instruction::LoadVarV3(idx) =>
+            // SAFETY: Stack and dataset boundary checks verified during AST load.
+            unsafe {
+                let i = *idx as usize;
+                *ctx.stack_v3.get_unchecked_mut(ctx.sp_v3) = [
+                    DualSimd::constant(*features.get_unchecked(i)),
+                    DualSimd::constant(*features.get_unchecked(i + 1)),
+                    DualSimd::constant(*features.get_unchecked(i + 2)),
+                ];
+                ctx.sp_v3 += 1;
+            },
+            Instruction::LoadConstV3(idx) =>
+            // SAFETY: Verifed continuous block load for constant components.
+            unsafe {
+                if let Scalar::Vec3(val) = constants.get_unchecked(*idx as usize) {
+                    let flat_idx = get_flat_start_idx(*idx as usize);
+                    *ctx.stack_v3.get_unchecked_mut(ctx.sp_v3) = [
+                        DualSimd::new(f32x8::splat(val[0]), get_grad(flat_idx)),
+                        DualSimd::new(f32x8::splat(val[1]), get_grad(flat_idx + 1)),
+                        DualSimd::new(f32x8::splat(val[2]), get_grad(flat_idx + 2)),
+                    ];
+                }
+                ctx.sp_v3 += 1;
+            },
+            Instruction::LoadVarM2(idx) =>
+            // SAFETY: Linear dataset boundaries allow for safe matrix data fetch.
+            unsafe {
+                let i = *idx as usize;
+                *ctx.stack_m2.get_unchecked_mut(ctx.sp_m2) = [
+                    DualSimd::constant(*features.get_unchecked(i)),
+                    DualSimd::constant(*features.get_unchecked(i + 1)),
+                    DualSimd::constant(*features.get_unchecked(i + 2)),
+                    DualSimd::constant(*features.get_unchecked(i + 3)),
+                ];
+                ctx.sp_m2 += 1;
+            },
+            Instruction::LoadConstM2(idx) =>
+            // SAFETY: Verified contiguous fetch from registered constants.
+            unsafe {
+                if let Scalar::Mat2(val) = constants.get_unchecked(*idx as usize) {
+                    let flat_idx = get_flat_start_idx(*idx as usize);
+                    *ctx.stack_m2.get_unchecked_mut(ctx.sp_m2) = [
+                        DualSimd::new(f32x8::splat(val[0]), get_grad(flat_idx)),
+                        DualSimd::new(f32x8::splat(val[1]), get_grad(flat_idx + 1)),
+                        DualSimd::new(f32x8::splat(val[2]), get_grad(flat_idx + 2)),
+                        DualSimd::new(f32x8::splat(val[3]), get_grad(flat_idx + 3)),
+                    ];
+                }
+                ctx.sp_m2 += 1;
+            },
+            Instruction::LoadVarM3(idx) =>
+            // SAFETY: Bounds verified before structural compilation.
+            unsafe {
+                let i = *idx as usize;
+                *ctx.stack_m3.get_unchecked_mut(ctx.sp_m3) = [
+                    DualSimd::constant(*features.get_unchecked(i)),
+                    DualSimd::constant(*features.get_unchecked(i + 1)),
+                    DualSimd::constant(*features.get_unchecked(i + 2)),
+                    DualSimd::constant(*features.get_unchecked(i + 3)),
+                    DualSimd::constant(*features.get_unchecked(i + 4)),
+                    DualSimd::constant(*features.get_unchecked(i + 5)),
+                    DualSimd::constant(*features.get_unchecked(i + 6)),
+                    DualSimd::constant(*features.get_unchecked(i + 7)),
+                    DualSimd::constant(*features.get_unchecked(i + 8)),
+                ];
+                ctx.sp_m3 += 1;
+            },
+            Instruction::LoadConstM3(idx) =>
+            // SAFETY: Valid bounds mapping to scalar flattened arrays.
+            unsafe {
+                if let Scalar::Mat3(val) = constants.get_unchecked(*idx as usize) {
+                    let flat_idx = get_flat_start_idx(*idx as usize);
+                    *ctx.stack_m3.get_unchecked_mut(ctx.sp_m3) = [
+                        DualSimd::new(f32x8::splat(val[0]), get_grad(flat_idx)),
+                        DualSimd::new(f32x8::splat(val[1]), get_grad(flat_idx + 1)),
+                        DualSimd::new(f32x8::splat(val[2]), get_grad(flat_idx + 2)),
+                        DualSimd::new(f32x8::splat(val[3]), get_grad(flat_idx + 3)),
+                        DualSimd::new(f32x8::splat(val[4]), get_grad(flat_idx + 4)),
+                        DualSimd::new(f32x8::splat(val[5]), get_grad(flat_idx + 5)),
+                        DualSimd::new(f32x8::splat(val[6]), get_grad(flat_idx + 6)),
+                        DualSimd::new(f32x8::splat(val[7]), get_grad(flat_idx + 7)),
+                        DualSimd::new(f32x8::splat(val[8]), get_grad(flat_idx + 8)),
+                    ];
+                }
+                ctx.sp_m3 += 1;
+            },
+            _ => crate::SymbolicEngine::eval_dual_single(*op, &mut ctx),
+        }
+    }
+    unsafe { *ctx.stack_m3.get_unchecked(0) }
+}
+
+pub fn compute_planar_biaxial_mse(program: &Program, dataset: &Dataset) -> f32 {
+    let mut sum_absolute_error = f32x8::splat(0.0);
+    let num_features = dataset.num_features as usize;
+    let targets = dataset.target_mat3_batches.as_ref().unwrap();
+    let remainder = dataset.num_samples % 8;
+
+    for i in 0..dataset.num_batches {
+        let start = i * num_features;
+        let input_batch = unsafe { dataset.feature_flat.get_unchecked(start..start + num_features) };
+        let prediction = eval_simd_mat3(program, input_batch);
+        let target = targets[i];
+
+        let mut batch_ae = f32x8::splat(0.0);
+        // CSAK A 11-es és 22-es KOMPONENSEK!
+        for dim in [0, 4] {
+            let mut diff = prediction[dim] - target[dim];
+            if i == dataset.num_batches - 1 && remainder != 0 {
+                let mut mask = [1.0f32; 8];
+                for j in remainder..8 { mask[j] = 0.0; }
+                diff *= wide::f32x8::new(mask);
+            }
+            batch_ae += diff * diff; // MAE!
+        }
+        sum_absolute_error += batch_ae;
+    }
+
+    // Osztás 2.0-val 9.0 helyett!
+    let mae = sum_absolute_error.reduce_add() / ((dataset.num_samples * 2) as f32);
+    if !mae.is_finite() { f32::MAX } else { mae }
+}
+
+pub fn compute_planar_biaxial_mse_with_gradient(program: &Program, dataset: &Dataset) -> (f32, [f32; 32]) {
+    let mut sum_absolute_error = f32x8::splat(0.0);
+    let mut grad_sum = [f32x8::splat(0.0); 32];
+
+    let num_features = dataset.num_features as usize;
+    let flat_features = &dataset.feature_flat;
+    let targets = dataset.target_mat3_batches.as_ref().unwrap();
+    let active_params_count = program.param_count().min(32);
+
+    if active_params_count == 0 {
+        return (compute_planar_biaxial_mse(program, dataset), [0.0; 32]);
+    }
+
+    let remainder = dataset.num_samples % 8;
+
+    for i in 0..dataset.num_batches {
+        let start = i * num_features;
+        let input_batch = unsafe { flat_features.get_unchecked(start..start + num_features) };
+        let target = targets[i];
+
+        for k in 0..active_params_count {
+            let prediction_dual = eval_simd_dual_mat3(program, input_batch, k);
+
+            let mut batch_ae = f32x8::splat(0.0);
+            let mut batch_grad = f32x8::splat(0.0);
+
+            // CSAK A 11-es és 22-es KOMPONENSEK!
+            for dim in [0, 4] {
+                let mut diff_val = prediction_dual[dim].val - target[dim];
+                let mut mask = f32x8::splat(1.0);
+
+                if i == dataset.num_batches - 1 && remainder != 0 {
+                    let mut m_arr = [1.0f32; 8];
+                    for j in remainder..8 { m_arr[j] = 0.0; }
+                    mask = wide::f32x8::new(m_arr);
+                    diff_val *= mask;
+                }
+
+                if k == 0 { batch_ae += diff_val * diff_val; }
+
+                batch_grad += f32x8::splat(2.0) * diff_val * prediction_dual[dim].grad * mask;
+            }
+
+            if k == 0 { sum_absolute_error += batch_ae; }
+            grad_sum[k] += batch_grad;
+        }
+    }
+
+    let num_samples_f32 = dataset.num_samples as f32;
+    let total_mae = sum_absolute_error.reduce_add() / (num_samples_f32 * 2.0);
+
+    if !total_mae.is_finite() {
+        return (f32::MAX, [0.0; 32]);
+    }
+
+    let mut final_gradient = [0.0f32; 32];
+    for k in 0..active_params_count {
+        final_gradient[k] = grad_sum[k].reduce_add() / (num_samples_f32 * 2.0);
+    }
+
+    (total_mae, final_gradient)
 }

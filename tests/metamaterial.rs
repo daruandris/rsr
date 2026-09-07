@@ -1,4 +1,5 @@
 use rsr::api::*;
+use rsr::engine::search::config::LossFunctionType;
 use rsr::prelude::*;
 
 mod common;
@@ -61,16 +62,13 @@ fn test_law_3_pig_sclera_biaxial() {
 
     // 3x3-as mátrixok, így a típus Mat3
     let dataset = Dataset::new_mat3(&dx, &dy, vec![ValueType::Mat3]);
-    
-    let mut config = Config::constitutive_tensor_law_mat3();
+    /*
+    TODO: I4, I6
+    */
+    let mut config = Config::solid_incompressible_hyperelastic();
    
-    config.max_generations = 8000;
-    config.island_size = 500;
-    config.num_islands = 32;
-    
-    // Mivel ~1800 sorunk van, egy kisebb subset-tel érdemes gyorsítani az iterációkat[cite: 6]
-    config.subset_size = Some(1000); 
-    config.mini_batch_size = 128; 
+    config.max_generations = 2000;
+    config.loss_type = LossFunctionType::PlanarBiaxialMse;
 
     let regressor = SymbolicRegressor::new(config);
 
@@ -78,9 +76,20 @@ fn test_law_3_pig_sclera_biaxial() {
     let start_time = std::time::Instant::now();
     let result = regressor.fit(&dataset);
     let time_ms = start_time.elapsed().as_millis() as u64;
+
+     result.plot_solid(&dataset, PlotConfig {
+        output_path: "pig.png".to_string(),
+        mode: SolidPlotMode::BiaxialTension,
+        max_points: 800,
+    }).expect("Nem sikerült a diagramot kimenteni!");
     
-    common::update_history("Tensor_Pig_Sclera", result.mse, time_ms);
-    println!("MSE = {:.8}, Time = {}ms\nEquation: {}\n", result.mse, time_ms, result.equation);
+    common::update_history("Tensor_Pig_Sclera", result.clear_mse, time_ms);
+    println!("clear MSE = {:.8}, Time = {}ms\nEquation: {}\n", result.clear_mse, time_ms, result.equation);
+    let mut i: i32 = 1;
+    for pareto in result.pareto_front{
+        println!("{}clear MSE = {:.8}, Compl = {}ms\nEquation: {}\n",i, pareto.clear_mse, pareto.complexity, pareto.equation);
+        i += 1;
+    }
 }
 
 #[test]
@@ -96,15 +105,10 @@ fn test_law_3_steel_x6cr17_uniaxial() {
 
     let dataset = Dataset::new_mat3(&dx, &dy, vec![ValueType::Mat3]);
     
-    let mut config = Config::constitutive_tensor_law_mat3();
+    let mut config = Config::solid_elastoplastic_metals();
    
-    config.max_generations = 8000;
-    config.island_size = 500;
-    config.num_islands = 32;
-    
-    // Az acél adathalmazunk kisebb (~750 sor), így a subset mérete is csökkenthető
-    config.subset_size = Some(640); 
-    config.mini_batch_size = 64; 
+    config.max_generations = 1000;
+    config.base_target_mse = 1.0;
 
     let regressor = SymbolicRegressor::new(config);
 
@@ -112,7 +116,18 @@ fn test_law_3_steel_x6cr17_uniaxial() {
     let start_time = std::time::Instant::now();
     let result = regressor.fit(&dataset);
     let time_ms = start_time.elapsed().as_millis() as u64;
+
+    result.plot_solid(&dataset, PlotConfig {
+        output_path: "metal.png".to_string(),
+        mode: SolidPlotMode::UniaxialTension,
+        max_points: 800,
+    }).expect("Nem sikerült a diagramot kimenteni!");
     
     common::update_history("Tensor_Steel_X6Cr17", result.mse, time_ms);
     println!("MSE = {:.8}, Time = {}ms\nEquation: {}\n", result.mse, time_ms, result.equation);
+     let mut i: i32 = 1;
+    for pareto in result.pareto_front{
+        println!("{}clear MSE = {:.8}, Compl = {}ms\nEquation: {}\n",i, pareto.clear_mse, pareto.complexity, pareto.equation);
+        i += 1;
+    }
 }

@@ -282,7 +282,7 @@ impl Individual {
                                     new_history |= HIST_TRANSPOSE;
                                 }
                                 InverseM3 => {
-                                    if (combined_history & (HIST_INVERSE | HIST_KINEMATIC)) != 0 { return true; }
+                                    if (combined_history & HIST_INVERSE) != 0 { return true; }
                                     if let TensorType::Mat3(l, r) = children[0].ttype {
                                         res_type = TensorType::Mat3(r, l);
                                     } else { res_type = TensorType::Mat3(Space::Mixed, Space::Mixed); }
@@ -365,7 +365,7 @@ impl Individual {
                                 stack.push(child_flags | FLAG_TRIG);
                             }
                             BasicOpCode::ExpF => {
-                                if (child_flags & (FLAG_TRIG | FLAG_EXP | FLAG_LN | FLAG_POWER)) != 0 { return true; }
+                                if (child_flags & (FLAG_TRIG | FLAG_EXP | FLAG_LN )) != 0 { return true; }
                                 stack.push(child_flags | FLAG_EXP);
                             }
                             BasicOpCode::LnF => {
@@ -373,7 +373,7 @@ impl Individual {
                                 stack.push(child_flags | FLAG_LN);
                             }
                             BasicOpCode::SqrtF | BasicOpCode::SqrF => {
-                                if (child_flags & (FLAG_POWER | FLAG_TRIG | FLAG_LN | FLAG_EXP)) != 0 { return true; }
+                                if (child_flags & (FLAG_POWER | FLAG_TRIG | FLAG_LN )) != 0 { return true; }
                                 stack.push(child_flags | FLAG_POWER);
                             }
                             _ => stack.push(child_flags),
