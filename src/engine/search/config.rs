@@ -161,74 +161,11 @@ impl Config {
     /// 
     /// data_x: F vagy E (Mat3), data_y: sigma vagy P (Mat3)
     /// target: pl. f(F)=sigma
-    pub fn constitutive_tensor_law_mat2() -> Self {
+
+    // gumi, szilikon
+    pub fn solid_incompressible_isotropic() -> Self {
         let mut config = Self::default(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
-        config.loss_type = LossFunctionType::TensorMseMat2;
-        config.target_type = ValueType::Mat2;
-        config.disabled_constant_types = vec![
-            ValueType::Vec2, ValueType::Vec3
-        ];
-
-        let mut exclusions = vec![
-            Instruction::Basic(BasicOpCode::SinF),
-            Instruction::Basic(BasicOpCode::CosF),
-        ];
-
-        // Vektoros operátorok tiltása
-        let vector_ops = [
-            LinalgOpCode::MakeVec2, LinalgOpCode::MakeVec3,
-            LinalgOpCode::GetXV2, LinalgOpCode::GetYV2,
-            LinalgOpCode::GetXV3, LinalgOpCode::GetYV3, LinalgOpCode::GetZV3,
-            LinalgOpCode::AddV2, LinalgOpCode::SubV2, LinalgOpCode::ScaleV2, 
-            LinalgOpCode::DotV2, LinalgOpCode::NormV2,
-            LinalgOpCode::AddV3, LinalgOpCode::SubV3, LinalgOpCode::ScaleV3, 
-            LinalgOpCode::DotV3, LinalgOpCode::NormV3, LinalgOpCode::CrossV3,
-            LinalgOpCode::MulM2V2, LinalgOpCode::MulM3V3,
-        ];
-        for op in vector_ops {
-            exclusions.push(Instruction::Linalg(op));
-        }
-
-        config.excluded_ops = exclusions;
-        config
-    }
-
-    pub fn constitutive_tensor_law_mat3() -> Self {
-        let mut config = Self::default(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
-        config.loss_type = LossFunctionType::TensorMseMat3;
-        config.target_type = ValueType::Mat3;
-        config.disabled_constant_types = vec![
-            ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3, 
-        ];
-        config.base_parsimony_penalty = 0.00005;
-
-        let mut exclusions = vec![
-            Instruction::Basic(BasicOpCode::SinF),
-            Instruction::Basic(BasicOpCode::CosF),
-        ];
-
-        // Vektoros operátorok tiltása
-        let vector_ops = [
-            LinalgOpCode::MakeVec2, LinalgOpCode::MakeVec3,
-            LinalgOpCode::GetXV2, LinalgOpCode::GetYV2,
-            LinalgOpCode::GetXV3, LinalgOpCode::GetYV3, LinalgOpCode::GetZV3,
-            LinalgOpCode::AddV2, LinalgOpCode::SubV2, LinalgOpCode::ScaleV2, 
-            LinalgOpCode::DotV2, LinalgOpCode::NormV2,
-            LinalgOpCode::AddV3, LinalgOpCode::SubV3, LinalgOpCode::ScaleV3, 
-            LinalgOpCode::DotV3, LinalgOpCode::NormV3, LinalgOpCode::CrossV3,
-            LinalgOpCode::MulM2V2, LinalgOpCode::MulM3V3,
-        ];
-        for op in vector_ops {
-            exclusions.push(Instruction::Linalg(op));
-        }
-
-        config.excluded_ops = exclusions;
-        config
-    }
-
-    pub fn solid_incompressible_hyperelastic() -> Self {
-        let mut config = Self::default(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
-        config.loss_type = LossFunctionType::TensorMseMat3;
+        config.loss_type = LossFunctionType::TensorMseMat3;// TODO
         config.target_type = ValueType::Mat3;
         config.disabled_constant_types = vec![
             ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3, 
@@ -246,7 +183,41 @@ impl Config {
         config.num_islands = 16;
         config.base_target_mse = 0.00005;
 
-        let mut exclusions = vec![
+       let exclusions = vec![
+            Instruction::Basic(BasicOpCode::SinF), Instruction::Basic(BasicOpCode::CosF),
+            Instruction::Linalg(LinalgOpCode::DetM3), Instruction::Linalg(LinalgOpCode::DetM2),
+            Instruction::Solid(SolidOpCode::InvariantJ3M3),
+            //Instruction::Solid(SolidOpCode::InvariantI4_M3),
+            //Instruction::Solid(SolidOpCode::InvariantI6_M3),
+            //Instruction::Solid(SolidOpCode::InvariantI5_M3),
+            //Instruction::Solid(SolidOpCode::InvariantI7_M3),
+        ];
+        config.excluded_ops = Self::add_vector_exclusions(exclusions);
+        config
+    }
+
+    // bilógiai szövetek
+    pub fn solid_incompressible_anisotropic() -> Self {
+        let mut config = Self::default(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
+        config.loss_type = LossFunctionType::PlanarBiaxialMse;
+        config.target_type = ValueType::Mat3;
+        config.disabled_constant_types = vec![
+            ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3, 
+        ];
+        config.base_parsimony_penalty = 0.00001;
+        config.max_tree_size = 64;
+        config.mutation_max_depth = 6;
+        config.island_size = 1000;
+        config.subset_size = Some(800);
+        config.mini_batch_size = 128;
+        config.stagnation_threshold = 200;
+        config.tournament_size = 3;
+        config.opt_iterations = 250;
+        config.opt_prob = 0.05;
+        config.num_islands = 16;
+        config.base_target_mse = 0.00005;
+
+        let exclusions = vec![
             Instruction::Basic(BasicOpCode::SinF),
             Instruction::Basic(BasicOpCode::CosF),
 
@@ -254,66 +225,44 @@ impl Config {
             Instruction::Linalg(LinalgOpCode::DetM2),
             Instruction::Solid(SolidOpCode::InvariantJ3M3),
         ];
-
-        // Vektoros operátorok tiltása
-        let vector_ops = [
-            LinalgOpCode::MakeVec2, LinalgOpCode::MakeVec3,
-            LinalgOpCode::GetXV2, LinalgOpCode::GetYV2,
-            LinalgOpCode::GetXV3, LinalgOpCode::GetYV3, LinalgOpCode::GetZV3,
-            LinalgOpCode::AddV2, LinalgOpCode::SubV2, LinalgOpCode::ScaleV2, 
-            LinalgOpCode::DotV2, LinalgOpCode::NormV2,
-            LinalgOpCode::AddV3, LinalgOpCode::SubV3, LinalgOpCode::ScaleV3, 
-            LinalgOpCode::DotV3, LinalgOpCode::NormV3, LinalgOpCode::CrossV3,
-            LinalgOpCode::MulM2V2, LinalgOpCode::MulM3V3,
-        ];
-        for op in vector_ops {
-            exclusions.push(Instruction::Linalg(op));
-        }
-
-        config.excluded_ops = exclusions;
+        
+        config.excluded_ops = Self::add_vector_exclusions(exclusions);
         config
     }
 
+    // fémek
     pub fn solid_elastoplastic_metals() -> Self {
         let mut config = Self::default(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
-        config.loss_type = LossFunctionType::TensorMseMat3;
+        config.loss_type = LossFunctionType::TensorMseMat3;//todo
         config.target_type = ValueType::Mat3;
         config.disabled_constant_types = vec![ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3];
         
-        // Fémeknél az egyenletek általában rövidebbek és "feszesebbek", mint a hiperelasztikus szöveteknél
         config.base_parsimony_penalty = 0.0001; 
         config.max_tree_size = 48;
         config.island_size = 800;
         config.stagnation_threshold = 800;
         config.opt_iterations = 200;
 
-        let mut exclusions = vec![
+        let exclusions = vec![
             Instruction::Basic(BasicOpCode::SinF),
             Instruction::Basic(BasicOpCode::CosF),
-            Instruction::Basic(BasicOpCode::ExpF), // Fémeknél ritka az exponenciális keményedés
+            Instruction::Basic(BasicOpCode::ExpF),
             Instruction::Basic(BasicOpCode::LnF),
-            // Tipikusan nagy alakváltozású hiperelasztikus formulák tiltása
             Instruction::Solid(SolidOpCode::IsochoricInvariant1),
             Instruction::Solid(SolidOpCode::IsochoricInvariant2),
+            //Instruction::Solid(SolidOpCode::InvariantI4_M3),
+            //Instruction::Solid(SolidOpCode::InvariantI6_M3),
             Instruction::Solid(SolidOpCode::CofactorM3),
         ];
 
-        let vector_ops = [
-            LinalgOpCode::MakeVec2, LinalgOpCode::MakeVec3, LinalgOpCode::GetXV2, LinalgOpCode::GetYV2,
-            LinalgOpCode::GetXV3, LinalgOpCode::GetYV3, LinalgOpCode::GetZV3, LinalgOpCode::AddV2, 
-            LinalgOpCode::SubV2, LinalgOpCode::ScaleV2, LinalgOpCode::DotV2, LinalgOpCode::NormV2,
-            LinalgOpCode::AddV3, LinalgOpCode::SubV3, LinalgOpCode::ScaleV3, LinalgOpCode::DotV3, 
-            LinalgOpCode::NormV3, LinalgOpCode::CrossV3, LinalgOpCode::MulM2V2, LinalgOpCode::MulM3V3,
-        ];
-        for op in vector_ops { exclusions.push(Instruction::Linalg(op)); }
-
-        config.excluded_ops = exclusions;
+        config.excluded_ops = Self::add_vector_exclusions(exclusions);
         config
     }
 
-    pub fn solid_compressible_hyperelastic() -> Self {
+    // habok, szivacsok
+    pub fn solid_compressible_isotropic() -> Self {
         let mut config = Self::default(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
-        config.loss_type = LossFunctionType::TensorMseMat3;
+        config.loss_type = LossFunctionType::TensorMseMat3;//todo
         config.target_type = ValueType::Mat3;
         config.disabled_constant_types = vec![ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3];
         
@@ -321,22 +270,59 @@ impl Config {
         config.max_tree_size = 56;
         config.mutation_max_depth = 5;
         config.island_size = 1000;
+        config.stagnation_threshold = 400;
+        config.opt_iterations = 250;
+        config.opt_prob = 0.05;
         
-        let mut exclusions = vec![
+        let exclusions = vec![
             Instruction::Basic(BasicOpCode::SinF),
             Instruction::Basic(BasicOpCode::CosF),
+            //Instruction::Solid(SolidOpCode::InvariantI4_M3),
+            //Instruction::Solid(SolidOpCode::InvariantI6_M3),
+            //Instruction::Solid(SolidOpCode::InvariantI5_M3),
+            //Instruction::Solid(SolidOpCode::InvariantI7_M3),
         ];
 
-        let vector_ops = [
-            LinalgOpCode::MakeVec2, LinalgOpCode::MakeVec3, LinalgOpCode::GetXV2, LinalgOpCode::GetYV2,
-            LinalgOpCode::GetXV3, LinalgOpCode::GetYV3, LinalgOpCode::GetZV3, LinalgOpCode::AddV2, 
-            LinalgOpCode::SubV2, LinalgOpCode::ScaleV2, LinalgOpCode::DotV2, LinalgOpCode::NormV2,
-            LinalgOpCode::AddV3, LinalgOpCode::SubV3, LinalgOpCode::ScaleV3, LinalgOpCode::DotV3, 
-            LinalgOpCode::NormV3, LinalgOpCode::CrossV3, LinalgOpCode::MulM2V2, LinalgOpCode::MulM3V3,
-        ];
-        for op in vector_ops { exclusions.push(Instruction::Linalg(op)); }
-
-        config.excluded_ops = exclusions;
+        config.excluded_ops = Self::add_vector_exclusions(exclusions);
         config
     }
+
+    // 3d nyomtatott rácsok, metamateriálok
+    pub fn solid_compressible_anisotropic() -> Self {
+        let mut config = Self::default(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
+        config.loss_type = LossFunctionType::TensorMseMat3;// TODO
+        config.target_type = ValueType::Mat3;
+        config.disabled_constant_types = vec![ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3];
+        
+        config.base_parsimony_penalty = 0.00005;
+        config.max_tree_size = 64;
+        config.mutation_max_depth = 6;
+        config.island_size = 1000;
+        config.stagnation_threshold = 400;
+        config.opt_iterations = 250;
+        config.opt_prob = 0.05;
+        
+        let exclusions = vec![
+            Instruction::Basic(BasicOpCode::SinF),
+            Instruction::Basic(BasicOpCode::CosF),            
+            //Instruction::Solid(SolidOpCode::InvariantI5_M3),
+            //Instruction::Solid(SolidOpCode::InvariantI7_M3),
+        ];
+
+        config.excluded_ops = Self::add_vector_exclusions(exclusions);
+        config
+    }
+    
+    fn add_vector_exclusions(mut exclusions: Vec<Instruction>) -> Vec<Instruction> {
+            let vector_ops = [
+                LinalgOpCode::MakeVec2, LinalgOpCode::MakeVec3, LinalgOpCode::GetXV2, LinalgOpCode::GetYV2,
+                LinalgOpCode::GetXV3, LinalgOpCode::GetYV3, LinalgOpCode::GetZV3, LinalgOpCode::AddV2, 
+                LinalgOpCode::SubV2, LinalgOpCode::ScaleV2, LinalgOpCode::DotV2, LinalgOpCode::NormV2,
+                LinalgOpCode::AddV3, LinalgOpCode::SubV3, LinalgOpCode::ScaleV3, LinalgOpCode::DotV3, 
+                LinalgOpCode::NormV3, LinalgOpCode::CrossV3, LinalgOpCode::MulM2V2, LinalgOpCode::MulM3V3,
+            ];
+            for op in vector_ops { exclusions.push(Instruction::Linalg(op)); }
+            exclusions
+        }
 }
+

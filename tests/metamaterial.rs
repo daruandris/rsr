@@ -60,12 +60,11 @@ fn test_law_3_pig_sclera_biaxial() {
     let (dx, dy) = load_mat3_csv(path);
     println!(">>> Betöltve {} adatpont a Pig Sclera adathalmazból <<<", dx.len());
 
-    // 3x3-as mátrixok, így a típus Mat3
     let dataset = Dataset::new_mat3(&dx, &dy, vec![ValueType::Mat3]);
     /*
     TODO: I4, I6
     */
-    let mut config = Config::solid_incompressible_hyperelastic();
+    let mut config = Config::solid_incompressible_anisotropic();
    
     config.max_generations = 2000;
     config.loss_type = LossFunctionType::PlanarBiaxialMse;
