@@ -164,7 +164,7 @@ impl Config {
     /// Rubber, silicone, elastomers.
     /// 
     /// **Mapping Type:**
-    /// Typically $F \rightarrow P$ (Deformation Gradient to 1st Piola-Kirchhoff stress), though $F \rightarrow \sigma$ can also be used.
+    /// Typically $F \rightarrow P$ (Deformation Gradient to 1st Piola-Kirchhoff stress), though $F \rightarrow \sigma$ can also be used. If the data_y is Cauchy-stress ($\sigma$), then set the target_is_cauchy parameter to true.
     /// 
     /// **Required Test Data:**
     /// Uniaxial tension/compression, equibiaxial tension, or pure shear tests. 
@@ -178,7 +178,7 @@ impl Config {
     /// **Evaluation:**
     /// // TODO: `LossFunctionType::TensorMseMat3` is currently a placeholder here. 
     /// // A specific loss function tailored to isotropic incompressible datasets (e.g., `UniaxialMse` or `EquibiaxialMse`) must be implemented and set here instead.
-    pub fn solid_incompressible_isotropic() -> Self {
+    pub fn solid_incompressible_isotropic(target_is_cauchy: bool) -> Self {
         let mut config = Self::default(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
         config.loss_type = LossFunctionType::TensorMseMat3;// TODO
         config.target_type = ValueType::Mat3;
@@ -198,8 +198,8 @@ impl Config {
         config.num_islands = 16;
         config.base_target_mse = 0.00005;
 
-       let exclusions = vec![
-            Instruction::Basic(BasicOpCode::SinF), Instruction::Basic(BasicOpCode::CosF),
+       let mut exclusions = vec![
+            Instruction::Basic(BasicOpCode::SinF), Instruction::Basic(BasicOpCode::CosF), Instruction::Basic(BasicOpCode::DivF),
             Instruction::Linalg(LinalgOpCode::DetM3), Instruction::Linalg(LinalgOpCode::DetM2),
             Instruction::Solid(SolidOpCode::InvariantJ3M3),
             Instruction::Solid(SolidOpCode::InvariantI4),
@@ -207,6 +207,10 @@ impl Config {
             Instruction::Solid(SolidOpCode::InvariantI5),
             Instruction::Solid(SolidOpCode::InvariantI7),
         ];
+
+        if !target_is_cauchy {
+            exclusions.push(Instruction::Solid(SolidOpCode::DeviatoricM3));
+        }
         config.excluded_ops = Self::add_vector_exclusions(exclusions);
         config
     }
@@ -237,10 +241,10 @@ impl Config {
         config.loss_type = LossFunctionType::PlanarBiaxialMse;
         config.target_type = ValueType::Mat3;
         config.disabled_constant_types = vec![
-             ValueType::Mat2, ValueType::Mat3, 
+             ValueType::Mat2, ValueType::Mat3,  
         ];
-        config.base_parsimony_penalty = 0.00001;
-        config.max_tree_size = 64;
+        config.base_parsimony_penalty = 0.000005;
+        config.max_tree_size = 128;
         config.mutation_max_depth = 6;
         config.island_size = 1000;
         config.subset_size = Some(800);
@@ -250,68 +254,20 @@ impl Config {
         config.opt_iterations = 250;
         config.opt_prob = 0.05;
         config.num_islands = 16;
-        config.base_target_mse = 0.00005;
+        config.base_target_mse = 1e-7;
 
         let exclusions = vec![
             Instruction::Basic(BasicOpCode::SinF),
             Instruction::Basic(BasicOpCode::CosF),
+            Instruction::Basic(BasicOpCode::DivF),
 
             Instruction::Linalg(LinalgOpCode::DetM3),
             Instruction::Linalg(LinalgOpCode::DetM2),
             Instruction::Solid(SolidOpCode::InvariantJ3M3),
+            Instruction::Solid(SolidOpCode::DeviatoricM3),
+
         ];
         
-        config.excluded_ops = Self::add_vector_exclusions(exclusions);
-        config
-    }
-
-    /// Configuration for Elastoplastic Metals
-    /// 
-    /// **Material Properties:**
-    /// Elastoplastic, exhibiting isochoric flow (volume is constant in the plastic region). The material can be treated as isotropic or plastically anisotropic.
-    /// 
-    /// **Typical Examples:**
-    /// Advanced High-Strength Steels (AHSS), aluminum, and structural metals.
-    /// 
-    /// **Mapping Type:**
-    /// $F \rightarrow \sigma$ (Deformation Gradient to Cauchy stress / True stress). 
-    /// For metals undergoing plastic yield, we MUST use the true Cauchy stress ($\sigma$) instead of $P$, because permanent plastic deformation depends on the current, instantaneous cross-section of the specimen, not the original one.
-    /// 
-    /// **Required Test Data:**
-    /// True stress - true strain flow curves, or Digital Image Correlation (DIC) uniaxial tensile test raw data. 
-    /// **CRITICAL:** The data must represent a **homogeneous stress state** (e.g., standard dog-bone specimens before necking occurs).
-    /// 
-    /// **Excluded Operators:**
-    /// * `ExpF`, `LnF`: Excluded because traditional metal plasticity (e.g., von Mises yield criterion, power-law hardening) typically relies on polynomial and fractional forms rather than exponentials.
-    /// * `IsochoricInvariant1`, `IsochoricInvariant2`, `InvariantI4`, `InvariantI6`, `CofactorM3`: Excluded because these specific hyperelastic invariants are generally unsuitable or overly complex for standard elastoplastic yield surfaces.
-    /// 
-    /// **Evaluation:**
-    /// // TODO: `LossFunctionType::TensorMseMat3` is currently a placeholder. 
-    /// // A specific loss function tailored to true stress-strain flow curves (e.g., `TrueStressUniaxialMse` or a `PlasticityMse`) must be implemented and set here instead.
-    pub fn solid_elastoplastic_metals() -> Self {
-        let mut config = Self::default(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
-        config.loss_type = LossFunctionType::TensorMseMat3;//todo
-        config.target_type = ValueType::Mat3;
-        config.disabled_constant_types = vec![ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3];
-        
-        config.base_parsimony_penalty = 0.0001; 
-        config.max_tree_size = 48;
-        config.island_size = 800;
-        config.stagnation_threshold = 800;
-        config.opt_iterations = 200;
-
-        let exclusions = vec![
-            Instruction::Basic(BasicOpCode::SinF),
-            Instruction::Basic(BasicOpCode::CosF),
-            Instruction::Basic(BasicOpCode::ExpF),
-            Instruction::Basic(BasicOpCode::LnF),
-            Instruction::Solid(SolidOpCode::IsochoricInvariant1),
-            Instruction::Solid(SolidOpCode::IsochoricInvariant2),
-            Instruction::Solid(SolidOpCode::InvariantI4),
-            Instruction::Solid(SolidOpCode::InvariantI6),
-            Instruction::Solid(SolidOpCode::CofactorM3),
-        ];
-
         config.excluded_ops = Self::add_vector_exclusions(exclusions);
         config
     }
@@ -354,6 +310,7 @@ impl Config {
         let exclusions = vec![
             Instruction::Basic(BasicOpCode::SinF),
             Instruction::Basic(BasicOpCode::CosF),
+            Instruction::Basic(BasicOpCode::DivF),
             Instruction::Solid(SolidOpCode::InvariantI4),
             Instruction::Solid(SolidOpCode::InvariantI6),
             Instruction::Solid(SolidOpCode::InvariantI5),
@@ -401,9 +358,11 @@ impl Config {
         
         let exclusions = vec![
             Instruction::Basic(BasicOpCode::SinF),
-            Instruction::Basic(BasicOpCode::CosF),            
+            Instruction::Basic(BasicOpCode::CosF),
+            Instruction::Basic(BasicOpCode::DivF),          
             Instruction::Solid(SolidOpCode::InvariantI5),
             Instruction::Solid(SolidOpCode::InvariantI7),
+             Instruction::Solid(SolidOpCode::DeviatoricM3),
         ];
 
         config.excluded_ops = Self::add_vector_exclusions(exclusions);
@@ -417,6 +376,7 @@ impl Config {
                 LinalgOpCode::SubV2, LinalgOpCode::ScaleV2, LinalgOpCode::DotV2, LinalgOpCode::NormV2,
                 LinalgOpCode::AddV3, LinalgOpCode::SubV3, LinalgOpCode::ScaleV3, LinalgOpCode::DotV3, 
                 LinalgOpCode::NormV3, LinalgOpCode::CrossV3, LinalgOpCode::MulM2V2, LinalgOpCode::MulM3V3,
+                LinalgOpCode::MakeMat2, LinalgOpCode::MakeMat3,
             ];
             for op in vector_ops { exclusions.push(Instruction::Linalg(op)); }
             exclusions        

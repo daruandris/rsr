@@ -194,6 +194,7 @@ impl Domain for BasicDomain {
                 BasicOpCode::LnF | BasicOpCode::ExpF | BasicOpCode::SinF | BasicOpCode::CosF
             ),
             BasicOpCode::CubeF => matches!(child, BasicOpCode::CubeF | BasicOpCode::SqrF | BasicOpCode::SqrtF),
+            BasicOpCode::DivF => matches!(child, BasicOpCode::DivF),
             _ => false,
         }
     }

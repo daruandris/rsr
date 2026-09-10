@@ -136,6 +136,8 @@ impl Individual {
         const HIST_INVERSE: u32 = 1 << 3; // Inv
         const HIST_TRANSPOSE: u32 = 1 << 4; // Transpose
         const HIST_INVARIANT: u32 = 1 << 5; // I1, I2, Tr, J2, J3, Det, I4, I5, I6, I7
+        const HIST_STRAIN_E: u32 = 1 << 6;  // E tenzor (Kezdetben 0, invertálása tilos)
+        const HIST_SUB: u32 = 1 << 7;
 
         let mut stack: Vec<PhysNode> = Vec::with_capacity(32);
 
@@ -207,6 +209,9 @@ impl Individual {
                                         return true; 
                                     }
                                     new_history |= HIST_KINEMATIC;
+                                    if *solid_op == GreenLagrangeStrainM3 {
+                                        new_history |= HIST_STRAIN_E;
+                                    }
                                 }
                                 CofactorM3 => {
                                     if (combined_history & (HIST_KINEMATIC | HIST_INVARIANT | HIST_INVERSE | HIST_COFACTOR)) != 0 {
@@ -281,6 +286,10 @@ impl Individual {
                                         let res_r = if r1 != Space::Mixed { r1 } else { r2 };
                                         res_type = TensorType::Mat3(res_l, res_r);
                                     } else { res_type = TensorType::Mat3(Space::Mixed, Space::Mixed); }
+                                    if *linalg_op == LinalgOpCode::SubM3 {
+                                        new_history |= HIST_SUB;
+                                    }
+
                                 }
                                 MulM3 => {
                                     if let (TensorType::Mat3(l1, r1), TensorType::Mat3(l2, r2)) = (children[0].ttype, children[1].ttype) {
@@ -304,6 +313,9 @@ impl Individual {
                                 }
                                 InverseM3 => {
                                     if (combined_history & HIST_INVERSE) != 0 { return true; }
+                                    if (combined_history & (HIST_STRAIN_E | HIST_DEVIATORIC | HIST_SUB)) != 0 {
+                                        return true; 
+                                    }
                                     if let TensorType::Mat3(l, r) = children[0].ttype {
                                         res_type = TensorType::Mat3(r, l);
                                     } else { res_type = TensorType::Mat3(Space::Mixed, Space::Mixed); }

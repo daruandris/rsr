@@ -90,7 +90,7 @@ fn test_law_3_pig_sclera_biaxial() {
 
 #[test]
 fn test_law_3_steel_x6cr17_uniaxial() {
-    let path = "test_data/metal/1/steel_X6Cr17_SR.csv";
+    let path = "test_data/metal/1/steel_X6Cr17_PLASTIC.csv";
     if !std::path::Path::new(path).exists() {
         println!("Fájl nem található: {}. Kérlek ellenőrizd az elérési utat!", path);
         return;
@@ -103,8 +103,9 @@ fn test_law_3_steel_x6cr17_uniaxial() {
     
     let mut config = Config::solid_elastoplastic_metals();
    
-    config.max_generations = 1000;
-    config.base_target_mse = 1.0;
+    config.max_generations = 5000;
+    config.base_target_mse = 1e-7;
+    config.base_parsimony_penalty = 0.0001;
 
     let regressor = SymbolicRegressor::new(config);
 
