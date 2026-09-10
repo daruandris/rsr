@@ -26,7 +26,6 @@ impl FitResult {
     /// Mátrixos (Mat3) Solid modell eredményeinek kirajzolása.
     pub fn plot_solid(&self, dataset: &Dataset, config: PlotConfig) -> Result<(), Box<dyn std::error::Error>> {
         let program = self.program.as_ref().ok_or("Nincs lefordított program a FitResult-ban!")?;
-        let targets = dataset.target_mat3_batches.as_ref().ok_or("Az adathalmaz nem tartalmaz Mat3 célváltozókat!")?;
 
         // 1. Adathalmaz ritkítása a gyors és tiszta plotolásért
         let plot_data = dataset.subset(config.max_points);

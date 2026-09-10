@@ -22,6 +22,7 @@ pub fn generate_random_ast(
     let cap = 1 << (max_depth.min(6));
     let mut nodes = Vec::with_capacity(cap);
     let mut constants = Vec::new();
+    let is_solid = allowed_ops.iter().any(|op| matches!(op, Instruction::Solid(_)));
 
     for _ in 0..10 {
         nodes.clear();
@@ -37,6 +38,7 @@ pub fn generate_random_ast(
             allowed_ops,
             None,
             disabled_constants,
+            is_solid
         ) {
             return (nodes, constants);
         }
@@ -50,7 +52,7 @@ pub fn generate_random_ast(
         return (nodes, constants);
     }
     if !disabled_constants.contains(&target_type) {
-        if let Some(c) = random_constant(target_type, disabled_constants, rng) {
+        if let Some(c) = random_constant(target_type, disabled_constants, is_solid, rng) {
             constants.push(c);
             nodes.push(Node::Constant(0, target_type));
             return (nodes, constants);
@@ -70,6 +72,7 @@ fn build_ast_recursive(
     allowed_ops: &[Instruction],
     parent_op: Option<Instruction>,
     disabled_constants: &[ValueType],
+    is_solid: bool,
 ) -> bool {
     let prefer_terminal = current_depth >= max_depth || (current_depth > 0 && rng.random::<f32>() < 0.2);
 
@@ -123,7 +126,7 @@ fn build_ast_recursive(
                 return true;
             }
             Choice::Const => {
-                if let Some(c) = random_constant(target_type, disabled_constants, rng) {
+                if let Some(c) = random_constant(target_type, disabled_constants, is_solid, rng) {
                     let idx = constants.len() as u16;
                     constants.push(c);
                     nodes.push(Node::Constant(idx, target_type));
@@ -137,7 +140,7 @@ fn build_ast_recursive(
                 for &child_type in expected_types {
                     if !build_ast_recursive(
                         nodes, constants, child_type, current_depth + 1, max_depth,
-                        rng, variables, allowed_ops, Some(op), disabled_constants
+                        rng, variables, allowed_ops, Some(op), disabled_constants, is_solid
                     ) {
                         success = false;
                         break;
@@ -184,7 +187,7 @@ pub fn random_operator(
     allowed_ops.iter().copied().filter(is_valid).nth(chosen_idx)
 }
 
-pub fn random_constant(target_type: ValueType, disabled_constants: &[ValueType], rng: &mut impl RngExt) -> Option<Scalar> {
+pub fn random_constant(target_type: ValueType, disabled_constants: &[ValueType], is_solid: bool, rng: &mut impl RngExt) -> Option<Scalar> {
     if disabled_constants.contains(&target_type) {
         return None;
     }
@@ -194,11 +197,31 @@ pub fn random_constant(target_type: ValueType, disabled_constants: &[ValueType],
             rng.random_range(-5.0..5.0),
             rng.random_range(-5.0..5.0),
         ])),
-        ValueType::Vec3 => Some(Scalar::Vec3([
-            rng.random_range(-5.0..5.0),
-            rng.random_range(-5.0..5.0),
-            rng.random_range(-5.0..5.0),
-        ])),
+        // only for now, for solid tests
+        ValueType::Vec3 => {
+            if is_solid {
+                let r = rng.random::<f32>();
+                if r < 0.30 {
+                    Some(Scalar::Vec3([1.0, 0.0, 0.0])) // X tengely (rostirány)
+                } else if r < 0.60 {
+                    Some(Scalar::Vec3([0.0, 1.0, 0.0])) // Y tengely
+                } else if r < 0.80 {
+                    Some(Scalar::Vec3([0.0, 0.0, 1.0])) // Z tengely
+                } else {
+                    Some(Scalar::Vec3([
+                        rng.random_range(-2.0..2.0),
+                        rng.random_range(-2.0..2.0),
+                        rng.random_range(-2.0..2.0),
+                    ]))
+                }
+            } else {
+                Some(Scalar::Vec3([
+                    rng.random_range(-5.0..5.0),
+                    rng.random_range(-5.0..5.0),
+                    rng.random_range(-5.0..5.0),
+                ]))
+            }
+        },
         ValueType::Mat2 => Some(Scalar::Mat2([
             rng.random_range(-5.0..5.0),
             rng.random_range(-5.0..5.0),

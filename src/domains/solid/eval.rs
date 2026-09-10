@@ -251,6 +251,61 @@ pub unsafe fn eval_invariant_j3_m3(
     *sp_f += 1;
 }
 
+#[inline(always)]
+pub unsafe fn eval_invariant_i4_i6(
+    sp_f: &mut usize, stack_f: &mut [f32x8; 32],
+    sp_m3: &mut usize, stack_m3: &[[f32x8; 9]; 32],
+    sp_v3: &mut usize, stack_v3: &[[f32x8; 3]; 32]
+) {
+    *sp_m3 -= 1;
+    *sp_v3 -= 1;
+    let c = *stack_m3.get_unchecked(*sp_m3);
+    let a = *stack_v3.get_unchecked(*sp_v3);
+    
+    // C * a (Mat3 * Vec3)
+    let ca_0 = c[0]*a[0] + c[1]*a[1] + c[2]*a[2];
+    let ca_1 = c[3]*a[0] + c[4]*a[1] + c[5]*a[2];
+    let ca_2 = c[6]*a[0] + c[7]*a[1] + c[8]*a[2];
+    
+    // a dot (C * a)
+    *stack_f.get_unchecked_mut(*sp_f) = a[0]*ca_0 + a[1]*ca_1 + a[2]*ca_2;
+    *sp_f += 1;
+}
+
+#[inline(always)]
+pub unsafe fn eval_invariant_i5_i7(
+    sp_f: &mut usize, stack_f: &mut [f32x8; 32],
+    sp_m3: &mut usize, stack_m3: &[[f32x8; 9]; 32],
+    sp_v3: &mut usize, stack_v3: &[[f32x8; 3]; 32]
+) {
+    *sp_m3 -= 1;
+    *sp_v3 -= 1;
+    let c = *stack_m3.get_unchecked(*sp_m3);
+    let a = *stack_v3.get_unchecked(*sp_v3);
+    
+    // C * a
+    let ca_0 = c[0]*a[0] + c[1]*a[1] + c[2]*a[2];
+    let ca_1 = c[3]*a[0] + c[4]*a[1] + c[5]*a[2];
+    let ca_2 = c[6]*a[0] + c[7]*a[1] + c[8]*a[2];
+    
+    // ||C * a||^2
+    *stack_f.get_unchecked_mut(*sp_f) = ca_0*ca_0 + ca_1*ca_1 + ca_2*ca_2;
+    *sp_f += 1;
+}
+
+#[inline(always)]
+pub unsafe fn eval_identity_m3(sp_m3: &mut usize, stack_m3: &mut [[f32x8; 9]; 32]) {
+    let one = f32x8::splat(1.0);
+    let zero = f32x8::splat(0.0);
+    
+    *stack_m3.get_unchecked_mut(*sp_m3) = [
+        one, zero, zero,
+        zero, one, zero,
+        zero, zero, one,
+    ];
+    *sp_m3 += 1;
+}
+
 // =====================================================================
 // DUAL SIMD EVALUATION (Autodiff)
 // =====================================================================
@@ -520,4 +575,55 @@ pub unsafe fn eval_dual_invariant_j3_m3(
               
     *stack_f.get_unchecked_mut(*sp_f) = det_s;
     *sp_f += 1;
+}
+
+#[inline(always)]
+pub unsafe fn eval_dual_invariant_i4_i6(
+    sp_f: &mut usize, stack_f: &mut [DualSimd; 32],
+    sp_m3: &mut usize, stack_m3: &[[DualSimd; 9]; 32],
+    sp_v3: &mut usize, stack_v3: &[[DualSimd; 3]; 32]
+) {
+    *sp_m3 -= 1;
+    *sp_v3 -= 1;
+    let c = *stack_m3.get_unchecked(*sp_m3);
+    let a = *stack_v3.get_unchecked(*sp_v3);
+    
+    let ca_0 = c[0]*a[0] + c[1]*a[1] + c[2]*a[2];
+    let ca_1 = c[3]*a[0] + c[4]*a[1] + c[5]*a[2];
+    let ca_2 = c[6]*a[0] + c[7]*a[1] + c[8]*a[2];
+    
+    *stack_f.get_unchecked_mut(*sp_f) = a[0]*ca_0 + a[1]*ca_1 + a[2]*ca_2;
+    *sp_f += 1;
+}
+
+#[inline(always)]
+pub unsafe fn eval_dual_invariant_i5_i7(
+    sp_f: &mut usize, stack_f: &mut [DualSimd; 32],
+    sp_m3: &mut usize, stack_m3: &[[DualSimd; 9]; 32],
+    sp_v3: &mut usize, stack_v3: &[[DualSimd; 3]; 32]
+) {
+    *sp_m3 -= 1;
+    *sp_v3 -= 1;
+    let c = *stack_m3.get_unchecked(*sp_m3);
+    let a = *stack_v3.get_unchecked(*sp_v3);
+    
+    let ca_0 = c[0]*a[0] + c[1]*a[1] + c[2]*a[2];
+    let ca_1 = c[3]*a[0] + c[4]*a[1] + c[5]*a[2];
+    let ca_2 = c[6]*a[0] + c[7]*a[1] + c[8]*a[2];
+    
+    *stack_f.get_unchecked_mut(*sp_f) = ca_0*ca_0 + ca_1*ca_1 + ca_2*ca_2;
+    *sp_f += 1;
+}
+
+#[inline(always)]
+pub unsafe fn eval_dual_identity_m3(sp_m3: &mut usize, stack_m3: &mut [[DualSimd; 9]; 32]) {
+    let one = DualSimd::constant(f32x8::splat(1.0));
+    let zero = DualSimd::constant(f32x8::splat(0.0));
+    
+    *stack_m3.get_unchecked_mut(*sp_m3) = [
+        one, zero, zero,
+        zero, one, zero,
+        zero, zero, one,
+    ];
+    *sp_m3 += 1;
 }

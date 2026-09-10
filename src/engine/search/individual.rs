@@ -135,7 +135,7 @@ impl Individual {
         const HIST_COFACTOR: u32 = 1 << 2; // Cof
         const HIST_INVERSE: u32 = 1 << 3; // Inv
         const HIST_TRANSPOSE: u32 = 1 << 4; // Transpose
-        const HIST_INVARIANT: u32 = 1 << 5; // I1, I2, Tr, J2, J3, Det
+        const HIST_INVARIANT: u32 = 1 << 5; // I1, I2, Tr, J2, J3, Det, I4, I5, I6, I7
 
         let mut stack: Vec<PhysNode> = Vec::with_capacity(32);
 
@@ -244,6 +244,27 @@ impl Individual {
                                     } else { return true; }
                                     res_type = TensorType::Scalar;
                                     new_history |= HIST_INVARIANT;
+                                }
+                                // A match solid_op blokkban bővítsd ki a következőkkel:
+                               InvariantI4 | InvariantI5 | InvariantI6 | InvariantI7 => {
+                                    if (combined_history & HIST_INVARIANT) != 0 { return true; }
+                                    
+                                    // A children[0] a Mat3, a children[1] a Vec3
+                                    if let TensorType::Mat3(l, r) = children[0].ttype {
+                                        // Ezek a pszeudo-invariánsok csak referenciatérbeli (Anyagi) tenzorokon értelmezettek
+                                        if !spaces_match(l, Space::Material) || !spaces_match(r, Space::Material) {
+                                            return true;
+                                        }
+                                    } else { 
+                                        return true; 
+                                    }
+                                    
+                                    res_type = TensorType::Scalar;
+                                    new_history |= HIST_INVARIANT;
+                                }
+                                IdentityM3 => {
+                                    // Mivel nincs bemenete, egyből adhatjuk neki a teret
+                                    res_type = TensorType::Mat3(Space::Mixed, Space::Mixed);
                                 }
                             }
                         }

@@ -27,7 +27,8 @@ pub fn point_mutation(
     if target_arity == 0 {
         let valid_vars: Vec<_> = variables.iter().filter(|v| v.0 == target_type).collect();
         let is_var_valid = !valid_vars.is_empty();
-        let maybe_const = random_constant(target_type, disabled_constants, rng);
+        let is_solid = allowed_ops.iter().any(|op| matches!(op, Instruction::Solid(_)));
+        let maybe_const = random_constant(target_type, disabled_constants, is_solid, rng);
 
         match (is_var_valid, maybe_const) {
             (true, Some(c)) => {

@@ -157,12 +157,27 @@ impl Config {
         self
     }
 
-    /// 3. Feszültség-alakváltozás kapcsolat keresése
+    /// **Material Properties:**
+    /// Hyperelastic, incompressible (volume remains constant, $J = \det(F) = 1$), and isotropic (mechanical properties are identical in all directions).
     /// 
-    /// data_x: F vagy E (Mat3), data_y: sigma vagy P (Mat3)
-    /// target: pl. f(F)=sigma
-
-    // gumi, szilikon
+    /// **Typical Examples:**
+    /// Rubber, silicone, elastomers.
+    /// 
+    /// **Mapping Type:**
+    /// Typically $F \rightarrow P$ (Deformation Gradient to 1st Piola-Kirchhoff stress), though $F \rightarrow \sigma$ can also be used.
+    /// 
+    /// **Required Test Data:**
+    /// Uniaxial tension/compression, equibiaxial tension, or pure shear tests. 
+    /// **CRITICAL:** The experimental dataset MUST represent a strictly **homogeneous stress state**. This means data cannot be extracted from a random, complex geometry (like an engine block); it must come from standardized specimens where the measured zone undergoes uniform deformation.
+    /// 
+    /// **Excluded Operators:**
+    /// * `DetM3`, `DetM2`, `InvariantJ3M3`: Excluded because the material is incompressible, meaning the determinant of the deformation gradient is always 1, making these operations redundant[cite: 1, 2].
+    /// * `InvariantI4`, `InvariantI5`, `InvariantI6`, `InvariantI7`: Excluded because these are pseudo-invariants used to describe fiber directions in anisotropic materials. Since this material is isotropic, these are not needed.
+    /// *(Note: Vector operations and basic trigonometric functions like Sin/Cos are excluded globally to reduce the search space).*
+    /// 
+    /// **Evaluation:**
+    /// // TODO: `LossFunctionType::TensorMseMat3` is currently a placeholder here. 
+    /// // A specific loss function tailored to isotropic incompressible datasets (e.g., `UniaxialMse` or `EquibiaxialMse`) must be implemented and set here instead.
     pub fn solid_incompressible_isotropic() -> Self {
         let mut config = Self::default(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
         config.loss_type = LossFunctionType::TensorMseMat3;// TODO
@@ -187,22 +202,42 @@ impl Config {
             Instruction::Basic(BasicOpCode::SinF), Instruction::Basic(BasicOpCode::CosF),
             Instruction::Linalg(LinalgOpCode::DetM3), Instruction::Linalg(LinalgOpCode::DetM2),
             Instruction::Solid(SolidOpCode::InvariantJ3M3),
-            //Instruction::Solid(SolidOpCode::InvariantI4_M3),
-            //Instruction::Solid(SolidOpCode::InvariantI6_M3),
-            //Instruction::Solid(SolidOpCode::InvariantI5_M3),
-            //Instruction::Solid(SolidOpCode::InvariantI7_M3),
+            Instruction::Solid(SolidOpCode::InvariantI4),
+            Instruction::Solid(SolidOpCode::InvariantI6),
+            Instruction::Solid(SolidOpCode::InvariantI5),
+            Instruction::Solid(SolidOpCode::InvariantI7),
         ];
         config.excluded_ops = Self::add_vector_exclusions(exclusions);
         config
     }
 
-    // bilógiai szövetek
+    /// Configuration for Incompressible Anisotropic Materials
+    /// 
+    /// **Material Properties:**
+    /// Hyperelastic, practically incompressible (isochoric, $J = \det(F) = 1$), and mechanically anisotropic (highly direction-dependent due to internal fiber structures).
+    /// 
+    /// **Typical Examples:**
+    /// Biological soft tissues, such as the aorta, skin, or muscle tissue.
+    /// 
+    /// **Mapping Type:**
+    /// $F \rightarrow P$ (Deformation Gradient to 1st Piola-Kirchhoff stress).
+    /// 
+    /// **Required Test Data:**
+    /// Planar biaxial experimental datasets (e.g., stretching a cross-shaped tissue sample in two directions while measuring forces and stretches). 
+    /// **CRITICAL:** As with all solid configs, the dataset must capture a pure **homogeneous stress state** from a precisely controlled lab environment. Search terms like "Biaxial tensile test raw data soft tissue" are recommended.
+    /// 
+    /// **Excluded Operators:**
+    /// * `DetM3`, `DetM2`, `InvariantJ3M3`: Excluded because the material is volume-preserving (incompressible), making volumetric variables constant[cite: 1, 2].
+    /// *(Note: Unlike the isotropic config, invariant operators like I4 and I6 are KEPT here because they are essential for describing anisotropic fiber directions).*
+    /// 
+    /// **Evaluation:**
+    /// Evaluated using `LossFunctionType::PlanarBiaxialMse`, which is specifically implemented to handle multi-axial force and displacement data correctly.
     pub fn solid_incompressible_anisotropic() -> Self {
         let mut config = Self::default(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
         config.loss_type = LossFunctionType::PlanarBiaxialMse;
         config.target_type = ValueType::Mat3;
         config.disabled_constant_types = vec![
-            ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3, 
+             ValueType::Mat2, ValueType::Mat3, 
         ];
         config.base_parsimony_penalty = 0.00001;
         config.max_tree_size = 64;
@@ -230,7 +265,29 @@ impl Config {
         config
     }
 
-    // fémek
+    /// Configuration for Elastoplastic Metals
+    /// 
+    /// **Material Properties:**
+    /// Elastoplastic, exhibiting isochoric flow (volume is constant in the plastic region). The material can be treated as isotropic or plastically anisotropic.
+    /// 
+    /// **Typical Examples:**
+    /// Advanced High-Strength Steels (AHSS), aluminum, and structural metals.
+    /// 
+    /// **Mapping Type:**
+    /// $F \rightarrow \sigma$ (Deformation Gradient to Cauchy stress / True stress). 
+    /// For metals undergoing plastic yield, we MUST use the true Cauchy stress ($\sigma$) instead of $P$, because permanent plastic deformation depends on the current, instantaneous cross-section of the specimen, not the original one.
+    /// 
+    /// **Required Test Data:**
+    /// True stress - true strain flow curves, or Digital Image Correlation (DIC) uniaxial tensile test raw data. 
+    /// **CRITICAL:** The data must represent a **homogeneous stress state** (e.g., standard dog-bone specimens before necking occurs).
+    /// 
+    /// **Excluded Operators:**
+    /// * `ExpF`, `LnF`: Excluded because traditional metal plasticity (e.g., von Mises yield criterion, power-law hardening) typically relies on polynomial and fractional forms rather than exponentials.
+    /// * `IsochoricInvariant1`, `IsochoricInvariant2`, `InvariantI4`, `InvariantI6`, `CofactorM3`: Excluded because these specific hyperelastic invariants are generally unsuitable or overly complex for standard elastoplastic yield surfaces.
+    /// 
+    /// **Evaluation:**
+    /// // TODO: `LossFunctionType::TensorMseMat3` is currently a placeholder. 
+    /// // A specific loss function tailored to true stress-strain flow curves (e.g., `TrueStressUniaxialMse` or a `PlasticityMse`) must be implemented and set here instead.
     pub fn solid_elastoplastic_metals() -> Self {
         let mut config = Self::default(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
         config.loss_type = LossFunctionType::TensorMseMat3;//todo
@@ -250,8 +307,8 @@ impl Config {
             Instruction::Basic(BasicOpCode::LnF),
             Instruction::Solid(SolidOpCode::IsochoricInvariant1),
             Instruction::Solid(SolidOpCode::IsochoricInvariant2),
-            //Instruction::Solid(SolidOpCode::InvariantI4_M3),
-            //Instruction::Solid(SolidOpCode::InvariantI6_M3),
+            Instruction::Solid(SolidOpCode::InvariantI4),
+            Instruction::Solid(SolidOpCode::InvariantI6),
             Instruction::Solid(SolidOpCode::CofactorM3),
         ];
 
@@ -259,7 +316,27 @@ impl Config {
         config
     }
 
-    // habok, szivacsok
+    /// Configuration for Compressible Isotropic Materials
+    /// 
+    /// **Material Properties:**
+    /// Hyperelastic/Elastic, strongly compressible (volume changes drastically under load, $J \neq 1$), and isotropic (uniform properties in all directions).
+    /// 
+    /// **Typical Examples:**
+    /// Foams, sponges, and porous polymers.
+    /// 
+    /// **Mapping Type:**
+    /// $F \rightarrow P$ or $F \rightarrow \sigma$ (Deformation Gradient to Stress).
+    /// 
+    /// **Required Test Data:**
+    /// Volumetric/hydrostatic pressure tests, or uniaxial compression tests. 
+    /// **CRITICAL:** Standardized testing creating a **homogeneous stress state** is mandatory. In these tests, both vertical compression and lateral expansion MUST be measured simultaneously, because the material's volume changes.
+    /// 
+    /// **Excluded Operators:**
+    /// * `InvariantI4`, `InvariantI5`, `InvariantI6`, `InvariantI7`: Excluded because these are directional pseudo-invariants used exclusively for fiber-reinforced or anisotropic materials. They have no physical meaning in isotropic foams.
+    /// 
+    /// **Evaluation:**
+    /// // TODO: `LossFunctionType::TensorMseMat3` is currently a placeholder. 
+    /// // A specific loss function designed for compressible data (e.g., `HydrostaticPressureMse` or `CompressibleUniaxialMse`) must be implemented and set here instead.
     pub fn solid_compressible_isotropic() -> Self {
         let mut config = Self::default(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
         config.loss_type = LossFunctionType::TensorMseMat3;//todo
@@ -277,22 +354,42 @@ impl Config {
         let exclusions = vec![
             Instruction::Basic(BasicOpCode::SinF),
             Instruction::Basic(BasicOpCode::CosF),
-            //Instruction::Solid(SolidOpCode::InvariantI4_M3),
-            //Instruction::Solid(SolidOpCode::InvariantI6_M3),
-            //Instruction::Solid(SolidOpCode::InvariantI5_M3),
-            //Instruction::Solid(SolidOpCode::InvariantI7_M3),
+            Instruction::Solid(SolidOpCode::InvariantI4),
+            Instruction::Solid(SolidOpCode::InvariantI6),
+            Instruction::Solid(SolidOpCode::InvariantI5),
+            Instruction::Solid(SolidOpCode::InvariantI7),
         ];
 
         config.excluded_ops = Self::add_vector_exclusions(exclusions);
         config
     }
 
-    // 3d nyomtatott rácsok, metamateriálok
+    // Configuration for Compressible Anisotropic Materials
+    /// 
+    /// **Material Properties:**
+    /// Elastic/Hyperelastic, compressible (volume is not constant due to internal voids/air), and anisotropic (geometry heavily dictates direction-dependent stiffness).
+    /// 
+    /// **Typical Examples:**
+    /// Mechanical metamaterials, 3D printed lattices, cellular solids.
+    /// 
+    /// **Mapping Type:**
+    /// $F \rightarrow P$ (Deformation Gradient to macroscopic "homogenized" 1st Piola-Kirchhoff stress).
+    /// 
+    /// **Required Test Data:**
+    /// Uniaxial compression tests on cellular solids (e.g., pressing a precise metamaterial cube). 
+    /// **CRITICAL:** The test must guarantee a macroscopic **homogeneous stress state** across the lattice structure. Since the lattice is compressible, lateral expansion/buckling cannot be mathematically derived from vertical compression; it MUST be optically measured alongside the load.
+    /// 
+    /// **Excluded Operators:**
+    /// * `InvariantI5`, `InvariantI7`: Excluded to constrain the search space. While the material is anisotropic, keeping a reduced set of directional invariants (like I4 and I6) is usually sufficient to model lattice symmetries without overwhelming the genetic algorithm.
+    /// 
+    /// **Evaluation:**
+    /// // TODO: `LossFunctionType::TensorMseMat3` is currently a placeholder. 
+    /// // A specific loss function handling homogenized macroscopic stresses for cellular solids (e.g., `LatticeCompressionMse`) must be implemented and set here instead.
     pub fn solid_compressible_anisotropic() -> Self {
         let mut config = Self::default(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
         config.loss_type = LossFunctionType::TensorMseMat3;// TODO
         config.target_type = ValueType::Mat3;
-        config.disabled_constant_types = vec![ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3];
+        config.disabled_constant_types = vec![ ValueType::Mat2, ValueType::Mat3];
         
         config.base_parsimony_penalty = 0.00005;
         config.max_tree_size = 64;
@@ -305,8 +402,8 @@ impl Config {
         let exclusions = vec![
             Instruction::Basic(BasicOpCode::SinF),
             Instruction::Basic(BasicOpCode::CosF),            
-            //Instruction::Solid(SolidOpCode::InvariantI5_M3),
-            //Instruction::Solid(SolidOpCode::InvariantI7_M3),
+            Instruction::Solid(SolidOpCode::InvariantI5),
+            Instruction::Solid(SolidOpCode::InvariantI7),
         ];
 
         config.excluded_ops = Self::add_vector_exclusions(exclusions);
@@ -322,7 +419,7 @@ impl Config {
                 LinalgOpCode::NormV3, LinalgOpCode::CrossV3, LinalgOpCode::MulM2V2, LinalgOpCode::MulM3V3,
             ];
             for op in vector_ops { exclusions.push(Instruction::Linalg(op)); }
-            exclusions
-        }
+            exclusions        
+    }
 }
 

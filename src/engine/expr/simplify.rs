@@ -97,7 +97,9 @@ pub fn simplify_ast(
 
                 match action {
                     SimplifyAction::ReplaceWithConstant(val) => {
-                        output.truncate(args[0].start_idx);
+                        let start_idx = if arity > 0 { args[0].start_idx } else { output.len() };
+                        output.truncate(start_idx);
+                        
                         let new_idx = output_constants.len() as u16;
                         output_constants.push(val);
 
@@ -150,9 +152,15 @@ pub fn simplify_ast(
                                 _ => {}
                             }
                         }
+                        let start_idx = if arity > 0 {
+                            args[0].start_idx
+                        } else {
+                            output.len()
+                        };
+
                         output.push(node);
                         stack.push(ExprInfo {
-                            start_idx: args[0].start_idx,
+                            start_idx,
                             const_val: None,
                         });
                     }

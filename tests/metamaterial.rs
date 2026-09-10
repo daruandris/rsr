@@ -61,9 +61,6 @@ fn test_law_3_pig_sclera_biaxial() {
     println!(">>> Betöltve {} adatpont a Pig Sclera adathalmazból <<<", dx.len());
 
     let dataset = Dataset::new_mat3(&dx, &dy, vec![ValueType::Mat3]);
-    /*
-    TODO: I4, I6
-    */
     let mut config = Config::solid_incompressible_anisotropic();
    
     config.max_generations = 2000;
