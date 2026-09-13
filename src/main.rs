@@ -7,8 +7,6 @@ use rsr::engine::data::dataset::Dataset;
 use rsr::engine::data::schema::Schema;
 use rsr::prelude::*;
 
-mod feyman;
-
 fn main() {
     let mut rng = rand::rng();
     let num_samples = 400;
@@ -62,6 +60,4 @@ fn main() {
     println!("\nEquation found in {:.3} seconds!", duration.as_secs_f64());
     println!("Equation: {}", result.equation);
     println!("MSE:    {:.10}", result.mse);
-
-    feyman::test();
 }

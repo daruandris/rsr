@@ -51,7 +51,7 @@ fn load_mat3_csv(path: &str) -> (Vec<Vec<f32>>, Vec<[f32; 9]>) {
 
 #[test]
 fn test_law_3_pig_sclera_biaxial() {
-    let path = "test_data/biomechanical/1/pig 02_SR.csv";
+    let path = "test_data/solid/incompressible/anisotropic/CANN_biaxial_deli_meat/AC_animal_chicken_FP.csv";
     if !std::path::Path::new(path).exists() {
         println!("Fájl nem található: {}. Kérlek ellenőrizd az elérési utat!", path);
         return;
@@ -63,7 +63,7 @@ fn test_law_3_pig_sclera_biaxial() {
     let dataset = Dataset::new_mat3(&dx, &dy, vec![ValueType::Mat3]);
     let mut config = Config::solid_incompressible_anisotropic();
    
-    config.max_generations = 2000;
+    config.max_generations = 10000;
     config.loss_type = LossFunctionType::PlanarBiaxialMse;
 
     let regressor = SymbolicRegressor::new(config);
@@ -82,47 +82,6 @@ fn test_law_3_pig_sclera_biaxial() {
     common::update_history("Tensor_Pig_Sclera", result.clear_mse, time_ms);
     println!("clear MSE = {:.8}, Time = {}ms\nEquation: {}\n", result.clear_mse, time_ms, result.equation);
     let mut i: i32 = 1;
-    for pareto in result.pareto_front{
-        println!("{}clear MSE = {:.8}, Compl = {}ms\nEquation: {}\n",i, pareto.clear_mse, pareto.complexity, pareto.equation);
-        i += 1;
-    }
-}
-
-#[test]
-fn test_law_3_steel_x6cr17_uniaxial() {
-    let path = "test_data/metal/1/steel_X6Cr17_PLASTIC.csv";
-    if !std::path::Path::new(path).exists() {
-        println!("Fájl nem található: {}. Kérlek ellenőrizd az elérési utat!", path);
-        return;
-    }
-
-    let (dx, dy) = load_mat3_csv(path);
-    println!(">>> Betöltve {} adatpont a Steel X6Cr17 adathalmazból <<<", dx.len());
-
-    let dataset = Dataset::new_mat3(&dx, &dy, vec![ValueType::Mat3]);
-    
-    let mut config = Config::solid_elastoplastic_metals();
-   
-    config.max_generations = 5000;
-    config.base_target_mse = 1e-7;
-    config.base_parsimony_penalty = 0.0001;
-
-    let regressor = SymbolicRegressor::new(config);
-
-    println!(">>> RUNNING 3D Steel Plasticity Cauchy Stress Discovery <<<");
-    let start_time = std::time::Instant::now();
-    let result = regressor.fit(&dataset);
-    let time_ms = start_time.elapsed().as_millis() as u64;
-
-    result.plot_solid(&dataset, PlotConfig {
-        output_path: "metal.png".to_string(),
-        mode: SolidPlotMode::UniaxialTension,
-        max_points: 800,
-    }).expect("Nem sikerült a diagramot kimenteni!");
-    
-    common::update_history("Tensor_Steel_X6Cr17", result.mse, time_ms);
-    println!("MSE = {:.8}, Time = {}ms\nEquation: {}\n", result.mse, time_ms, result.equation);
-     let mut i: i32 = 1;
     for pareto in result.pareto_front{
         println!("{}clear MSE = {:.8}, Compl = {}ms\nEquation: {}\n",i, pareto.clear_mse, pareto.complexity, pareto.equation);
         i += 1;
