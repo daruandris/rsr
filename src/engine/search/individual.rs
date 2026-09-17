@@ -298,8 +298,8 @@ impl Individual {
                                         if !spaces_match(r1, l2) {
                                             return true; 
                                         }
-                                        let res_l = if l1 != Space::Mixed { l1 } else { Space::Mixed }; 
-                                        let res_r = if r2 != Space::Mixed { r2 } else { Space::Mixed }; 
+                                        let res_l = if l1 != Space::Mixed { l1 } else { l2 };
+                                        let res_r = if r2 != Space::Mixed { r2 } else { r1 };
                                         res_type = TensorType::Mat3(res_l, res_r);
                                     } else { res_type = TensorType::Mat3(Space::Mixed, Space::Mixed); }
                                 }
@@ -355,6 +355,16 @@ impl Individual {
                 }
             }
         }
+        if let Some(root) = stack.last() {
+            if let TensorType::Mat3(l, r) = root.ttype {
+                // Ha a bal oldal Material, vagy a jobb oldal Spatial, az fizikailag érvénytelen feszültség (P)!
+                // Ez azonnal kilövi a nyers C, B, vagy hibásan szorzott tenzorokat.
+                if l == Space::Material || r == Space::Spatial {
+                    return true; 
+                }
+            }
+        }
+
         false
     }
 

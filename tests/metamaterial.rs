@@ -51,7 +51,7 @@ fn load_mat3_csv(path: &str) -> (Vec<Vec<f32>>, Vec<[f32; 9]>) {
 
 #[test]
 fn test_law_3_pig_sclera_biaxial() {
-    let path = "test_data/solid/incompressible/anisotropic/CANN_biaxial_deli_meat/AC_animal_chicken_FP.csv";
+    let path = "test_data/solid/incompressible/isotropic/treloar/treloar_Isotropic_FP.csv";
     if !std::path::Path::new(path).exists() {
         println!("Fájl nem található: {}. Kérlek ellenőrizd az elérési utat!", path);
         return;
@@ -61,10 +61,10 @@ fn test_law_3_pig_sclera_biaxial() {
     println!(">>> Betöltve {} adatpont a Pig Sclera adathalmazból <<<", dx.len());
 
     let dataset = Dataset::new_mat3(&dx, &dy, vec![ValueType::Mat3]);
-    let mut config = Config::solid_incompressible_anisotropic();
+    let mut config = Config::solid_incompressible_isotropic(false);
    
-    config.max_generations = 10000;
-    config.loss_type = LossFunctionType::PlanarBiaxialMse;
+    config.max_generations = 2000;
+    config.loss_type = LossFunctionType::TensorMseMat3;
 
     let regressor = SymbolicRegressor::new(config);
 

@@ -185,8 +185,8 @@ impl Config {
         config.disabled_constant_types = vec![
             ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3, 
         ];
-        config.base_parsimony_penalty = 0.00001;
-        config.max_tree_size = 64;
+        config.base_parsimony_penalty = 0.000005;
+        config.max_tree_size = 64; //TODO to make it bigger than 32
         config.mutation_max_depth = 6;
         config.island_size = 1000;
         config.subset_size = Some(800);
@@ -243,8 +243,8 @@ impl Config {
         config.disabled_constant_types = vec![
              ValueType::Mat2, ValueType::Mat3,  
         ];
-        config.base_parsimony_penalty = 0.000005;
-        config.max_tree_size = 128;
+        config.base_parsimony_penalty = 0.00005;
+        config.max_tree_size = 128; //TODO to make it bigger than 32
         config.mutation_max_depth = 6;
         config.island_size = 1000;
         config.subset_size = Some(800);
@@ -265,6 +265,7 @@ impl Config {
             Instruction::Linalg(LinalgOpCode::DetM2),
             Instruction::Solid(SolidOpCode::InvariantJ3M3),
             Instruction::Solid(SolidOpCode::DeviatoricM3),
+            //Instruction::Solid(SolidOpCode::IdentityM3),
 
         ];
         
@@ -300,7 +301,7 @@ impl Config {
         config.disabled_constant_types = vec![ValueType::Vec2, ValueType::Vec3, ValueType::Mat2, ValueType::Mat3];
         
         config.base_parsimony_penalty = 0.00005;
-        config.max_tree_size = 56;
+         //config.max_tree_size = 64; TODO to make it bigger than 32
         config.mutation_max_depth = 5;
         config.island_size = 1000;
         config.stagnation_threshold = 400;
@@ -349,7 +350,7 @@ impl Config {
         config.disabled_constant_types = vec![ ValueType::Mat2, ValueType::Mat3];
         
         config.base_parsimony_penalty = 0.00005;
-        config.max_tree_size = 64;
+        //config.max_tree_size = 64; TODO to make it bigger than 32
         config.mutation_max_depth = 6;
         config.island_size = 1000;
         config.stagnation_threshold = 400;

@@ -80,6 +80,30 @@ pub fn simplify_ast(
                 let mut action =
                     crate::SymbolicEngine::try_simplify(op, &const_vals[..arity], args_equal);
 
+                //Identity-hez
+                if arity == 2 {
+                    let is_identity = |arg: &ExprInfo| -> bool {
+                        if arg.start_idx < output.len() && output.len() - arg.start_idx == 1 {
+                            if let Node::Operator(crate::Instruction::Solid(crate::domains::solid::SolidOpCode::IdentityM3)) = output[arg.start_idx] {
+                                return true;
+                            }
+                        }
+                        false
+                    };
+
+                    let a_is_id = is_identity(&args[0]);
+                    let b_is_id = is_identity(&args[1]);
+
+                    // I * M = M  illetve  M * I = M
+                    if let crate::Instruction::Linalg(crate::domains::linalg::LinalgOpCode::MulM3) = op {
+                        if a_is_id && !b_is_id {
+                            action = SimplifyAction::KeepArg(1);
+                        } else if b_is_id && !a_is_id {
+                            action = SimplifyAction::KeepArg(0);
+                        }
+                    }
+                }
+
                 if let SimplifyAction::ReplaceWithConstant(val) = action {
                     let target_type = match val {
                         Scalar::Float(_) => ValueType::Float,
