@@ -222,6 +222,7 @@ pub fn get_test_config(modules: Vec<OpModule>) -> Config {
         mini_batch_size: 64,
         disabled_constant_types: vec![],
         loss_type: rsr::engine::search::config::LossFunctionType::DirectMse,
-        target_type: ValueType::Float
+        target_type: ValueType::Float,
+        extract_scalars: true
     }
 }

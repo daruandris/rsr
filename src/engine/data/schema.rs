@@ -20,8 +20,10 @@ use crate::engine::eval::types::ValueType;
 /// ```
 #[derive(Clone, Debug)]
 pub struct Schema {
-    /// The types of the input features in order.
+    /// The types of the X features in order.
     pub feature_types: Vec<ValueType>,
+    /// The type of the Y feature
+    pub target_type: ValueType,
     /// The zero-based index of the target variable column. If `None`, defaults to the last column.
     pub target_col_index: Option<usize>,
     /// Whether to automatically standardize features and targets during dataset creation.
@@ -36,9 +38,15 @@ impl Schema {
     pub fn new(feature_types: Vec<ValueType>) -> Self {
         Self {
             feature_types,
+            target_type: ValueType::Float,
             target_col_index: None,
             normalize: false,
         }
+    }
+
+    pub fn with_target_type(mut self, target_type: ValueType) -> Self {
+        self.target_type = target_type;
+        self
     }
 
     /// Sets the specific column index that contains the target (Y) variable.

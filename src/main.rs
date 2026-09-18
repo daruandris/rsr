@@ -33,13 +33,17 @@ fn main() {
         let fy = e1 + cy;
         let fz: f32 = e2 + cz;
 
-        dy.push((fx * fx + fy * fy + fz * fz).sqrt());
+        // JAVÍTÁS: A skalár célváltozót is vektorba rakjuk
+        dy.push(vec![(fx * fx + fy * fy + fz * fz).sqrt()]);
     }
 
+    // JAVÍTÁS: Explicit megadjuk a célváltozó típusát
     let schema = Schema::new(vec![ValueType::Vec3, ValueType::Vec3, ValueType::Vec3])
-        .with_normalization(false);
+        .with_normalization(false)
+        .with_target_type(ValueType::Float);
 
     let dataset = Dataset::from_arrays(&dx, &dy, &schema);
+    
     let config = Config::default(vec![OpModule::Basic, OpModule::Linalg]).without_ops(vec![
         Instruction::Basic(BasicOpCode::SinF),
         Instruction::Basic(BasicOpCode::CosF),
@@ -51,7 +55,7 @@ fn main() {
 
     println!("Starting the algorithm...");
 
-    let regressor = SymbolicRegressor { config };
+    let regressor = SymbolicRegressor::new(config);
 
     let start_time = Instant::now();
     let result = regressor.fit(&dataset);

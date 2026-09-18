@@ -40,249 +40,112 @@ pub struct Dataset {
 impl Dataset {
     pub fn new(
         data_x: &[Vec<f32>],
-        data_y: &[f32],
-        feature_types: Vec<ValueType>,
-        normalize: bool,
+        data_y: &[Vec<f32>],
+        schema: &Schema,
     ) -> Self {
         let num_samples = data_x.len();
         let mut num_features_usize = 0;
 
-        for t in &feature_types {
+        for t in &schema.feature_types {
             num_features_usize += match t {
-                ValueType::Float => 1,
-                ValueType::Vec2 => 2,
-                ValueType::Vec3 => 3,
-                ValueType::Mat2 => 4,
-                ValueType::Mat3 => 9,
-                _ => 1,
+                ValueType::Float => 1, ValueType::Vec2 => 2, ValueType::Vec3 => 3,
+                ValueType::Mat2 => 4, ValueType::Mat3 => 9, _ => 1,
             };
-        }
-        let num_features = num_features_usize as u8;
-
-        let mut feature_means = vec![0.0; num_features_usize];
-        let mut feature_std_devs = vec![1.0; num_features_usize];
-        let mut target_mean = 0.0;
-        let mut target_std_dev = 1.0;
-
-        let target_sum: f32 = data_y.iter().sum();
-        let actual_target_mean = target_sum / num_samples as f32;
-        let mut target_variance: f32 = data_y
-            .iter()
-            .map(|&y| (y - actual_target_mean).powi(2))
-            .sum::<f32>()
-            / num_samples as f32;
-        if target_variance < 1e-9 {
-            target_variance = 1.0;
-        }
-
-        if normalize {
-            target_mean = actual_target_mean;
-            target_std_dev = target_variance.sqrt();
-
-            for f_idx in 0..num_features_usize {
-                let sum: f32 = data_x.iter().map(|row| row[f_idx]).sum();
-                let mean = sum / num_samples as f32;
-                feature_means[f_idx] = mean;
-
-                let variance: f32 = data_x
-                    .iter()
-                    .map(|row| (row[f_idx] - mean).powi(2))
-                    .sum::<f32>()
-                    / num_samples as f32;
-                feature_std_devs[f_idx] = if variance < 1e-9 {
-                    1.0
-                } else {
-                    variance.sqrt()
-                };
-            }
         }
 
         let simd_width = 8;
-        let remainder = num_samples % simd_width;
-        let padding = if remainder == 0 {
-            0
-        } else {
-            simd_width - remainder
-        };
-        let padded_size = num_samples + padding;
-        let num_batches = padded_size / simd_width;
+        let padding = if num_samples % simd_width == 0 { 0 } else { simd_width - (num_samples % simd_width) };
+        let num_batches = (num_samples + padding) / simd_width;
 
         let mut feature_flat = Vec::with_capacity(num_batches * num_features_usize);
-        let mut target_batches = Vec::with_capacity(num_batches);
+        let mut target_batches = Vec::new();
+        let mut target_mat2_batches = None;
+        let mut target_mat3_batches = None;
 
-        let get_norm_sample = |idx: usize, f_idx: usize| -> f32 {
-            if idx < num_samples {
-                let val = data_x[idx][f_idx];
-                (val - feature_means[f_idx]) / feature_std_devs[f_idx]
-            } else {
-                0.0
-            }
-        };
-
-        let get_norm_target = |idx: usize| -> f32 {
-            if idx < num_samples {
-                let val = data_y[idx];
-                (val - target_mean) / target_std_dev
-            } else {
-                0.0
-            }
-        };
-
+        // X Bemenetek SIMD feltöltése
         for i in 0..num_batches {
-            let start_idx = i * simd_width;
+            let start = i * simd_width;
             for f_idx in 0..num_features_usize {
-                let batch = f32x8::new([
-                    get_norm_sample(start_idx, f_idx),
-                    get_norm_sample(start_idx + 1, f_idx),
-                    get_norm_sample(start_idx + 2, f_idx),
-                    get_norm_sample(start_idx + 3, f_idx),
-                    get_norm_sample(start_idx + 4, f_idx),
-                    get_norm_sample(start_idx + 5, f_idx),
-                    get_norm_sample(start_idx + 6, f_idx),
-                    get_norm_sample(start_idx + 7, f_idx),
-                ]);
-                feature_flat.push(batch);
+                feature_flat.push(f32x8::new([
+                    if start < num_samples { data_x[start][f_idx] } else { 0.0 },
+                    if start+1 < num_samples { data_x[start+1][f_idx] } else { 0.0 },
+                    if start+2 < num_samples { data_x[start+2][f_idx] } else { 0.0 },
+                    if start+3 < num_samples { data_x[start+3][f_idx] } else { 0.0 },
+                    if start+4 < num_samples { data_x[start+4][f_idx] } else { 0.0 },
+                    if start+5 < num_samples { data_x[start+5][f_idx] } else { 0.0 },
+                    if start+6 < num_samples { data_x[start+6][f_idx] } else { 0.0 },
+                    if start+7 < num_samples { data_x[start+7][f_idx] } else { 0.0 },
+                ]));
             }
 
-            let target_batch = f32x8::new([
-                get_norm_target(start_idx),
-                get_norm_target(start_idx + 1),
-                get_norm_target(start_idx + 2),
-                get_norm_target(start_idx + 3),
-                get_norm_target(start_idx + 4),
-                get_norm_target(start_idx + 5),
-                get_norm_target(start_idx + 6),
-                get_norm_target(start_idx + 7),
-            ]);
-            target_batches.push(target_batch);
+            // Y Célváltozók SIMD feltöltése a típus alapján
+            match schema.target_type {
+                ValueType::Float => {
+                    target_batches.push(f32x8::new([
+                        if start < num_samples { data_y[start][0] } else { 0.0 },
+                        if start+1 < num_samples { data_y[start+1][0] } else { 0.0 },
+                        if start+2 < num_samples { data_y[start+2][0] } else { 0.0 },
+                        if start+3 < num_samples { data_y[start+3][0] } else { 0.0 },
+                        if start+4 < num_samples { data_y[start+4][0] } else { 0.0 },
+                        if start+5 < num_samples { data_y[start+5][0] } else { 0.0 },
+                        if start+6 < num_samples { data_y[start+6][0] } else { 0.0 },
+                        if start+7 < num_samples { data_y[start+7][0] } else { 0.0 },
+                    ]));
+                },
+                ValueType::Mat2 => {
+                    let mut batch_target = [f32x8::splat(0.0); 4];
+                    for dim in 0..4 {
+                        batch_target[dim] = f32x8::new([
+                            if start < num_samples { data_y[start][dim] } else { 0.0 },
+                            if start+1 < num_samples { data_y[start+1][dim] } else { 0.0 },
+                            if start+2 < num_samples { data_y[start+2][dim] } else { 0.0 },
+                            if start+3 < num_samples { data_y[start+3][dim] } else { 0.0 },
+                            if start+4 < num_samples { data_y[start+4][dim] } else { 0.0 },
+                            if start+5 < num_samples { data_y[start+5][dim] } else { 0.0 },
+                            if start+6 < num_samples { data_y[start+6][dim] } else { 0.0 },
+                            if start+7 < num_samples { data_y[start+7][dim] } else { 0.0 },
+                        ]);
+                    }
+                    if target_mat2_batches.is_none() { target_mat2_batches = Some(Vec::new()); }
+                    target_mat2_batches.as_mut().unwrap().push(batch_target);
+                },
+                ValueType::Mat3 => {
+                    let mut batch_target = [f32x8::splat(0.0); 9];
+                    for dim in 0..9 {
+                        batch_target[dim] = f32x8::new([
+                            if start < num_samples { data_y[start][dim] } else { 0.0 },
+                            if start+1 < num_samples { data_y[start+1][dim] } else { 0.0 },
+                            if start+2 < num_samples { data_y[start+2][dim] } else { 0.0 },
+                            if start+3 < num_samples { data_y[start+3][dim] } else { 0.0 },
+                            if start+4 < num_samples { data_y[start+4][dim] } else { 0.0 },
+                            if start+5 < num_samples { data_y[start+5][dim] } else { 0.0 },
+                            if start+6 < num_samples { data_y[start+6][dim] } else { 0.0 },
+                            if start+7 < num_samples { data_y[start+7][dim] } else { 0.0 },
+                        ]);
+                    }
+                    if target_mat3_batches.is_none() { target_mat3_batches = Some(Vec::new()); }
+                    target_mat3_batches.as_mut().unwrap().push(batch_target);
+                },
+                _ => {}
+            }
         }
 
         Self {
             feature_flat,
             target_batches,
-            target_mat2_batches: None,
-            target_mat3_batches: None,
-            num_features,
+            target_mat2_batches,
+            target_mat3_batches,
+            num_features: num_features_usize as u8,
             num_batches,
             num_samples,
-            feature_means,
-            feature_std_devs,
-            target_mean,
-            target_std_dev,
-            target_variance,
-            is_normalized: normalize,
-            feature_types,
-            extract_scalars: true
-        }
-    }
-
-    pub fn new_mat2(data_x: &[Vec<f32>], data_y: &[[f32; 4]], feature_types: Vec<ValueType>) -> Self {
-        let num_samples = data_x.len();
-        let mut num_features_usize = 0;
-        for t in &feature_types {
-            num_features_usize += match t {
-                ValueType::Float => 1, ValueType::Vec2 => 2, ValueType::Vec3 => 3,
-                ValueType::Mat2 => 4, ValueType::Mat3 => 9, _ => 1,
-            };
-        }
-        let simd_width = 8;
-        let padding = if num_samples % simd_width == 0 { 0 } else { simd_width - (num_samples % simd_width) };
-        let num_batches = (num_samples + padding) / simd_width;
-
-        let mut feature_flat = Vec::with_capacity(num_batches * num_features_usize);
-        let mut target_mat2_batches = Vec::with_capacity(num_batches);
-
-        for i in 0..num_batches {
-            let start = i * simd_width;
-            for f_idx in 0..num_features_usize {
-                feature_flat.push(f32x8::new([
-                    if start < num_samples { data_x[start][f_idx] } else { 0.0 },
-                    if start+1 < num_samples { data_x[start+1][f_idx] } else { 0.0 },
-                    if start+2 < num_samples { data_x[start+2][f_idx] } else { 0.0 },
-                    if start+3 < num_samples { data_x[start+3][f_idx] } else { 0.0 },
-                    if start+4 < num_samples { data_x[start+4][f_idx] } else { 0.0 },
-                    if start+5 < num_samples { data_x[start+5][f_idx] } else { 0.0 },
-                    if start+6 < num_samples { data_x[start+6][f_idx] } else { 0.0 },
-                    if start+7 < num_samples { data_x[start+7][f_idx] } else { 0.0 },
-                ]));
-            }
-            let mut batch_target = [f32x8::splat(0.0); 4];
-            for dim in 0..4 {
-                batch_target[dim] = f32x8::new([
-                    if start < num_samples { data_y[start][dim] } else { 0.0 },
-                    if start+1 < num_samples { data_y[start+1][dim] } else { 0.0 },
-                    if start+2 < num_samples { data_y[start+2][dim] } else { 0.0 },
-                    if start+3 < num_samples { data_y[start+3][dim] } else { 0.0 },
-                    if start+4 < num_samples { data_y[start+4][dim] } else { 0.0 },
-                    if start+5 < num_samples { data_y[start+5][dim] } else { 0.0 },
-                    if start+6 < num_samples { data_y[start+6][dim] } else { 0.0 },
-                    if start+7 < num_samples { data_y[start+7][dim] } else { 0.0 },
-                ]);
-            }
-            target_mat2_batches.push(batch_target);
-        }
-
-        Self {
-            feature_flat, target_batches: vec![], target_mat2_batches: Some(target_mat2_batches),
-            target_mat3_batches: None, num_features: num_features_usize as u8,
-            num_batches, num_samples, feature_means: vec![0.0; num_features_usize],
-            feature_std_devs: vec![1.0; num_features_usize], target_mean: 0.0, target_std_dev: 1.0,
-            target_variance: 1.0, is_normalized: false, feature_types, extract_scalars: false,
-        }
-    }
-
-    pub fn new_mat3(data_x: &[Vec<f32>], data_y: &[[f32; 9]], feature_types: Vec<ValueType>) -> Self {
-        let num_samples = data_x.len();
-        let mut num_features_usize = 0;
-        for t in &feature_types {
-            num_features_usize += match t {
-                ValueType::Float => 1, ValueType::Vec2 => 2, ValueType::Vec3 => 3,
-                ValueType::Mat2 => 4, ValueType::Mat3 => 9, _ => 1,
-            };
-        }
-        let simd_width = 8;
-        let padding = if num_samples % simd_width == 0 { 0 } else { simd_width - (num_samples % simd_width) };
-        let num_batches = (num_samples + padding) / simd_width;
-
-        let mut feature_flat = Vec::with_capacity(num_batches * num_features_usize);
-        let mut target_mat3_batches = Vec::with_capacity(num_batches);
-
-        for i in 0..num_batches {
-            let start = i * simd_width;
-            for f_idx in 0..num_features_usize {
-                feature_flat.push(f32x8::new([
-                    if start < num_samples { data_x[start][f_idx] } else { 0.0 },
-                    if start+1 < num_samples { data_x[start+1][f_idx] } else { 0.0 },
-                    if start+2 < num_samples { data_x[start+2][f_idx] } else { 0.0 },
-                    if start+3 < num_samples { data_x[start+3][f_idx] } else { 0.0 },
-                    if start+4 < num_samples { data_x[start+4][f_idx] } else { 0.0 },
-                    if start+5 < num_samples { data_x[start+5][f_idx] } else { 0.0 },
-                    if start+6 < num_samples { data_x[start+6][f_idx] } else { 0.0 },
-                    if start+7 < num_samples { data_x[start+7][f_idx] } else { 0.0 },
-                ]));
-            }
-            let mut batch_target = [f32x8::splat(0.0); 9];
-            for dim in 0..9 {
-                batch_target[dim] = f32x8::new([
-                    if start < num_samples { data_y[start][dim] } else { 0.0 },
-                    if start+1 < num_samples { data_y[start+1][dim] } else { 0.0 },
-                    if start+2 < num_samples { data_y[start+2][dim] } else { 0.0 },
-                    if start+3 < num_samples { data_y[start+3][dim] } else { 0.0 },
-                    if start+4 < num_samples { data_y[start+4][dim] } else { 0.0 },
-                    if start+5 < num_samples { data_y[start+5][dim] } else { 0.0 },
-                    if start+6 < num_samples { data_y[start+6][dim] } else { 0.0 },
-                    if start+7 < num_samples { data_y[start+7][dim] } else { 0.0 },
-                ]);
-            }
-            target_mat3_batches.push(batch_target);
-        }
-
-        Self {
-            feature_flat, target_batches: vec![], target_mat2_batches: None,
-            target_mat3_batches: Some(target_mat3_batches), num_features: num_features_usize as u8,
-            num_batches, num_samples, feature_means: vec![0.0; num_features_usize],
-            feature_std_devs: vec![1.0; num_features_usize], target_mean: 0.0, target_std_dev: 1.0,
-            target_variance: 1.0, is_normalized: false, feature_types, extract_scalars: false,
+            feature_means: vec![0.0; num_features_usize],
+            feature_std_devs: vec![1.0; num_features_usize],
+            target_mean: 0.0,
+            target_std_dev: 1.0,
+            target_variance: 1.0,
+            is_normalized: false,
+            feature_types: schema.feature_types.clone(),
+            extract_scalars: true,
         }
     }
 
@@ -351,13 +214,8 @@ impl Dataset {
     /// * `data_x` - A slice of vectors, where each vector is a row of input features.
     /// * `data_y` - A slice containing the target values for each row.
     /// * `schema` - The [`Schema`] defining data types and preprocessing rules.
-    pub fn from_arrays(data_x: &[Vec<f32>], data_y: &[f32], schema: &Schema) -> Self {
-        Self::new(
-            data_x,
-            data_y,
-            schema.feature_types.clone(),
-            schema.normalize,
-        )
+    pub fn from_arrays(data_x: &[Vec<f32>], data_y: &[Vec<f32>], schema: &Schema) -> Self {
+        Self::new(data_x, data_y, schema)
     }
 
     /// Loads a dataset from a JSON file based on the provided schema.
@@ -401,15 +259,10 @@ impl Dataset {
 
         for rec in records {
             data_x.push(rec.x);
-            data_y.push(rec.y);
+            data_y.push(vec![rec.y]);
         }
 
-        Ok(Self::new(
-            &data_x,
-            &data_y,
-            schema.feature_types.clone(),
-            schema.normalize,
-        ))
+        Ok(Self::new(&data_x, &data_y, schema))
     }
 
     /// Loads a dataset from a CSV file based on the provided schema.
@@ -420,63 +273,41 @@ impl Dataset {
     /// # Errors
     /// Returns an error if the file cannot be read, parsed, or if a row has missing columns.
     pub fn from_csv<P: AsRef<Path>>(path: P, schema: &Schema) -> Result<Self, Box<dyn Error>> {
-        let mut rdr = csv::ReaderBuilder::new()
-            .has_headers(true)
-            .from_path(path)?;
+        let mut rdr = csv::ReaderBuilder::new().has_headers(true).from_path(path)?;
 
-        let expected_floats: usize = schema
-            .feature_types
-            .iter()
-            .map(|t| match t {
-                ValueType::Float => 1,
-                ValueType::Vec2 => 2,
-                ValueType::Vec3 => 3,
-                ValueType::Mat2 => 4,
-                ValueType::Mat3 => 9,
-                _ => 1,
-            })
-            .sum();
+        let expected_floats: usize = schema.feature_types.iter().map(|t| match t {
+            ValueType::Vec2 => 2, ValueType::Vec3 => 3, ValueType::Mat2 => 4, ValueType::Mat3 => 9, _ => 1,
+        }).sum();
+
+        let target_dim = match schema.target_type {
+            ValueType::Vec2 => 2, ValueType::Vec3 => 3, ValueType::Mat2 => 4, ValueType::Mat3 => 9, _ => 1,
+        };
 
         let mut data_x = Vec::new();
         let mut data_y = Vec::new();
 
-        for (line_idx, result) in rdr.records().enumerate() {
+        for result in rdr.records() {
             let record = result?;
-            let target_idx = schema.target_col_index.unwrap_or(record.len() - 1);
+            let target_start = schema.target_col_index.unwrap_or(record.len() - target_dim);
 
-            if record.len() < expected_floats + 1 {
-                return Err(format!(
-                    "Error at line {}. : not enough column! Expected: {}, actual: {}",
-                    line_idx + 1,
-                    expected_floats + 1,
-                    record.len()
-                )
-                .into());
-            }
-
-            let y_val: f32 = record.get(target_idx).unwrap().parse()?;
             let mut x_row = Vec::with_capacity(expected_floats);
             let mut current_col = 0;
-
             for _ in 0..expected_floats {
-                if current_col == target_idx {
-                    current_col += 1;
-                }
-                let val: f32 = record.get(current_col).unwrap().parse()?;
-                x_row.push(val);
+                if current_col == target_start { current_col += target_dim; }
+                x_row.push(record.get(current_col).unwrap_or("0.0").parse()?);
                 current_col += 1;
             }
 
+            let mut y_row = Vec::with_capacity(target_dim);
+            for d in 0..target_dim {
+                y_row.push(record.get(target_start + d).unwrap_or("0.0").parse()?);
+            }
+
             data_x.push(x_row);
-            data_y.push(y_val);
+            data_y.push(y_row);
         }
 
-        Ok(Self::new(
-            &data_x,
-            &data_y,
-            schema.feature_types.clone(),
-            schema.normalize,
-        ))
+        Ok(Self::new(&data_x, &data_y, schema))
     }
 
     /// Get the subset of the data for better performance

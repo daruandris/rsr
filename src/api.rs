@@ -156,11 +156,12 @@ impl SymbolicRegressor {
         let strategy = StaticStrategy::new(self.config.clone(), full_dataset.target_variance);
         let allowed_ops = strategy.get_allowed_operators();
 
-        let train_data = if let Some(size) = self.config.subset_size {
+        let mut train_data = if let Some(size) = self.config.subset_size {
             full_dataset.subset(size)
         } else {
             full_dataset.clone()
         };
+        train_data.extract_scalars = self.config.extract_scalars;
 
         let mut engine = Engine::new(strategy, train_data.get_variable_registry(), allowed_ops);
         engine.run(&train_data);

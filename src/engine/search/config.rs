@@ -50,6 +50,7 @@ pub struct Config {
     pub disabled_constant_types: Vec<ValueType>,
     pub loss_type: LossFunctionType,
     pub target_type: ValueType,
+    pub extract_scalars: bool
 }
 
 impl Config {
@@ -82,6 +83,7 @@ impl Config {
             disabled_constant_types: vec![],
             loss_type: LossFunctionType::DirectMse,
             target_type: ValueType::Float,
+            extract_scalars: true,
         }
     }
 
@@ -197,6 +199,7 @@ impl Config {
         config.opt_prob = 0.05;
         config.num_islands = 16;
         config.base_target_mse = 0.00005;
+        config.extract_scalars = false;
 
        let mut exclusions = vec![
             Instruction::Basic(BasicOpCode::SinF), Instruction::Basic(BasicOpCode::CosF), Instruction::Basic(BasicOpCode::DivF),
@@ -255,6 +258,7 @@ impl Config {
         config.opt_prob = 0.05;
         config.num_islands = 16;
         config.base_target_mse = 1e-7;
+        config.extract_scalars = false;
 
         let exclusions = vec![
             Instruction::Basic(BasicOpCode::SinF),
@@ -307,6 +311,7 @@ impl Config {
         config.stagnation_threshold = 400;
         config.opt_iterations = 250;
         config.opt_prob = 0.05;
+        config.extract_scalars = false;
         
         let exclusions = vec![
             Instruction::Basic(BasicOpCode::SinF),
@@ -356,6 +361,7 @@ impl Config {
         config.stagnation_threshold = 400;
         config.opt_iterations = 250;
         config.opt_prob = 0.05;
+        config.extract_scalars = false;
         
         let exclusions = vec![
             Instruction::Basic(BasicOpCode::SinF),
