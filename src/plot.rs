@@ -11,6 +11,8 @@ pub enum SolidPlotMode {
     BiaxialTension,
     /// F12 vs P12 (1-es indexek)
     Shear,
+    /// Térfogatváltozás (J = det(F)) vs Hidrosztatikus nyomás (-Tr(P)/3)
+    Volumetric,
     /// Egyedi indexek: (X_komponens_F_ből, Y_komponens_P_ből). (0..8)
     Custom(usize, usize),
 }
@@ -27,27 +29,24 @@ impl FitResult {
     pub fn plot_solid(&self, dataset: &Dataset, config: PlotConfig) -> Result<(), Box<dyn std::error::Error>> {
         let program = self.program.as_ref().ok_or("Nincs lefordított program a FitResult-ban!")?;
 
-        // 1. Adathalmaz ritkítása a gyors és tiszta plotolásért
         let plot_data = dataset.subset(config.max_points);
         let plot_targets = plot_data.target_mat3_batches.as_ref().unwrap();
 
-        // 2. Indexek leképzése a választott mód alapján
         let (idx_x1, idx_y1, idx_x2, idx_y2) = match config.mode {
             SolidPlotMode::UniaxialTension => (0, 0, None, None),
             SolidPlotMode::Shear => (1, 1, None, None),
             SolidPlotMode::BiaxialTension => (0, 0, Some(4), Some(4)),
+            SolidPlotMode::Volumetric => (0, 0, None, None), // A loopon belül felülbíráljuk
             SolidPlotMode::Custom(x, y) => (x, y, None, None),
         };
 
         let mut x1_act = Vec::new(); let mut y1_act = Vec::new(); let mut y1_prd = Vec::new();
         let mut x2_act = Vec::new(); let mut y2_act = Vec::new(); let mut y2_prd = Vec::new();
 
-        // 3. Predikciók legenerálása és kinyerése a SIMD sávokból
         for i in 0..plot_data.num_batches {
             let start_f = i * (plot_data.num_features as usize);
             let features = &plot_data.feature_flat[start_f..start_f + (plot_data.num_features as usize)];
             
-            // SIMD kiértékelés (8 sor egyszerre)
             let pred_batch = eval_simd_mat3(program, features);
             let target_batch = plot_targets[i];
 
@@ -59,21 +58,39 @@ impl FitResult {
                     unsafe { (*(&simd_val as *const _ as *const [f32; 8]))[l] }
                 };
 
-                x1_act.push(extract(features[idx_x1], lane));
-                y1_act.push(extract(target_batch[idx_y1], lane));
-                y1_prd.push(extract(pred_batch[idx_y1], lane));
+                if let SolidPlotMode::Volumetric = config.mode {
+                    // Det(F) kiszámítása
+                    let f0 = extract(features[0], lane); let f1 = extract(features[1], lane); let f2 = extract(features[2], lane);
+                    let f3 = extract(features[3], lane); let f4 = extract(features[4], lane); let f5 = extract(features[5], lane);
+                    let f6 = extract(features[6], lane); let f7 = extract(features[7], lane); let f8 = extract(features[8], lane);
+                    
+                    let det_f = f0 * (f4 * f8 - f5 * f7) - f3 * (f1 * f8 - f2 * f7) + f6 * (f1 * f5 - f2 * f4);
+                    
+                    // Valós és Prediktált nyomás kiszámítása (-Tr(P)/3)
+                    let p0_act = extract(target_batch[0], lane); let p4_act = extract(target_batch[4], lane); let p8_act = extract(target_batch[8], lane);
+                    let press_act = -(p0_act + p4_act + p8_act) / 3.0;
 
-                if let (Some(x2), Some(y2)) = (idx_x2, idx_y2) {
-                    x2_act.push(extract(features[x2], lane));
-                    y2_act.push(extract(target_batch[y2], lane));
-                    y2_prd.push(extract(pred_batch[y2], lane));
+                    let p0_prd = extract(pred_batch[0], lane); let p4_prd = extract(pred_batch[4], lane); let p8_prd = extract(pred_batch[8], lane);
+                    let press_prd = -(p0_prd + p4_prd + p8_prd) / 3.0;
+
+                    x1_act.push(det_f);
+                    y1_act.push(press_act);
+                    y1_prd.push(press_prd);
+                } else {
+                    x1_act.push(extract(features[idx_x1], lane));
+                    y1_act.push(extract(target_batch[idx_y1], lane));
+                    y1_prd.push(extract(pred_batch[idx_y1], lane));
+
+                    if let (Some(x2), Some(y2)) = (idx_x2, idx_y2) {
+                        x2_act.push(extract(features[x2], lane));
+                        y2_act.push(extract(target_batch[y2], lane));
+                        y2_prd.push(extract(pred_batch[y2], lane));
+                    }
                 }
             }
         }
 
-        // 4. Diagram renderelése (Plotters)
         if idx_x2.is_some() {
-            // Biaxial mód: 2 diagram egymás mellett (1200x600 px)
             let root = BitMapBackend::new(&config.output_path, (1200, 600)).into_drawing_area();
             root.fill(&WHITE)?;
             let (left, right) = root.split_horizontally(600);
@@ -82,10 +99,13 @@ impl FitResult {
             draw_chart(&right, &x2_act, &y2_act, &y2_prd, "22 Komponens")?;
             root.present()?;
         } else {
-            // Single mód: 1 diagram (800x600 px)
             let root = BitMapBackend::new(&config.output_path, (800, 600)).into_drawing_area();
             root.fill(&WHITE)?;
-            draw_chart(&root, &x1_act, &y1_act, &y1_prd, "Feszültség - Alakváltozás")?;
+            let title = match config.mode {
+                SolidPlotMode::Volumetric => "Térfogat (J) - Hidrosztatikus Nyomás",
+                _ => "Feszültség - Alakváltozás",
+            };
+            draw_chart(&root, &x1_act, &y1_act, &y1_prd, title)?;
             root.present()?;
         }
 
