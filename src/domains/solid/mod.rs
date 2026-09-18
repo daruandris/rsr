@@ -22,7 +22,9 @@ pub enum SolidOpCode {
     InvariantI5,
     InvariantI6,
     InvariantI7,
-    IdentityM3
+    IdentityM3,
+    DispersedI4,
+    DispersedI5,
 }
 
 pub struct SolidDomain;
@@ -50,6 +52,8 @@ impl Domain for SolidDomain {
                 SolidOpCode::InvariantI5 | SolidOpCode::InvariantI7 => 
                     eval::eval_invariant_i5_i7(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3, &mut ctx.sp_v3, &ctx.stack_v3),
                 SolidOpCode::IdentityM3 => eval::eval_identity_m3(&mut ctx.sp_m3, &mut ctx.stack_m3),
+                SolidOpCode::DispersedI4 => eval::eval_dispersed_i4(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3, &mut ctx.sp_v3, &ctx.stack_v3),
+                SolidOpCode::DispersedI5 => eval::eval_dispersed_i5(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3, &mut ctx.sp_v3, &ctx.stack_v3),
             }
         }
     }
@@ -74,6 +78,8 @@ impl Domain for SolidDomain {
                 SolidOpCode::InvariantI5 | SolidOpCode::InvariantI7 => 
                     eval::eval_dual_invariant_i5_i7(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3, &mut ctx.sp_v3, &ctx.stack_v3),
                 SolidOpCode::IdentityM3 => eval::eval_dual_identity_m3(&mut ctx.sp_m3, &mut ctx.stack_m3),
+                SolidOpCode::DispersedI4 => eval::eval_dual_dispersed_i4(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3, &mut ctx.sp_v3, &ctx.stack_v3),
+                SolidOpCode::DispersedI5 => eval::eval_dual_dispersed_i5(&mut ctx.sp_f, &mut ctx.stack_f, &mut ctx.sp_m3, &ctx.stack_m3, &mut ctx.sp_v3, &ctx.stack_v3),
             }
         }
     }
@@ -253,7 +259,8 @@ impl Domain for SolidDomain {
                     return SimplifyAction::ReplaceWithConstant(Scalar::Float(j3));
                 }
                 SolidOpCode::InvariantI4 | SolidOpCode::InvariantI5 | 
-                SolidOpCode::InvariantI6 | SolidOpCode::InvariantI7 |SolidOpCode::IdentityM3 => {unreachable!()}
+                SolidOpCode::InvariantI6 | SolidOpCode::InvariantI7 |
+                SolidOpCode::IdentityM3 | SolidOpCode::DispersedI4 | SolidOpCode::DispersedI5 => {unreachable!()}
                 }
             }  
         }
@@ -283,6 +290,7 @@ impl Domain for SolidDomain {
 
     fn arity(op: Self::OpCode) -> usize {
         match op {
+            SolidOpCode::DispersedI4 | SolidOpCode::DispersedI5 => 3,
             SolidOpCode::InvariantI4 | SolidOpCode::InvariantI5 | SolidOpCode::InvariantI6 | SolidOpCode::InvariantI7 => 2,
             SolidOpCode::IdentityM3 => 0,
             _ => 1,
@@ -298,12 +306,15 @@ impl Domain for SolidDomain {
             | SolidOpCode::InvariantJ2M3
             | SolidOpCode::InvariantJ3M3 => ValueType::Float,
             SolidOpCode::InvariantI4 | SolidOpCode::InvariantI5 | SolidOpCode::InvariantI6 | SolidOpCode::InvariantI7 => ValueType::Float,
+            SolidOpCode::DispersedI4 | SolidOpCode::DispersedI5 => ValueType::Float,
             _ => ValueType::Mat3,
         }
     }
 
     fn expected_types(op: Self::OpCode) -> &'static [ValueType] {
         match op {
+            SolidOpCode::DispersedI4 | SolidOpCode::DispersedI5 => 
+                &[ValueType::Mat3, ValueType::Vec3, ValueType::Float],
             SolidOpCode::InvariantI4 | SolidOpCode::InvariantI5 | SolidOpCode::InvariantI6 | SolidOpCode::InvariantI7 => 
                 &[ValueType::Mat3, ValueType::Vec3],
             SolidOpCode::IdentityM3 => &[],
@@ -322,6 +333,8 @@ impl Domain for SolidDomain {
             SolidOpCode::IsochoricInvariant1 | SolidOpCode::IsochoricInvariant2 => 6,
             SolidOpCode::InvariantI4 | SolidOpCode::InvariantI6 => 4,
             SolidOpCode::InvariantI5 | SolidOpCode::InvariantI7 => 5,
+            SolidOpCode::DispersedI4 => 6, // Picit drágábbak a normál invariánsnál
+            SolidOpCode::DispersedI5 => 7,
         }
     }
 
@@ -352,6 +365,8 @@ impl Domain for SolidDomain {
                         | SolidOpCode::InvariantI5
                         | SolidOpCode::InvariantI6
                         | SolidOpCode::InvariantI7
+                        | SolidOpCode::DispersedI4
+                        | SolidOpCode::DispersedI5
                 )
             }
             SolidOpCode::Invariant2M3 => {
@@ -367,6 +382,8 @@ impl Domain for SolidDomain {
                         | SolidOpCode::InvariantI5
                         | SolidOpCode::InvariantI6
                         | SolidOpCode::InvariantI7
+                        | SolidOpCode::DispersedI4
+                        | SolidOpCode::DispersedI5
                 )
             }
             SolidOpCode::DeviatoricM3 => {
@@ -383,9 +400,12 @@ impl Domain for SolidDomain {
                         | SolidOpCode::InvariantI6
                         | SolidOpCode::InvariantI7
                         | SolidOpCode::IdentityM3
+                        | SolidOpCode::DispersedI4
+                        | SolidOpCode::DispersedI5
                 )
             }
-            SolidOpCode::InvariantI4 | SolidOpCode::InvariantI5 | SolidOpCode::InvariantI6 | SolidOpCode::InvariantI7 => {
+            SolidOpCode::InvariantI4 | SolidOpCode::InvariantI5 | SolidOpCode::InvariantI6 | SolidOpCode::InvariantI7 | SolidOpCode::DispersedI4
+            | SolidOpCode::DispersedI5 => {
                 matches!(child, SolidOpCode::LeftCauchyGreenM3 | SolidOpCode::DeviatoricM3)
             }
             SolidOpCode::TraceSqrM3 => false,
@@ -410,7 +430,25 @@ impl Domain for SolidDomain {
             SolidOpCode::InvariantI5 => format!("I5({}, {})", args[0], args[1]),
             SolidOpCode::InvariantI6 => format!("I6({}, {})", args[0], args[1]),
             SolidOpCode::InvariantI7 => format!("I7({}, {})", args[0], args[1]),
-            SolidOpCode::IdentityM3 =>"I".to_string()
+            SolidOpCode::IdentityM3 =>"I".to_string(),
+            SolidOpCode::DispersedI4 => {
+                // Megpróbáljuk float-tá alakítani a p konstanst
+                if let Ok(p) = args[2].parse::<f32>() {
+                    let kappa = (p.sin() + 1.0) / 6.0;
+                    format!("I4*({}, {}, kappa={:.4})", args[0], args[1], kappa)
+                } else {
+                    // Ha valamiért nem konstans (hanem pl. egy változó), kiírjuk a képletet
+                    format!("I4*({}, {}, kappa=(sin({})+1)/6)", args[0], args[1], args[2])
+                }
+            }
+            SolidOpCode::DispersedI5 => {
+                if let Ok(p) = args[2].parse::<f32>() {
+                    let kappa = (p.sin() + 1.0) / 6.0;
+                    format!("I5*({}, {}, kappa={:.4})", args[0], args[1], kappa)
+                } else {
+                    format!("I5*({}, {}, kappa=(sin({})+1)/6)", args[0], args[1], args[2])
+                }
+            }
         }
     }
 }

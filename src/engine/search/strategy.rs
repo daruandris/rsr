@@ -213,6 +213,8 @@ impl Strategy for StaticStrategy {
                     Instruction::Solid(SolidOpCode::InvariantI6),
                     Instruction::Solid(SolidOpCode::InvariantI7),
                     Instruction::Solid(SolidOpCode::IdentityM3),
+                    Instruction::Solid(SolidOpCode::DispersedI4),
+                    Instruction::Solid(SolidOpCode::DispersedI5),
                 ]),
             }
         }

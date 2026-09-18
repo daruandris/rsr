@@ -306,6 +306,89 @@ pub unsafe fn eval_identity_m3(sp_m3: &mut usize, stack_m3: &mut [[f32x8; 9]; 32
     *sp_m3 += 1;
 }
 
+#[inline(always)]
+pub unsafe fn eval_dispersed_i4(
+    sp_f: &mut usize, stack_f: &mut [f32x8; 32],
+    sp_m3: &mut usize, stack_m3: &[[f32x8; 9]; 32],
+    sp_v3: &mut usize, stack_v3: &[[f32x8; 3]; 32]
+) {
+    *sp_m3 -= 1;
+    *sp_v3 -= 1;
+    // A Float verem mérete nem változik: 1-et kiveszünk (kappa), 1-et beteszünk (eredmény)
+    let idx_f = *sp_f - 1;
+
+    let c = *stack_m3.get_unchecked(*sp_m3);
+    let v = *stack_v3.get_unchecked(*sp_v3);
+    let p = *stack_f.get_unchecked(idx_f);
+    let one = f32x8::splat(1.0);
+    let six = f32x8::splat(6.0);
+    let kappa = (p.sin() + one) / six;
+
+    // I1 = tr(C)
+    let i1 = c[0] + c[4] + c[8];
+
+    // I4 = v * (C * v)
+    let cv_0 = c[0]*v[0] + c[1]*v[1] + c[2]*v[2];
+    let cv_1 = c[3]*v[0] + c[4]*v[1] + c[5]*v[2];
+    let cv_2 = c[6]*v[0] + c[7]*v[1] + c[8]*v[2];
+    let i4 = v[0]*cv_0 + v[1]*cv_1 + v[2]*cv_2;
+
+    // Smooth tension-compression switch (s = 20.0) a cikk alapján
+    let s = f32x8::splat(20.0);
+    let one = f32x8::splat(1.0);
+    let two = f32x8::splat(2.0);
+    let x = s * (i4 - one);
+    let i4_active = one + ((one + x.exp()).ln() - two.ln()) / s;
+
+    // I4* = kappa * I1 + (1 - 3*kappa) * I4_active
+    let three = f32x8::splat(3.0);
+    let disp_i4 = kappa * i1 + (one - three * kappa) * i4_active;
+
+    *stack_f.get_unchecked_mut(idx_f) = disp_i4;
+}
+
+#[inline(always)]
+pub unsafe fn eval_dispersed_i5(
+    sp_f: &mut usize, stack_f: &mut [f32x8; 32],
+    sp_m3: &mut usize, stack_m3: &[[f32x8; 9]; 32],
+    sp_v3: &mut usize, stack_v3: &[[f32x8; 3]; 32]
+) {
+    *sp_m3 -= 1;
+    *sp_v3 -= 1;
+    let idx_f = *sp_f - 1;
+
+    let c = *stack_m3.get_unchecked(*sp_m3);
+    let v = *stack_v3.get_unchecked(*sp_v3);
+    let p = *stack_f.get_unchecked(idx_f);
+    let one = f32x8::splat(1.0);
+    let six = f32x8::splat(6.0);
+    let kappa = (p.sin() + one) / six;
+
+    // tr(C^2)
+    let tr_c2 = c[0]*c[0] + c[1]*c[3] + c[2]*c[6] +
+                c[3]*c[1] + c[4]*c[4] + c[5]*c[7] +
+                c[6]*c[2] + c[7]*c[5] + c[8]*c[8];
+
+    // I5 = (C*v) * (C*v)
+    let cv_0 = c[0]*v[0] + c[1]*v[1] + c[2]*v[2];
+    let cv_1 = c[3]*v[0] + c[4]*v[1] + c[5]*v[2];
+    let cv_2 = c[6]*v[0] + c[7]*v[1] + c[8]*v[2];
+    let i5 = cv_0*cv_0 + cv_1*cv_1 + cv_2*cv_2;
+
+    // Smooth tension-compression switch (s = 20.0)
+    let s = f32x8::splat(20.0);
+    let one = f32x8::splat(1.0);
+    let two = f32x8::splat(2.0);
+    let x = s * (i5 - one);
+    let i5_active = one + ((one + x.exp()).ln() - two.ln()) / s;
+
+    // I5* = kappa * tr(C^2) + (1 - 3*kappa) * I5_active
+    let three = f32x8::splat(3.0);
+    let disp_i5 = kappa * tr_c2 + (one - three * kappa) * i5_active;
+
+    *stack_f.get_unchecked_mut(idx_f) = disp_i5;
+}
+
 // =====================================================================
 // DUAL SIMD EVALUATION (Autodiff)
 // =====================================================================
@@ -626,4 +709,80 @@ pub unsafe fn eval_dual_identity_m3(sp_m3: &mut usize, stack_m3: &mut [[DualSimd
         zero, zero, one,
     ];
     *sp_m3 += 1;
+}
+
+#[inline(always)]
+pub unsafe fn eval_dual_dispersed_i4(
+    sp_f: &mut usize, stack_f: &mut [DualSimd; 32],
+    sp_m3: &mut usize, stack_m3: &[[DualSimd; 9]; 32],
+    sp_v3: &mut usize, stack_v3: &[[DualSimd; 3]; 32]
+) {
+    *sp_m3 -= 1;
+    *sp_v3 -= 1;
+    let idx_f = *sp_f - 1;
+
+    let c = *stack_m3.get_unchecked(*sp_m3);
+    let v = *stack_v3.get_unchecked(*sp_v3);
+    let p = *stack_f.get_unchecked(idx_f);
+    let one = DualSimd::constant(f32x8::splat(1.0));
+    let six = DualSimd::constant(f32x8::splat(6.0));
+    let kappa = (p.sin() + one) / six;
+
+    let i1 = c[0] + c[4] + c[8];
+
+    let cv_0 = c[0]*v[0] + c[1]*v[1] + c[2]*v[2];
+    let cv_1 = c[3]*v[0] + c[4]*v[1] + c[5]*v[2];
+    let cv_2 = c[6]*v[0] + c[7]*v[1] + c[8]*v[2];
+    let i4 = v[0]*cv_0 + v[1]*cv_1 + v[2]*cv_2;
+
+    let s = DualSimd::constant(f32x8::splat(20.0));
+    let one = DualSimd::constant(f32x8::splat(1.0));
+    let two = DualSimd::constant(f32x8::splat(2.0));
+    
+    let x = s * (i4 - one);
+    let i4_active = one + ((one + x.exp()).ln() - two.ln()) / s;
+
+    let three = DualSimd::constant(f32x8::splat(3.0));
+    let disp_i4 = kappa * i1 + (one - three * kappa) * i4_active;
+
+    *stack_f.get_unchecked_mut(idx_f) = disp_i4;
+}
+
+#[inline(always)]
+pub unsafe fn eval_dual_dispersed_i5(
+    sp_f: &mut usize, stack_f: &mut [DualSimd; 32],
+    sp_m3: &mut usize, stack_m3: &[[DualSimd; 9]; 32],
+    sp_v3: &mut usize, stack_v3: &[[DualSimd; 3]; 32]
+) {
+    *sp_m3 -= 1;
+    *sp_v3 -= 1;
+    let idx_f = *sp_f - 1;
+
+    let c = *stack_m3.get_unchecked(*sp_m3);
+    let v = *stack_v3.get_unchecked(*sp_v3);
+    let p = *stack_f.get_unchecked(idx_f);
+    let one = DualSimd::constant(f32x8::splat(1.0));
+    let six = DualSimd::constant(f32x8::splat(6.0));
+    let kappa = (p.sin() + one) / six;
+
+    let tr_c2 = c[0]*c[0] + c[1]*c[3] + c[2]*c[6] +
+                c[3]*c[1] + c[4]*c[4] + c[5]*c[7] +
+                c[6]*c[2] + c[7]*c[5] + c[8]*c[8];
+
+    let cv_0 = c[0]*v[0] + c[1]*v[1] + c[2]*v[2];
+    let cv_1 = c[3]*v[0] + c[4]*v[1] + c[5]*v[2];
+    let cv_2 = c[6]*v[0] + c[7]*v[1] + c[8]*v[2];
+    let i5 = cv_0*cv_0 + cv_1*cv_1 + cv_2*cv_2;
+
+    let s = DualSimd::constant(f32x8::splat(20.0));
+    let one = DualSimd::constant(f32x8::splat(1.0));
+    let two = DualSimd::constant(f32x8::splat(2.0));
+    
+    let x = s * (i5 - one);
+    let i5_active = one + ((one + x.exp()).ln() - two.ln()) / s;
+
+    let three = DualSimd::constant(f32x8::splat(3.0));
+    let disp_i5 = kappa * tr_c2 + (one - three * kappa) * i5_active;
+
+    *stack_f.get_unchecked_mut(idx_f) = disp_i5;
 }

@@ -15,7 +15,7 @@ fn run_solid_test(name: &str, config_fn: fn() -> Config, test_files: &[&str], pl
         println!(">>> RUNNING: {} - Fájl: {} <<<", name, path);
         let dataset = Dataset::from_csv(path, &schema).expect("Hibás CSV formátum");
         let mut config = config_fn();
-        config.max_generations = 4000;
+        config.max_generations = 2000;
         let regressor = SymbolicRegressor::new(config);
 
         let start_time = std::time::Instant::now();
@@ -61,14 +61,14 @@ fn test_solid_incompressible_isotropic() {
 }
 
 #[test]
-fn test_solid_incompressible_anisotropic() {
+fn test_solid_incompressible_anisotropic_dispersive() {
     let files = [
         "test_data/solid/incompressible/anisotropic/CANN_heart/HeartTissue_FP.csv",
         //"test_data/solid/incompressible/anisotropic/CANN_skin"
     ];
     run_solid_test(
         "Solid Incompressible Anisotropic", 
-        Config::solid_incompressible_anisotropic, 
+        Config::solid_incompressible_anisotropic_dispersive, 
         &files,
         SolidPlotMode::BiaxialTension // Biológiai szöveteknél a Biaxial a standard (2 tengelyes plot)
     );

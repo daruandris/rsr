@@ -251,7 +251,8 @@ impl Individual {
                                     new_history |= HIST_INVARIANT;
                                 }
                                 // A match solid_op blokkban bővítsd ki a következőkkel:
-                               InvariantI4 | InvariantI5 | InvariantI6 | InvariantI7 => {
+                               InvariantI4 | InvariantI5 | InvariantI6 | InvariantI7 |
+                               DispersedI4 | DispersedI5 => {
                                     if (combined_history & HIST_INVARIANT) != 0 { return true; }
                                     
                                     // A children[0] a Mat3, a children[1] a Vec3

@@ -209,6 +209,8 @@ impl Config {
             Instruction::Solid(SolidOpCode::InvariantI6),
             Instruction::Solid(SolidOpCode::InvariantI5),
             Instruction::Solid(SolidOpCode::InvariantI7),
+            Instruction::Solid(SolidOpCode::DispersedI4),
+            Instruction::Solid(SolidOpCode::DispersedI5),
         ];
 
         if !target_is_cauchy {
@@ -269,8 +271,54 @@ impl Config {
             Instruction::Linalg(LinalgOpCode::DetM2),
             Instruction::Solid(SolidOpCode::InvariantJ3M3),
             Instruction::Solid(SolidOpCode::DeviatoricM3),
-            //Instruction::Solid(SolidOpCode::IdentityM3),
+            Instruction::Solid(SolidOpCode::DispersedI4),
+            Instruction::Solid(SolidOpCode::DispersedI5),
 
+        ];
+        
+        config.excluded_ops = Self::add_vector_exclusions(exclusions);
+        config
+    }
+
+    /// Configuration for Incompressible Anisotropic Dispersive Materials
+    /// 
+    /// **Material Properties:**
+    /// Biological soft tissues with strong fiber dispersion (e.g., skin, heart myocardium).
+    /// Fibers are not perfectly aligned, but spread spherically/elliptically around a mean direction.
+    pub fn solid_incompressible_anisotropic_dispersive() -> Self {
+        let mut config = Self::default(vec![OpModule::Basic, OpModule::Linalg, OpModule::Solid]);
+        config.loss_type = LossFunctionType::TensorMseMat3;
+        config.target_type = ValueType::Mat3;
+        config.disabled_constant_types = vec![
+             ValueType::Mat2, ValueType::Mat3,  
+        ];
+        config.base_parsimony_penalty = 0.00005;
+        config.max_tree_size = 128;
+        config.mutation_max_depth = 6;
+        config.island_size = 1000;
+        config.subset_size = Some(800);
+        config.mini_batch_size = 128;
+        config.stagnation_threshold = 200;
+        config.tournament_size = 3;
+        config.opt_iterations = 250;
+        config.opt_prob = 0.05;
+        config.num_islands = 16;
+        config.base_target_mse = 1e-7;
+        config.extract_scalars = false;
+
+        let exclusions = vec![
+            Instruction::Basic(BasicOpCode::SinF),
+            Instruction::Basic(BasicOpCode::CosF),
+            Instruction::Basic(BasicOpCode::DivF),
+
+            Instruction::Linalg(LinalgOpCode::DetM3),
+            Instruction::Linalg(LinalgOpCode::DetM2),
+            Instruction::Solid(SolidOpCode::InvariantJ3M3),
+            Instruction::Solid(SolidOpCode::DeviatoricM3),
+            Instruction::Solid(SolidOpCode::InvariantI4),
+            Instruction::Solid(SolidOpCode::InvariantI5),
+            Instruction::Solid(SolidOpCode::InvariantI6),
+            Instruction::Solid(SolidOpCode::InvariantI7),
         ];
         
         config.excluded_ops = Self::add_vector_exclusions(exclusions);
@@ -321,6 +369,8 @@ impl Config {
             Instruction::Solid(SolidOpCode::InvariantI6),
             Instruction::Solid(SolidOpCode::InvariantI5),
             Instruction::Solid(SolidOpCode::InvariantI7),
+            Instruction::Solid(SolidOpCode::DispersedI4),
+            Instruction::Solid(SolidOpCode::DispersedI5),
         ];
 
         config.excluded_ops = Self::add_vector_exclusions(exclusions);
@@ -369,7 +419,9 @@ impl Config {
             Instruction::Basic(BasicOpCode::DivF),          
             Instruction::Solid(SolidOpCode::InvariantI5),
             Instruction::Solid(SolidOpCode::InvariantI7),
-             Instruction::Solid(SolidOpCode::DeviatoricM3),
+            Instruction::Solid(SolidOpCode::DeviatoricM3),
+            Instruction::Solid(SolidOpCode::DispersedI4),
+            Instruction::Solid(SolidOpCode::DispersedI5),
         ];
 
         config.excluded_ops = Self::add_vector_exclusions(exclusions);
